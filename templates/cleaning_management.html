@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+
+{% block title %}Cleaning Management - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-broom me-2"></i>Equipment Cleaning Management</h1>
+    </div>
+</div>
+
+{% if due_machines %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-warning">
+            <h5><i class="fas fa-exclamation-triangle me-2"></i>Machines Due for Cleaning</h5>
+            <p class="mb-2">The following machines require immediate cleaning:</p>
+            <ul class="mb-0">
+                {% for machine in due_machines %}
+                <li><strong>{{ machine.name }}</strong> ({{ machine.machine_type.replace('_', ' ').title() }}) - 
+                    {% if machine.last_cleaned %}
+                        Last cleaned: {{ machine.last_cleaned.strftime('%m/%d/%Y %H:%M') }}
+                    {% else %}
+                        Never cleaned
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Record Cleaning Activity</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="machine_id" class="form-label">Machine</label>
+                        <select class="form-select" id="machine_id" name="machine_id" required>
+                            <option value="">Select Machine</option>
+                            {% for machine in machines %}
+                            <option value="{{ machine.id }}" 
+                                    data-type="{{ machine.machine_type }}" 
+                                    data-frequency="{{ machine.cleaning_frequency_hours }}"
+                                    data-last-cleaned="{{ machine.last_cleaned.strftime('%Y-%m-%d %H:%M:%S') if machine.last_cleaned else '' }}">
+                                {{ machine.name }} ({{ machine.machine_type.replace('_', ' ').title() }})
+                                {% if machine.last_cleaned %}
+                                    - Last: {{ machine.last_cleaned.strftime('%m/%d %H:%M') }}
+                                {% else %}
+                                    - Never cleaned
+                                {% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="cleaned_by" class="form-label">Cleaned By</label>
+                        <input type="text" class="form-control" id="cleaned_by" name="cleaned_by" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="photo_before" class="form-label">Photo Before Cleaning</label>
+                                <input type="file" class="form-control" id="photo_before" name="photo_before" accept="image/*" required>
+                                <div class="form-text">Required: Photo showing dirty machine</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="photo_after" class="form-label">Photo After Cleaning</label>
+                                <input type="file" class="form-control" id="photo_after" name="photo_after" accept="image/*" required>
+                                <div class="form-text">Required: Photo showing clean machine</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="waste_collected" class="form-label">Waste Collected (kg)</label>
+                        <input type="number" step="0.1" class="form-control" id="waste_collected" name="waste_collected" min="0">
+                        <div class="form-text">Weight of waste materials collected during cleaning</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Cleaning Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                  placeholder="Any observations, issues, or special notes about the cleaning process..."></textarea>
+                    </div>
+                    
+                    <div id="machine-info" class="mb-3" style="display: none;">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Machine Information</h6>
+                                <div id="machine-details"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Record Cleaning
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Machine Status</h5>
+            </div>
+            <div class="card-body">
+                {% for machine in machines %}
+                <div class="card mb-3 border-{{ 'danger' if machine in due_machines else 'success' }}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="card-title mb-1">{{ machine.name }}</h6>
+                                <p class="card-text small text-muted mb-2">
+                                    {{ machine.machine_type.replace('_', ' ').title() }} - 
+                                    {{ machine.location or 'Location not set' }}
+                                </p>
+                            </div>
+                            <span class="badge bg-{{ 'danger' if machine in due_machines else 'success' }}">
+                                {% if machine in due_machines %}
+                                    Due for Cleaning
+                                {% else %}
+                                    Clean
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <small class="text-muted d-block">Frequency</small>
+                                <strong>{{ machine.cleaning_frequency_hours }}h</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Last Cleaned</small>
+                                <strong>
+                                    {% if machine.last_cleaned %}
+                                        {{ machine.last_cleaned.strftime('%m/%d %H:%M') }}
+                                    {% else %}
+                                        Never
+                                    {% endif %}
+                                </strong>
+                            </div>
+                        </div>
+                        
+                        {% if machine.last_cleaned %}
+                            {% set hours_since = ((now() - machine.last_cleaned).total_seconds() / 3600) | int %}
+                            {% set next_cleaning = machine.cleaning_frequency_hours - hours_since %}
+                            <div class="progress mt-2" style="height: 6px;">
+                                {% set progress = (hours_since / machine.cleaning_frequency_hours * 100) | min(100) %}
+                                <div class="progress-bar bg-{{ 'success' if progress < 80 else 'warning' if progress < 100 else 'danger' }}" 
+                                     style="width: {{ progress }}%"></div>
+                            </div>
+                            <small class="text-muted">
+                                {% if next_cleaning > 0 %}
+                                    Next cleaning in {{ next_cleaning }} hours
+                                {% else %}
+                                    Overdue by {{ -next_cleaning }} hours
+                                {% endif %}
+                            </small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Cleaning Logs</h5>
+            </div>
+            <div class="card-body">
+                {% if cleaning_logs %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Machine</th>
+                                    <th>Type</th>
+                                    <th>Cleaned By</th>
+                                    <th>Cleaning Time</th>
+                                    <th>Waste (kg)</th>
+                                    <th>Photos</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in cleaning_logs %}
+                                <tr>
+                                    <td><strong>{{ log.machine.name }}</strong></td>
+                                    <td>
+                                        <span class="badge bg-{{ 'primary' if log.machine.machine_type == 'drum_shield' else 'danger' if log.machine.machine_type == 'magnet' else 'warning' if log.machine.machine_type == 'separator' else 'info' }}">
+                                            {{ log.machine.machine_type.replace('_', ' ').title() }}
+                                        </span>
+                                    </td>
+                                    <td>{{ log.cleaned_by }}</td>
+                                    <td>{{ log.cleaning_time.strftime('%m/%d/%Y %H:%M') }}</td>
+                                    <td>{{ "%.1f"|format(log.waste_collected) if log.waste_collected else '-' }}</td>
+                                    <td>
+                                        {% if log.photo_before or log.photo_after %}
+                                            <div class="btn-group btn-group-sm">
+                                                {% if log.photo_before %}
+                                                    <a href="{{ url_for('uploaded_file', filename=log.photo_before) }}" 
+                                                       target="_blank" class="btn btn-outline-primary btn-sm">
+                                                        <i class="fas fa-image"></i> Before
+                                                    </a>
+                                                {% endif %}
+                                                {% if log.photo_after %}
+                                                    <a href="{{ url_for('uploaded_file', filename=log.photo_after) }}" 
+                                                       target="_blank" class="btn btn-outline-success btn-sm">
+                                                        <i class="fas fa-image"></i> After
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.notes %}
+                                            <span data-bs-toggle="tooltip" title="{{ log.notes }}">
+                                                {{ log.notes[:30] }}{{ '...' if log.notes|length > 30 else '' }}
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No cleaning logs recorded</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Cleaning Guidelines</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary">
+                            <i class="fas fa-shield-alt text-primary me-2"></i>Drum Shield
+                        </h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Removes plastic materials</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Collects cotton strings</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Filters thread (Dhaga)</li>
+                            <li><i class="fas fa-clock text-info me-2"></i>Clean every 3 hours</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-danger">
+                            <i class="fas fa-magnet text-danger me-2"></i>Magnet Machine
+                        </h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Removes metal particles</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Collects iron filings</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Safety critical cleaning</li>
+                            <li><i class="fas fa-clock text-info me-2"></i>Clean every 3 hours</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-warning">
+                            <i class="fas fa-filter text-warning me-2"></i>Separator
+                        </h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Removes stones</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Filters heavy debris</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Ensures purity</li>
+                            <li><i class="fas fa-clock text-info me-2"></i>Clean every 3 hours</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">Cleaning Procedure</h6>
+                        <ol class="list-unstyled">
+                            <li><i class="fas fa-camera text-info me-2"></i>1. Take "before" photo</li>
+                            <li><i class="fas fa-stop text-danger me-2"></i>2. Stop machine safely</li>
+                            <li><i class="fas fa-broom text-secondary me-2"></i>3. Clean thoroughly</li>
+                            <li><i class="fas fa-weight text-warning me-2"></i>4. Weigh collected waste</li>
+                            <li><i class="fas fa-camera text-success me-2"></i>5. Take "after" photo</li>
+                            <li><i class="fas fa-play text-success me-2"></i>6. Restart machine</li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-primary">Reminders</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-bell text-warning me-2"></i>10 minutes before due</li>
+                            <li><i class="fas fa-bell text-danger me-2"></i>5 minutes before due</li>
+                            <li><i class="fas fa-exclamation-triangle text-danger me-2"></i>When overdue</li>
+                            <li><i class="fas fa-calendar text-info me-2"></i>Daily summary reports</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Machine selection change handler
+    const machineSelect = document.getElementById('machine_id');
+    const machineInfo = document.getElementById('machine-info');
+    const machineDetails = document.getElementById('machine-details');
+
+    machineSelect.addEventListener('change', function() {
+        if (this.value) {
+            const option = this.options[this.selectedIndex];
+            const machineType = option.getAttribute('data-type');
+            const frequency = option.getAttribute('data-frequency');
+            const lastCleaned = option.getAttribute('data-last-cleaned');
+
+            let status = 'Never cleaned';
+            let nextDue = 'Overdue';
+            
+            if (lastCleaned) {
+                const lastCleanedDate = new Date(lastCleaned);
+                const now = new Date();
+                const hoursSince = (now - lastCleanedDate) / (1000 * 60 * 60);
+                const hoursUntilNext = frequency - hoursSince;
+                
+                status = `Last cleaned: ${lastCleanedDate.toLocaleDateString()} ${lastCleanedDate.toLocaleTimeString()}`;
+                
+                if (hoursUntilNext > 0) {
+                    nextDue = `Due in ${Math.ceil(hoursUntilNext)} hours`;
+                } else {
+                    nextDue = `Overdue by ${Math.ceil(-hoursUntilNext)} hours`;
+                }
+            }
+
+            let typeDescription = '';
+            switch(machineType) {
+                case 'drum_shield':
+                    typeDescription = 'Removes plastic, cotton string, and thread materials';
+                    break;
+                case 'magnet':
+                    typeDescription = 'Removes metal particles and iron filings';
+                    break;
+                case 'separator':
+                    typeDescription = 'Removes stones and heavy debris';
+                    break;
+                case 'grinding':
+                    typeDescription = 'Grinding machine for wheat processing';
+                    break;
+                default:
+                    typeDescription = 'Equipment cleaning';
+            }
+
+            machineDetails.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <small class="text-muted">Type:</small><br>
+                        <strong>${machineType.replace('_', ' ').toUpperCase()}</strong>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted">Frequency:</small><br>
+                        <strong>Every ${frequency} hours</strong>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <small class="text-muted">Description:</small><br>
+                        <span>${typeDescription}</span>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <small class="text-muted">Status:</small><br>
+                        <span>${status}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted">Next Due:</small><br>
+                        <span class="${hoursUntilNext < 0 ? 'text-danger' : 'text-success'}">${nextDue}</span>
+                    </div>
+                </div>
+            `;
+            
+            machineInfo.style.display = 'block';
+        } else {
+            machineInfo.style.display = 'none';
+        }
+    });
+
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // File input validation
+    const photoBeforeInput = document.getElementById('photo_before');
+    const photoAfterInput = document.getElementById('photo_after');
+
+    function validateFileInput(input) {
+        const file = input.files[0];
+        if (file) {
+            const maxSize = 5 * 1024 * 1024; // 5MB
+            if (file.size > maxSize) {
+                alert('File size must be less than 5MB');
+                input.value = '';
+                return false;
+            }
+            
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Only JPEG, PNG, and GIF images are allowed');
+                input.value = '';
+                return false;
+            }
+        }
+        return true;
+    }
+
+    photoBeforeInput.addEventListener('change', function() {
+        validateFileInput(this);
+    });
+
+    photoAfterInput.addEventListener('change', function() {
+        validateFileInput(this);
+    });
+});
+</script>
+{% endblock %}

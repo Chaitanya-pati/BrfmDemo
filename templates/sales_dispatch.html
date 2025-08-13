@@ -1,0 +1,530 @@
+{% extends "base.html" %}
+
+{% block title %}Sales & Dispatch - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-shipping-fast me-2"></i>Sales & Dispatch Management</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <ul class="nav nav-tabs" id="salesTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders" type="button" role="tab">
+                    <i class="fas fa-list me-2"></i>Sales Orders
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="dispatch-tab" data-bs-toggle="tab" data-bs-target="#dispatch" type="button" role="tab">
+                    <i class="fas fa-truck me-2"></i>Dispatch
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tracking-tab" data-bs-toggle="tab" data-bs-target="#tracking" type="button" role="tab">
+                    <i class="fas fa-map-marker-alt me-2"></i>Tracking
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="salesTabContent">
+            <!-- Sales Orders Tab -->
+            <div class="tab-pane fade show active" id="orders" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Create Sales Order</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <input type="hidden" name="action" value="create_order">
+                                    
+                                    <div class="mb-3">
+                                        <label for="customer_id" class="form-label">Customer</label>
+                                        <select class="form-select" id="customer_id" name="customer_id" required>
+                                            <option value="">Select Customer</option>
+                                            {% for customer in customers %}
+                                            <option value="{{ customer.id }}" 
+                                                    data-address="{{ customer.address }}"
+                                                    data-city="{{ customer.city }}" 
+                                                    data-state="{{ customer.state }}">
+                                                {{ customer.name }} - {{ customer.city }}, {{ customer.state }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="salesman" class="form-label">Salesman</label>
+                                        <input type="text" class="form-control" id="salesman" name="salesman" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="total_quantity" class="form-label">Total Quantity (tons)</label>
+                                        <input type="number" step="0.1" class="form-control" id="total_quantity" name="total_quantity" min="0.1" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="delivery_date" class="form-label">Delivery Date</label>
+                                        <input type="date" class="form-control" id="delivery_date" name="delivery_date" required>
+                                    </div>
+                                    
+                                    <div id="customer-details" class="mb-3" style="display: none;">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Customer Details</h6>
+                                                <div id="customer-info"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Create Order
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-list-alt me-2"></i>Pending & Partial Orders</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if sales_orders %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Order No.</th>
+                                                    <th>Customer</th>
+                                                    <th>Salesman</th>
+                                                    <th>Total Qty</th>
+                                                    <th>Delivered</th>
+                                                    <th>Pending</th>
+                                                    <th>Status</th>
+                                                    <th>Delivery Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for order in sales_orders %}
+                                                <tr>
+                                                    <td><strong>{{ order.order_number }}</strong></td>
+                                                    <td>{{ order.customer.name }}</td>
+                                                    <td>{{ order.salesman }}</td>
+                                                    <td>{{ "%.1f"|format(order.total_quantity) }} tons</td>
+                                                    <td>{{ "%.1f"|format(order.delivered_quantity) }} tons</td>
+                                                    <td>{{ "%.1f"|format(order.pending_quantity) }} tons</td>
+                                                    <td>
+                                                        <span class="badge bg-{{ 'warning' if order.status == 'pending' else 'info' if order.status == 'partial' else 'success' }}">
+                                                            {{ order.status.title() }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ order.delivery_date.strftime('%m/%d/%Y') if order.delivery_date else '-' }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No pending orders</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Dispatch Tab -->
+            <div class="tab-pane fade" id="dispatch" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-truck-loading me-2"></i>Create Dispatch</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" enctype="multipart/form-data">
+                                    <input type="hidden" name="action" value="dispatch">
+                                    
+                                    <div class="mb-3">
+                                        <label for="sales_order_id" class="form-label">Sales Order</label>
+                                        <select class="form-select" id="sales_order_id" name="sales_order_id" required>
+                                            <option value="">Select Order</option>
+                                            {% for order in sales_orders %}
+                                            <option value="{{ order.id }}" 
+                                                    data-pending="{{ order.pending_quantity }}"
+                                                    data-customer="{{ order.customer.name }}"
+                                                    data-address="{{ order.customer.address }}, {{ order.customer.city }}, {{ order.customer.state }}">
+                                                {{ order.order_number }} - {{ order.customer.name }} 
+                                                ({{ "%.1f"|format(order.pending_quantity) }} tons pending)
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="vehicle_id" class="form-label">Dispatch Vehicle</label>
+                                        <select class="form-select" id="vehicle_id" name="vehicle_id" required>
+                                            <option value="">Select Vehicle</option>
+                                            {% for vehicle in vehicles %}
+                                            <option value="{{ vehicle.id }}" 
+                                                    data-capacity="{{ vehicle.capacity }}"
+                                                    data-driver="{{ vehicle.driver_name }}"
+                                                    data-phone="{{ vehicle.driver_phone }}">
+                                                {{ vehicle.vehicle_number }} - {{ vehicle.driver_name or 'No driver assigned' }}
+                                                ({{ vehicle.state }}, {{ vehicle.city }})
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="quantity" class="form-label">Dispatch Quantity (tons)</label>
+                                        <input type="number" step="0.1" class="form-control" id="quantity" name="quantity" min="0.1" required>
+                                        <div class="form-text">Max available: <span id="max-quantity">0</span> tons</div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="loading_photo" class="form-label">Loading Photo</label>
+                                                <input type="file" class="form-control" id="loading_photo" name="loading_photo" accept="image/*" required>
+                                                <div class="form-text">Photo before loading</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="loaded_photo" class="form-label">Loaded Photo</label>
+                                                <input type="file" class="form-control" id="loaded_photo" name="loaded_photo" accept="image/*" required>
+                                                <div class="form-text">Photo after loading</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="dispatch-summary" class="mb-3" style="display: none;">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Dispatch Summary</h6>
+                                                <div id="dispatch-details"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-truck me-2"></i>Create Dispatch
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i>Available Vehicles</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if vehicles %}
+                                    <div class="row">
+                                        {% for vehicle in vehicles %}
+                                        <div class="col-md-6 mb-3">
+                                            <div class="card border-success">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">{{ vehicle.vehicle_number }}</h6>
+                                                    <p class="card-text small">
+                                                        <strong>Driver:</strong> {{ vehicle.driver_name or 'Not assigned' }}<br>
+                                                        <strong>Location:</strong> {{ vehicle.city }}, {{ vehicle.state }}<br>
+                                                        <strong>Capacity:</strong> {{ "%.1f"|format(vehicle.capacity) if vehicle.capacity else 'Not set' }} tons<br>
+                                                        <strong>Phone:</strong> {{ vehicle.driver_phone or 'Not available' }}
+                                                    </p>
+                                                    <span class="badge bg-success">Available</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No vehicles available for dispatch</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tracking Tab -->
+            <div class="tab-pane fade" id="tracking" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-route me-2"></i>Active Dispatches</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if dispatches %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Dispatch No.</th>
+                                                    <th>Sales Order</th>
+                                                    <th>Customer</th>
+                                                    <th>Vehicle</th>
+                                                    <th>Driver</th>
+                                                    <th>Quantity</th>
+                                                    <th>Dispatch Date</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for dispatch in dispatches %}
+                                                <tr>
+                                                    <td><strong>{{ dispatch.dispatch_number }}</strong></td>
+                                                    <td>{{ dispatch.sales_order.order_number }}</td>
+                                                    <td>{{ dispatch.sales_order.customer.name }}</td>
+                                                    <td>{{ dispatch.vehicle.vehicle_number }}</td>
+                                                    <td>{{ dispatch.vehicle.driver_name or '-' }}</td>
+                                                    <td>{{ "%.1f"|format(dispatch.quantity) }} tons</td>
+                                                    <td>{{ dispatch.dispatch_date.strftime('%m/%d/%Y %H:%M') }}</td>
+                                                    <td>
+                                                        <span class="badge bg-{{ 'warning' if dispatch.status == 'loaded' else 'primary' if dispatch.status == 'in_transit' else 'success' }}">
+                                                            {{ dispatch.status.replace('_', ' ').title() }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {% if dispatch.loading_photo or dispatch.loaded_photo %}
+                                                            <div class="btn-group btn-group-sm">
+                                                                {% if dispatch.loading_photo %}
+                                                                    <a href="{{ url_for('uploaded_file', filename=dispatch.loading_photo) }}" 
+                                                                       target="_blank" class="btn btn-outline-primary btn-sm">
+                                                                        <i class="fas fa-image"></i> Loading
+                                                                    </a>
+                                                                {% endif %}
+                                                                {% if dispatch.loaded_photo %}
+                                                                    <a href="{{ url_for('uploaded_file', filename=dispatch.loaded_photo) }}" 
+                                                                       target="_blank" class="btn btn-outline-success btn-sm">
+                                                                        <i class="fas fa-image"></i> Loaded
+                                                                    </a>
+                                                                {% endif %}
+                                                            </div>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No active dispatches</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Sales & Dispatch Guidelines</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Order Management</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Capture complete customer details</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Include state, city, postal code</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Assign salesman responsibility</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Set realistic delivery dates</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Partial Deliveries</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Support partial quantity dispatch</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Track remaining quantities</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Multiple dispatches per order</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Auto-update order status</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Vehicle Tracking</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Before/after loading photos</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Delivery proof required</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Driver accountability</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Block drivers without proof</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Customer selection handler
+    const customerSelect = document.getElementById('customer_id');
+    const customerDetails = document.getElementById('customer-details');
+    const customerInfo = document.getElementById('customer-info');
+
+    if (customerSelect) {
+        customerSelect.addEventListener('change', function() {
+            if (this.value) {
+                const option = this.options[this.selectedIndex];
+                const address = option.getAttribute('data-address');
+                const city = option.getAttribute('data-city');
+                const state = option.getAttribute('data-state');
+
+                customerInfo.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-12">
+                            <strong>Address:</strong><br>
+                            ${address || 'Not provided'}<br>
+                            ${city || ''}, ${state || ''}
+                        </div>
+                    </div>
+                `;
+                customerDetails.style.display = 'block';
+            } else {
+                customerDetails.style.display = 'none';
+            }
+        });
+    }
+
+    // Sales order selection handler for dispatch
+    const salesOrderSelect = document.getElementById('sales_order_id');
+    const maxQuantitySpan = document.getElementById('max-quantity');
+    const quantityInput = document.getElementById('quantity');
+    const dispatchSummary = document.getElementById('dispatch-summary');
+    const dispatchDetails = document.getElementById('dispatch-details');
+
+    if (salesOrderSelect) {
+        salesOrderSelect.addEventListener('change', function() {
+            if (this.value) {
+                const option = this.options[this.selectedIndex];
+                const pendingQty = parseFloat(option.getAttribute('data-pending'));
+                const customer = option.getAttribute('data-customer');
+                const address = option.getAttribute('data-address');
+
+                maxQuantitySpan.textContent = pendingQty.toFixed(1);
+                quantityInput.max = pendingQty;
+                quantityInput.value = '';
+
+                dispatchDetails.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Customer:</strong><br>
+                            ${customer}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Available Quantity:</strong><br>
+                            ${pendingQty.toFixed(1)} tons
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-12">
+                            <strong>Delivery Address:</strong><br>
+                            ${address}
+                        </div>
+                    </div>
+                `;
+                dispatchSummary.style.display = 'block';
+            } else {
+                dispatchSummary.style.display = 'none';
+                maxQuantitySpan.textContent = '0';
+            }
+        });
+    }
+
+    // Quantity validation
+    if (quantityInput) {
+        quantityInput.addEventListener('input', function() {
+            const maxQty = parseFloat(this.max) || 0;
+            const currentQty = parseFloat(this.value) || 0;
+
+            if (currentQty > maxQty) {
+                this.setCustomValidity(`Quantity cannot exceed ${maxQty} tons`);
+                this.classList.add('is-invalid');
+            } else {
+                this.setCustomValidity('');
+                this.classList.remove('is-invalid');
+            }
+        });
+    }
+
+    // Vehicle selection handler
+    const vehicleSelect = document.getElementById('vehicle_id');
+    if (vehicleSelect) {
+        vehicleSelect.addEventListener('change', function() {
+            if (this.value) {
+                const option = this.options[this.selectedIndex];
+                const capacity = option.getAttribute('data-capacity');
+                const driver = option.getAttribute('data-driver');
+                const phone = option.getAttribute('data-phone');
+
+                // Could show vehicle details if needed
+                console.log(`Selected vehicle capacity: ${capacity} tons, Driver: ${driver}, Phone: ${phone}`);
+            }
+        });
+    }
+
+    // Set minimum date for delivery date to today
+    const deliveryDateInput = document.getElementById('delivery_date');
+    if (deliveryDateInput) {
+        const today = new Date().toISOString().split('T')[0];
+        deliveryDateInput.min = today;
+    }
+
+    // File upload validation
+    function validateFileUpload(input) {
+        const file = input.files[0];
+        if (file) {
+            const maxSize = 5 * 1024 * 1024; // 5MB
+            if (file.size > maxSize) {
+                alert('File size must be less than 5MB');
+                input.value = '';
+                return false;
+            }
+            
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Only JPEG, PNG, and GIF images are allowed');
+                input.value = '';
+                return false;
+            }
+        }
+        return true;
+    }
+
+    const loadingPhotoInput = document.getElementById('loading_photo');
+    const loadedPhotoInput = document.getElementById('loaded_photo');
+
+    if (loadingPhotoInput) {
+        loadingPhotoInput.addEventListener('change', function() {
+            validateFileUpload(this);
+        });
+    }
+
+    if (loadedPhotoInput) {
+        loadedPhotoInput.addEventListener('change', function() {
+            validateFileUpload(this);
+        });
+    }
+});
+</script>
+{% endblock %}

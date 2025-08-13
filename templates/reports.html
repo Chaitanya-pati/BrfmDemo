@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-chart-bar me-2"></i>Reports & Analytics</h1>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-primary">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Vehicle Status</h6>
+                        <h4>{{ vehicle_stats|length }}</h4>
+                    </div>
+                    <i class="fas fa-truck fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-success">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Inventory</h6>
+                        <h4>{{ "%.1f"|format(godown_inventory|sum(attribute='current_stock')) }} kg</h4>
+                    </div>
+                    <i class="fas fa-warehouse fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-info">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Production Orders</h6>
+                        <h4>{{ production_stats|length }}</h4>
+                    </div>
+                    <i class="fas fa-cogs fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-warning">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Dispatches</h6>
+                        <h4>{{ dispatch_stats|length }}</h4>
+                    </div>
+                    <i class="fas fa-shipping-fast fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Vehicle Status Report</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="vehicleStatusChart" width="400" height="200"></canvas>
+                
+                <div class="table-responsive mt-3">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Count</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set total_vehicles = vehicle_stats|sum(attribute='count') %}
+                            {% for stat in vehicle_stats %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-{{ 'warning' if stat.status == 'pending' else 'info' if stat.status == 'quality_check' else 'success' if stat.status == 'approved' else 'danger' if stat.status == 'rejected' else 'secondary' }}">
+                                        {{ stat.status.title() }}
+                                    </span>
+                                </td>
+                                <td>{{ stat.count }}</td>
+                                <td>{{ "%.1f"|format((stat.count / total_vehicles * 100) if total_vehicles > 0 else 0) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Godown Inventory Report</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="inventoryChart" width="400" height="200"></canvas>
+                
+                <div class="table-responsive mt-3">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Godown</th>
+                                <th>Type</th>
+                                <th>Current Stock (kg)</th>
+                                <th>Capacity (kg)</th>
+                                <th>Utilization</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for godown in godown_inventory %}
+                            <tr>
+                                <td>{{ godown.name }}</td>
+                                <td>{{ godown.godown_type.name }}</td>
+                                <td>{{ "%.1f"|format(godown.current_stock) }}</td>
+                                <td>{{ "%.0f"|format(godown.capacity) }}</td>
+                                <td>
+                                    {% set utilization = (godown.current_stock / godown.capacity * 100) if godown.capacity > 0 else 0 %}
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-{{ 'success' if utilization < 80 else 'warning' if utilization < 100 else 'danger' }}" 
+                                             style="width: {{ utilization }}%">
+                                            {{ "%.1f"|format(utilization) }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Production Status Report</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="productionChart" width="400" height="200"></canvas>
+                
+                <div class="table-responsive mt-3">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Count</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set total_production = production_stats|sum(attribute='count') %}
+                            {% for stat in production_stats %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-{{ 'warning' if stat.status == 'pending' else 'info' if stat.status == 'planned' else 'primary' if stat.status == 'in_progress' else 'success' }}">
+                                        {{ stat.status.title() }}
+                                    </span>
+                                </td>
+                                <td>{{ stat.count }}</td>
+                                <td>{{ "%.1f"|format((stat.count / total_production * 100) if total_production > 0 else 0) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-shipping-fast me-2"></i>Dispatch Status Report</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="dispatchChart" width="400" height="200"></canvas>
+                
+                <div class="table-responsive mt-3">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Count</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set total_dispatch = dispatch_stats|sum(attribute='count') %}
+                            {% for stat in dispatch_stats %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-{{ 'warning' if stat.status == 'loaded' else 'primary' if stat.status == 'in_transit' else 'success' }}">
+                                        {{ stat.status.replace('_', ' ').title() }}
+                                    </span>
+                                </td>
+                                <td>{{ stat.count }}</td>
+                                <td>{{ "%.1f"|format((stat.count / total_dispatch * 100) if total_dispatch > 0 else 0) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Custom Reports</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="card border-primary">
+                            <div class="card-body text-center">
+                                <i class="fas fa-calendar-day text-primary fa-3x mb-3"></i>
+                                <h6>Date-wise Report</h6>
+                                <p class="small text-muted">Filter by specific date range</p>
+                                <button class="btn btn-outline-primary btn-sm" onclick="generateDateReport()">
+                                    Generate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card border-success">
+                            <div class="card-body text-center">
+                                <i class="fas fa-users text-success fa-3x mb-3"></i>
+                                <h6>Customer-wise Report</h6>
+                                <p class="small text-muted">Orders and deliveries by customer</p>
+                                <button class="btn btn-outline-success btn-sm" onclick="generateCustomerReport()">
+                                    Generate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card border-info">
+                            <div class="card-body text-center">
+                                <i class="fas fa-seedling text-info fa-3x mb-3"></i>
+                                <h6>Product-wise Report</h6>
+                                <p class="small text-muted">Production and sales by product</p>
+                                <button class="btn btn-outline-info btn-sm" onclick="generateProductReport()">
+                                    Generate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card border-warning">
+                            <div class="card-body text-center">
+                                <i class="fas fa-truck text-warning fa-3x mb-3"></i>
+                                <h6>Vehicle-wise Report</h6>
+                                <p class="small text-muted">Performance by vehicle and driver</p>
+                                <button class="btn btn-outline-warning btn-sm" onclick="generateVehicleReport()">
+                                    Generate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-secondary">
+                            <div class="card-body text-center">
+                                <i class="fas fa-user-tie text-secondary fa-3x mb-3"></i>
+                                <h6>Salesman Performance</h6>
+                                <p class="small text-muted">Orders brought by each salesman</p>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="generateSalesmanReport()">
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-dark">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clipboard-list text-dark fa-3x mb-3"></i>
+                                <h6>Order-wise Report</h6>
+                                <p class="small text-muted">Complete order lifecycle tracking</p>
+                                <button class="btn btn-outline-dark btn-sm" onclick="generateOrderReport()">
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-download me-2"></i>Export Options</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Export data in various formats for external analysis</p>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-primary" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel me-2"></i>Export to Excel
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="exportToPDF()">
+                        <i class="fas fa-file-pdf me-2"></i>Export to PDF
+                    </button>
+                    <button type="button" class="btn btn-outline-info" onclick="exportToCSV()">
+                        <i class="fas fa-file-csv me-2"></i>Export to CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Vehicle Status Chart
+    const vehicleCtx = document.getElementById('vehicleStatusChart').getContext('2d');
+    const vehicleData = {
+        labels: [
+            {% for stat in vehicle_stats %}
+            '{{ stat.status.title() }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for stat in vehicle_stats %}
+                {{ stat.count }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#FFC107', // Pending - Warning
+                '#17A2B8', // Quality Check - Info
+                '#28A745', // Approved - Success
+                '#DC3545', // Rejected - Danger
+                '#6C757D'  // Other - Secondary
+            ]
+        }]
+    };
+
+    new Chart(vehicleCtx, {
+        type: 'doughnut',
+        data: vehicleData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Inventory Chart
+    const inventoryCtx = document.getElementById('inventoryChart').getContext('2d');
+    const inventoryData = {
+        labels: [
+            {% for godown in godown_inventory %}
+            '{{ godown.name }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Current Stock (kg)',
+            data: [
+                {% for godown in godown_inventory %}
+                {{ godown.current_stock }},
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    };
+
+    new Chart(inventoryCtx, {
+        type: 'bar',
+        data: inventoryData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Stock (kg)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Production Chart
+    const productionCtx = document.getElementById('productionChart').getContext('2d');
+    const productionData = {
+        labels: [
+            {% for stat in production_stats %}
+            '{{ stat.status.title() }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for stat in production_stats %}
+                {{ stat.count }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#FFC107', // Pending - Warning
+                '#17A2B8', // Planned - Info
+                '#007BFF', // In Progress - Primary
+                '#28A745'  // Completed - Success
+            ]
+        }]
+    };
+
+    new Chart(productionCtx, {
+        type: 'pie',
+        data: productionData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Dispatch Chart
+    const dispatchCtx = document.getElementById('dispatchChart').getContext('2d');
+    const dispatchData = {
+        labels: [
+            {% for stat in dispatch_stats %}
+            '{{ stat.status.replace("_", " ").title() }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for stat in dispatch_stats %}
+                {{ stat.count }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#FFC107', // Loaded - Warning
+                '#007BFF', // In Transit - Primary
+                '#28A745'  // Delivered - Success
+            ]
+        }]
+    };
+
+    new Chart(dispatchCtx, {
+        type: 'doughnut',
+        data: dispatchData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+});
+
+// Report generation functions
+function generateDateReport() {
+    const startDate = prompt("Enter start date (YYYY-MM-DD):");
+    const endDate = prompt("Enter end date (YYYY-MM-DD):");
+    if (startDate && endDate) {
+        alert(`Generating date-wise report from ${startDate} to ${endDate}`);
+        // Implement actual report generation
+    }
+}
+
+function generateCustomerReport() {
+    alert("Generating customer-wise report...");
+    // Implement actual report generation
+}
+
+function generateProductReport() {
+    alert("Generating product-wise report...");
+    // Implement actual report generation
+}
+
+function generateVehicleReport() {
+    alert("Generating vehicle-wise report...");
+    // Implement actual report generation
+}
+
+function generateSalesmanReport() {
+    alert("Generating salesman performance report...");
+    // Implement actual report generation
+}
+
+function generateOrderReport() {
+    alert("Generating order-wise report...");
+    // Implement actual report generation
+}
+
+// Export functions
+function exportToExcel() {
+    alert("Exporting data to Excel format...");
+    // Implement actual Excel export
+}
+
+function exportToPDF() {
+    alert("Exporting data to PDF format...");
+    // Implement actual PDF export
+}
+
+function exportToCSV() {
+    alert("Exporting data to CSV format...");
+    // Implement actual CSV export
+}
+</script>
+{% endblock %}

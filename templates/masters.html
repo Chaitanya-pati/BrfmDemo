@@ -1,0 +1,831 @@
+{% extends "base.html" %}
+
+{% block title %}Master Data Management - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-database me-2"></i>Master Data Management</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <ul class="nav nav-tabs" id="masterTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="suppliers-tab" data-bs-toggle="tab" data-bs-target="#suppliers" type="button" role="tab">
+                    <i class="fas fa-truck me-2"></i>Suppliers
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="customers-tab" data-bs-toggle="tab" data-bs-target="#customers" type="button" role="tab">
+                    <i class="fas fa-users me-2"></i>Customers
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="godowns-tab" data-bs-toggle="tab" data-bs-target="#godowns" type="button" role="tab">
+                    <i class="fas fa-warehouse me-2"></i>Godowns
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="bins-tab" data-bs-toggle="tab" data-bs-target="#bins" type="button" role="tab">
+                    <i class="fas fa-filter me-2"></i>Pre-cleaning Bins
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="products-tab" data-bs-toggle="tab" data-bs-target="#products" type="button" role="tab">
+                    <i class="fas fa-seedling me-2"></i>Products
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="machines-tab" data-bs-toggle="tab" data-bs-target="#machines" type="button" role="tab">
+                    <i class="fas fa-cogs me-2"></i>Cleaning Machines
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="vehicles-tab" data-bs-toggle="tab" data-bs-target="#vehicles" type="button" role="tab">
+                    <i class="fas fa-shipping-fast me-2"></i>Dispatch Vehicles
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="masterTabContent">
+            <!-- Suppliers Tab -->
+            <div class="tab-pane fade show active" id="suppliers" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Supplier</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <input type="hidden" name="form_type" value="supplier">
+                                    
+                                    <div class="mb-3">
+                                        <label for="supplier_name" class="form-label">Supplier Name</label>
+                                        <input type="text" class="form-control" id="supplier_name" name="name" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="supplier_contact_person" class="form-label">Contact Person</label>
+                                        <input type="text" class="form-control" id="supplier_contact_person" name="contact_person">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="supplier_phone" class="form-label">Phone</label>
+                                        <input type="tel" class="form-control" id="supplier_phone" name="phone">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="supplier_address" class="form-label">Address</label>
+                                        <textarea class="form-control" id="supplier_address" name="address" rows="3"></textarea>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Supplier
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Existing Suppliers</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if suppliers %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Contact Person</th>
+                                                    <th>Phone</th>
+                                                    <th>Address</th>
+                                                    <th>Created</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for supplier in suppliers %}
+                                                <tr>
+                                                    <td><strong>{{ supplier.name }}</strong></td>
+                                                    <td>{{ supplier.contact_person or '-' }}</td>
+                                                    <td>{{ supplier.phone or '-' }}</td>
+                                                    <td>{{ supplier.address[:50] + '...' if supplier.address and supplier.address|length > 50 else supplier.address or '-' }}</td>
+                                                    <td>{{ supplier.created_at.strftime('%m/%d/%Y') }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No suppliers added yet</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Customers Tab -->
+            <div class="tab-pane fade" id="customers" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Customer</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <input type="hidden" name="form_type" value="customer">
+                                    
+                                    <div class="mb-3">
+                                        <label for="customer_name" class="form-label">Customer Name</label>
+                                        <input type="text" class="form-control" id="customer_name" name="name" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="customer_contact_person" class="form-label">Contact Person</label>
+                                        <input type="text" class="form-control" id="customer_contact_person" name="contact_person">
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="customer_phone" class="form-label">Phone</label>
+                                                <input type="tel" class="form-control" id="customer_phone" name="phone">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="customer_email" class="form-label">Email</label>
+                                                <input type="email" class="form-control" id="customer_email" name="email">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="customer_address" class="form-label">Address</label>
+                                        <textarea class="form-control" id="customer_address" name="address" rows="2"></textarea>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="customer_city" class="form-label">City</label>
+                                                <input type="text" class="form-control" id="customer_city" name="city">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="customer_state" class="form-label">State</label>
+                                                <input type="text" class="form-control" id="customer_state" name="state">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="customer_postal_code" class="form-label">Postal Code</label>
+                                                <input type="text" class="form-control" id="customer_postal_code" name="postal_code">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Customer
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Existing Customers</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if customers %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Contact Person</th>
+                                                    <th>Phone</th>
+                                                    <th>Location</th>
+                                                    <th>Email</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for customer in customers %}
+                                                <tr>
+                                                    <td><strong>{{ customer.name }}</strong></td>
+                                                    <td>{{ customer.contact_person or '-' }}</td>
+                                                    <td>{{ customer.phone or '-' }}</td>
+                                                    <td>{{ customer.city or '' }}{{ ', ' + customer.state if customer.city and customer.state else customer.state or '-' }}</td>
+                                                    <td>{{ customer.email or '-' }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No customers added yet</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Godowns Tab -->
+            <div class="tab-pane fade" id="godowns" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Godown</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <input type="hidden" name="form_type" value="godown">
+                                    
+                                    <div class="mb-3">
+                                        <label for="godown_name" class="form-label">Godown Name</label>
+                                        <input type="text" class="form-control" id="godown_name" name="name" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="godown_type_id" class="form-label">Godown Type</label>
+                                        <select class="form-select" id="godown_type_id" name="type_id" required>
+                                            <option value="">Select Type</option>
+                                            {% for type in godown_types %}
+                                            <option value="{{ type.id }}">{{ type.name }} - {{ type.description }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="godown_capacity" class="form-label">Capacity (kg)</label>
+                                        <input type="number" step="0.1" class="form-control" id="godown_capacity" name="capacity" min="0">
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Godown
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Existing Godowns</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if godowns %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Type</th>
+                                                    <th>Capacity (kg)</th>
+                                                    <th>Current Stock (kg)</th>
+                                                    <th>Utilization</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for godown in godowns %}
+                                                <tr>
+                                                    <td><strong>{{ godown.name }}</strong></td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">{{ godown.godown_type.name }}</span>
+                                                    </td>
+                                                    <td>{{ "%.0f"|format(godown.capacity) }}</td>
+                                                    <td>{{ "%.1f"|format(godown.current_stock) }}</td>
+                                                    <td>
+                                                        {% set utilization = (godown.current_stock / godown.capacity * 100) if godown.capacity > 0 else 0 %}
+                                                        <div class="progress" style="height: 15px;">
+                                                            <div class="progress-bar bg-{{ 'success' if utilization < 80 else 'warning' if utilization < 100 else 'danger' }}" 
+                                                                 style="width: {{ utilization }}%">
+                                                                {{ "%.1f"|format(utilization) }}%
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No godowns added yet</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pre-cleaning Bins Tab -->
+            <div class="tab-pane fade" id="bins" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Pre-cleaning Bin</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <input type="hidden" name="form_type" value="precleaning_bin">
+                                    
+                                    <div class="mb-3">
+                                        <label for="bin_name" class="form-label">Bin Name</label>
+                                        <input type="text" class="form-control" id="bin_name" name="name" required placeholder="e.g., Bin A, Bin B">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="bin_capacity" class="form-label">Capacity (tons)</label>
+                                        <input type="number" step="0.1" class="form-control" id="bin_capacity" name="capacity" min="0.1" required placeholder="e.g., 25, 65">
+                                    </div>
+                                    
+                                    <div class="alert alert-info">
+                                        <small>
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            Configure bins based on your facility's capacity (e.g., 4 bins of 25 tons, 2 bins of 65 tons)
+                                        </small>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Bin
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Existing Pre-cleaning Bins</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if precleaning_bins %}
+                                    <div class="row">
+                                        {% for bin in precleaning_bins %}
+                                        <div class="col-lg-6 mb-3">
+                                            <div class="card border-info">
+                                                <div class="card-header bg-info text-white">
+                                                    <h6 class="mb-0">{{ bin.name }}</h6>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div class="row">
+                                                        <div class="col-6">
+                                                            <small class="text-muted">Capacity</small>
+                                                            <div class="h6">{{ "%.1f"|format(bin.capacity) }} tons</div>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <small class="text-muted">Current Stock</small>
+                                                            <div class="h6 text-info">{{ "%.1f"|format(bin.current_stock) }} tons</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="progress mt-2">
+                                                        {% set utilization = (bin.current_stock / bin.capacity * 100) if bin.capacity > 0 else 0 %}
+                                                        <div class="progress-bar bg-info" style="width: {{ utilization }}%">
+                                                            {{ "%.1f"|format(utilization) }}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No pre-cleaning bins configured yet</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Products Tab -->
+            <div class="tab-pane fade" id="products" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Product</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <input type="hidden" name="form_type" value="product">
+                                    
+                                    <div class="mb-3">
+                                        <label for="product_name" class="form-label">Product Name</label>
+                                        <input type="text" class="form-control" id="product_name" name="name" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="product_category" class="form-label">Category</label>
+                                        <select class="form-select" id="product_category" name="category" required>
+                                            <option value="">Select Category</option>
+                                            <option value="Main Product">Main Product</option>
+                                            <option value="Bran">Bran</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="product_description" class="form-label">Description</label>
+                                        <textarea class="form-control" id="product_description" name="description" rows="3"></textarea>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Product
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Existing Products</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if products %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Category</th>
+                                                    <th>Description</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for product in products %}
+                                                <tr>
+                                                    <td><strong>{{ product.name }}</strong></td>
+                                                    <td>
+                                                        <span class="badge bg-{{ 'primary' if product.category == 'Main Product' else 'warning' }}">
+                                                            {{ product.category }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ product.description or '-' }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No products added yet</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Cleaning Machines Tab -->
+            <div class="tab-pane fade" id="machines" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Cleaning Machine</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <input type="hidden" name="form_type" value="cleaning_machine">
+                                    
+                                    <div class="mb-3">
+                                        <label for="machine_name" class="form-label">Machine Name</label>
+                                        <input type="text" class="form-control" id="machine_name" name="name" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="machine_type" class="form-label">Machine Type</label>
+                                        <select class="form-select" id="machine_type" name="machine_type" required>
+                                            <option value="">Select Type</option>
+                                            <option value="drum_shield">Drum Shield</option>
+                                            <option value="magnet">Magnet Machine</option>
+                                            <option value="separator">Separator</option>
+                                            <option value="grinding">Grinding Machine</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="cleaning_frequency_hours" class="form-label">Cleaning Frequency (hours)</label>
+                                        <select class="form-select" id="cleaning_frequency_hours" name="cleaning_frequency_hours">
+                                            <option value="1">Every 1 hour</option>
+                                            <option value="3" selected>Every 3 hours</option>
+                                            <option value="6">Every 6 hours</option>
+                                            <option value="8">Every 8 hours</option>
+                                            <option value="12">Every 12 hours</option>
+                                            <option value="24">Every 24 hours</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="machine_location" class="form-label">Location</label>
+                                        <input type="text" class="form-control" id="machine_location" name="location" placeholder="e.g., Pre-cleaning area, Production area">
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Machine
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Existing Cleaning Machines</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if cleaning_machines %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Type</th>
+                                                    <th>Frequency</th>
+                                                    <th>Location</th>
+                                                    <th>Last Cleaned</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for machine in cleaning_machines %}
+                                                <tr>
+                                                    <td><strong>{{ machine.name }}</strong></td>
+                                                    <td>
+                                                        <span class="badge bg-{{ 'primary' if machine.machine_type == 'drum_shield' else 'danger' if machine.machine_type == 'magnet' else 'warning' if machine.machine_type == 'separator' else 'info' }}">
+                                                            {{ machine.machine_type.replace('_', ' ').title() }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ machine.cleaning_frequency_hours }}h</td>
+                                                    <td>{{ machine.location or '-' }}</td>
+                                                    <td>
+                                                        {% if machine.last_cleaned %}
+                                                            {{ machine.last_cleaned.strftime('%m/%d/%Y %H:%M') }}
+                                                        {% else %}
+                                                            <span class="text-muted">Never</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No cleaning machines added yet</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Dispatch Vehicles Tab -->
+            <div class="tab-pane fade" id="vehicles" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Dispatch Vehicle</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <input type="hidden" name="form_type" value="dispatch_vehicle">
+                                    
+                                    <div class="mb-3">
+                                        <label for="vehicle_number" class="form-label">Vehicle Number</label>
+                                        <input type="text" class="form-control" id="vehicle_number" name="vehicle_number" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="driver_name" class="form-label">Driver Name</label>
+                                        <input type="text" class="form-control" id="driver_name" name="driver_name">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="driver_phone" class="form-label">Driver Phone</label>
+                                        <input type="tel" class="form-control" id="driver_phone" name="driver_phone">
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="vehicle_state" class="form-label">State</label>
+                                                <input type="text" class="form-control" id="vehicle_state" name="state">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="vehicle_city" class="form-label">City</label>
+                                                <input type="text" class="form-control" id="vehicle_city" name="city">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="vehicle_capacity" class="form-label">Capacity (tons)</label>
+                                        <input type="number" step="0.1" class="form-control" id="vehicle_capacity" name="capacity" min="0">
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Vehicle
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Existing Dispatch Vehicles</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if dispatch_vehicles %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Vehicle Number</th>
+                                                    <th>Driver</th>
+                                                    <th>Phone</th>
+                                                    <th>Location</th>
+                                                    <th>Capacity</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for vehicle in dispatch_vehicles %}
+                                                <tr>
+                                                    <td><strong>{{ vehicle.vehicle_number }}</strong></td>
+                                                    <td>{{ vehicle.driver_name or '-' }}</td>
+                                                    <td>{{ vehicle.driver_phone or '-' }}</td>
+                                                    <td>{{ vehicle.city or '' }}{{ ', ' + vehicle.state if vehicle.city and vehicle.state else vehicle.state or '-' }}</td>
+                                                    <td>{{ "%.1f"|format(vehicle.capacity) if vehicle.capacity else '-' }} tons</td>
+                                                    <td>
+                                                        <span class="badge bg-{{ 'success' if vehicle.status == 'available' else 'warning' if vehicle.status == 'dispatched' else 'danger' }}">
+                                                            {{ vehicle.status.title() }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">No dispatch vehicles added yet</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Master Data Guidelines</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Data Setup Order</h6>
+                        <ol class="list-unstyled">
+                            <li><i class="fas fa-arrow-right text-primary me-2"></i>1. Add suppliers for incoming wheat</li>
+                            <li><i class="fas fa-arrow-right text-primary me-2"></i>2. Configure godowns by type</li>
+                            <li><i class="fas fa-arrow-right text-primary me-2"></i>3. Set up pre-cleaning bins</li>
+                            <li><i class="fas fa-arrow-right text-primary me-2"></i>4. Add cleaning machines</li>
+                            <li><i class="fas fa-arrow-right text-primary me-2"></i>5. Define products to manufacture</li>
+                            <li><i class="fas fa-arrow-right text-primary me-2"></i>6. Add customers and dispatch vehicles</li>
+                        </ol>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Best Practices</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Keep supplier information updated</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Set realistic godown capacities</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Configure cleaning frequencies appropriately</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Include complete customer addresses</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Organize vehicles by state/city</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Data Integrity</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-shield-alt text-info me-2"></i>Validate phone numbers and emails</li>
+                            <li><i class="fas fa-shield-alt text-info me-2"></i>Use consistent naming conventions</li>
+                            <li><i class="fas fa-shield-alt text-info me-2"></i>Regular data cleanup and verification</li>
+                            <li><i class="fas fa-shield-alt text-info me-2"></i>Backup master data regularly</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation for required fields
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const requiredFields = form.querySelectorAll('input[required], select[required]');
+            let isValid = true;
+            
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+                alert('Please fill in all required fields');
+            }
+        });
+    });
+    
+    // Phone number validation
+    const phoneInputs = document.querySelectorAll('input[type="tel"]');
+    phoneInputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+            if (this.value && !phoneRegex.test(this.value.replace(/[\s\-\(\)]/g, ''))) {
+                this.classList.add('is-invalid');
+                this.title = 'Please enter a valid phone number';
+            } else {
+                this.classList.remove('is-invalid');
+                this.title = '';
+            }
+        });
+    });
+    
+    // Email validation
+    const emailInputs = document.querySelectorAll('input[type="email"]');
+    emailInputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (this.value && !emailRegex.test(this.value)) {
+                this.classList.add('is-invalid');
+                this.title = 'Please enter a valid email address';
+            } else {
+                this.classList.remove('is-invalid');
+                this.title = '';
+            }
+        });
+    });
+    
+    // Auto-clear forms after successful submission
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success')) {
+        // Clear all form inputs
+        forms.forEach(form => {
+            form.reset();
+        });
+    }
+    
+    // Tab persistence
+    const activeTab = localStorage.getItem('activeMasterTab');
+    if (activeTab) {
+        const tabButton = document.querySelector(`button[data-bs-target="${activeTab}"]`);
+        if (tabButton) {
+            const tab = new bootstrap.Tab(tabButton);
+            tab.show();
+        }
+    }
+    
+    // Save active tab
+    const tabButtons = document.querySelectorAll('#masterTabs button[data-bs-toggle="tab"]');
+    tabButtons.forEach(button => {
+        button.addEventListener('shown.bs.tab', function(e) {
+            localStorage.setItem('activeMasterTab', e.target.getAttribute('data-bs-target'));
+        });
+    });
+});
+</script>
+{% endblock %}

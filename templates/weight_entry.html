@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Weight Entry - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-weight me-2"></i>Weight Entry</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Weight Entry Form</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="vehicle_id" class="form-label">Approved Vehicle</label>
+                        <select class="form-select" id="vehicle_id" name="vehicle_id" required>
+                            <option value="">Select Approved Vehicle</option>
+                            {% for vehicle in vehicles %}
+                            <option value="{{ vehicle.id }}">
+                                {{ vehicle.vehicle_number }} - {{ vehicle.supplier.name }} ({{ vehicle.quality_category }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="net_weight_before" class="form-label">Net Weight Before Unloading (kg)</label>
+                                <input type="number" step="0.1" class="form-control" id="net_weight_before" name="net_weight_before" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="net_weight_after" class="form-label">Net Weight After Unloading (kg)</label>
+                                <input type="number" step="0.1" class="form-control" id="net_weight_after" name="net_weight_after" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="godown_id" class="form-label">Unloading Godown</label>
+                        <select class="form-select" id="godown_id" name="godown_id" required>
+                            <option value="">Select Godown</option>
+                            {% for godown in godowns %}
+                            <option value="{{ godown.id }}">
+                                {{ godown.name }} ({{ godown.godown_type.name }}) - Current: {{ "%.1f"|format(godown.current_stock) }} kg
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="vehicle_photo_after" class="form-label">Vehicle Photo After Unloading</label>
+                        <input type="file" class="form-control" id="vehicle_photo_after" name="vehicle_photo_after" accept="image/*">
+                        <div class="form-text">Capture vehicle photo after unloading</div>
+                    </div>
+                    
+                    <div class="mb-3 bg-light p-3 rounded">
+                        <h6 class="text-primary mb-2">Weight Calculation Preview</h6>
+                        <div id="weight-calculation">
+                            <p class="mb-0">Final Weight = Before Weight - After Weight</p>
+                            <p class="mb-0"><strong>Final Weight: <span id="final-weight">0.0</span> kg</strong></p>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Record Weight & Update Inventory
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Godown Status</h5>
+            </div>
+            <div class="card-body">
+                {% for godown in godowns %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>{{ godown.name }}</strong></span>
+                        <span class="badge bg-{{ 'success' if godown.current_stock < godown.capacity * 0.8 else 'warning' if godown.current_stock < godown.capacity else 'danger' }}">
+                            {{ "%.1f"|format(godown.current_stock) }} kg
+                        </span>
+                    </div>
+                    <div class="progress mt-1" style="height: 6px;">
+                        {% set utilization = (godown.current_stock / godown.capacity * 100) if godown.capacity > 0 else 0 %}
+                        <div class="progress-bar bg-{{ 'success' if utilization < 80 else 'warning' if utilization < 100 else 'danger' }}" 
+                             style="width: {{ utilization }}%"></div>
+                    </div>
+                    <small class="text-muted">{{ godown.godown_type.name }} - Capacity: {{ "%.0f"|format(godown.capacity) }} kg</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Weight Entry Guidelines</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>Only approved vehicles can be unloaded</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Record weights accurately before and after</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Select appropriate godown based on quality</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Take photo after unloading as evidence</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Inventory will be updated automatically</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Calculate final weight dynamically
+function calculateFinalWeight() {
+    const before = parseFloat(document.getElementById('net_weight_before').value) || 0;
+    const after = parseFloat(document.getElementById('net_weight_after').value) || 0;
+    const final = before - after;
+    document.getElementById('final-weight').textContent = final.toFixed(1);
+}
+
+document.getElementById('net_weight_before').addEventListener('input', calculateFinalWeight);
+document.getElementById('net_weight_after').addEventListener('input', calculateFinalWeight);
+</script>
+{% endblock %}

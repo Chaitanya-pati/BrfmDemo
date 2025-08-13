@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Godown Management - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-warehouse me-2"></i>Godown & Storage Management</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Godown Inventory</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Godown</th>
+                                <th>Type</th>
+                                <th>Current Stock</th>
+                                <th>Capacity</th>
+                                <th>Utilization</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for godown in godowns %}
+                            <tr>
+                                <td><strong>{{ godown.name }}</strong></td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ godown.godown_type.name }}</span>
+                                </td>
+                                <td>{{ "%.1f"|format(godown.current_stock) }} kg</td>
+                                <td>{{ "%.0f"|format(godown.capacity) }} kg</td>
+                                <td>
+                                    {% set utilization = (godown.current_stock / godown.capacity * 100) if godown.capacity > 0 else 0 %}
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-{{ 'success' if utilization < 80 else 'warning' if utilization < 100 else 'danger' }}" 
+                                             style="width: {{ utilization }}%">
+                                            {{ "%.1f"|format(utilization) }}%
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if utilization < 50 %}
+                                        <span class="badge bg-success">Available</span>
+                                    {% elif utilization < 80 %}
+                                        <span class="badge bg-warning">Medium</span>
+                                    {% elif utilization < 100 %}
+                                        <span class="badge bg-danger">High</span>
+                                    {% else %}
+                                        <span class="badge bg-dark">Full</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Storage Overview</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="storageChart" width="300" height="300"></canvas>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Pre-cleaning Bins</h5>
+            </div>
+            <div class="card-body">
+                {% for bin in precleaning_bins %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>{{ bin.name }}</strong></span>
+                        <span class="badge bg-info">{{ "%.1f"|format(bin.current_stock) }} kg</span>
+                    </div>
+                    <div class="progress mt-1" style="height: 6px;">
+                        {% set utilization = (bin.current_stock / bin.capacity * 100) if bin.capacity > 0 else 0 %}
+                        <div class="progress-bar bg-info" style="width: {{ utilization }}%"></div>
+                    </div>
+                    <small class="text-muted">Capacity: {{ "%.0f"|format(bin.capacity) }} kg</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Storage Guidelines</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Godown Types</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-star text-warning me-2"></i><strong>Mill:</strong> Standard quality wheat storage</li>
+                            <li><i class="fas fa-star-half text-warning me-2"></i><strong>Low Mill:</strong> Lower grade wheat storage</li>
+                            <li><i class="fas fa-star text-warning me-2"></i><strong>HD:</strong> High density premium wheat</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Capacity Management</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Monitor utilization levels</li>
+                            <li><i class="fas fa-exclamation text-warning me-2"></i>Alert at 80% capacity</li>
+                            <li><i class="fas fa-ban text-danger me-2"></i>Prevent overfilling</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Best Practices</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-thermometer-half text-info me-2"></i>Monitor temperature and humidity</li>
+                            <li><i class="fas fa-bug text-danger me-2"></i>Regular pest control</li>
+                            <li><i class="fas fa-broom text-secondary me-2"></i>Keep storage areas clean</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Storage overview chart
+const ctx = document.getElementById('storageChart').getContext('2d');
+const storageData = {
+    labels: [
+        {% for godown in godowns %}
+        '{{ godown.name }}',
+        {% endfor %}
+    ],
+    datasets: [{
+        data: [
+            {% for godown in godowns %}
+            {{ godown.current_stock }},
+            {% endfor %}
+        ],
+        backgroundColor: [
+            '#FF6384',
+            '#36A2EB',
+            '#FFCE56',
+            '#4BC0C0',
+            '#9966FF',
+            '#FF9F40'
+        ],
+        hoverBackgroundColor: [
+            '#FF6384',
+            '#36A2EB',
+            '#FFCE56',
+            '#4BC0C0',
+            '#9966FF',
+            '#FF9F40'
+        ]
+    }]
+};
+
+const storageChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: storageData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 10,
+                    font: {
+                        size: 11
+                    }
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.raw.toFixed(1);
+                        return label + ': ' + value + ' kg';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

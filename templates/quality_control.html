@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Quality Control - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-clipboard-check me-2"></i>Quality Control</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-flask me-2"></i>Quality Test Entry</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="vehicle_id" class="form-label">Vehicle</label>
+                        <select class="form-select" id="vehicle_id" name="vehicle_id" required>
+                            <option value="">Select Vehicle</option>
+                            {% for vehicle in vehicles %}
+                            <option value="{{ vehicle.id }}">
+                                {{ vehicle.vehicle_number }} - {{ vehicle.supplier.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sample_bags_tested" class="form-label">Sample Bags Tested</label>
+                                <input type="number" class="form-control" id="sample_bags_tested" name="sample_bags_tested" min="1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="total_bags" class="form-label">Total Bags</label>
+                                <input type="number" class="form-control" id="total_bags" name="total_bags" min="1" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="category_assigned" class="form-label">Category Assigned</label>
+                        <select class="form-select" id="category_assigned" name="category_assigned" required>
+                            <option value="">Select Category</option>
+                            <option value="Mill">Mill</option>
+                            <option value="Low Mill">Low Mill</option>
+                            <option value="HD">HD (High Density)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="moisture_content" class="form-label">Moisture Content (%)</label>
+                        <input type="number" step="0.1" class="form-control" id="moisture_content" name="moisture_content">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="lab_instructor" class="form-label">Lab Instructor</label>
+                        <input type="text" class="form-control" id="lab_instructor" name="lab_instructor" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="quality_notes" class="form-label">Quality Notes</label>
+                        <textarea class="form-control" id="quality_notes" name="quality_notes" rows="3"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Record Test
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Quality Test Results</h5>
+            </div>
+            <div class="card-body">
+                {% if quality_tests %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Vehicle</th>
+                                    <th>Category</th>
+                                    <th>Moisture %</th>
+                                    <th>Instructor</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for test in quality_tests %}
+                                <tr>
+                                    <td>{{ test.vehicle.vehicle_number }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ test.category_assigned }}</span>
+                                    </td>
+                                    <td>{{ test.moisture_content or '-' }}%</td>
+                                    <td>{{ test.lab_instructor }}</td>
+                                    <td>
+                                        {% if test.vehicle.status == 'quality_check' and not test.vehicle.owner_approved %}
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{{ url_for('approve_vehicle', vehicle_id=test.vehicle.id) }}" 
+                                                   class="btn btn-success btn-sm" onclick="return confirm('Approve vehicle for unloading?')">
+                                                    <i class="fas fa-check"></i> Approve
+                                                </a>
+                                                <a href="{{ url_for('reject_vehicle', vehicle_id=test.vehicle.id) }}" 
+                                                   class="btn btn-danger btn-sm" onclick="return confirm('Reject this vehicle?')">
+                                                    <i class="fas fa-times"></i> Reject
+                                                </a>
+                                            </div>
+                                        {% elif test.vehicle.owner_approved %}
+                                            <span class="badge bg-success">Approved</span>
+                                        {% elif test.vehicle.status == 'rejected' %}
+                                            <span class="badge bg-danger">Rejected</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No quality tests recorded</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Quality Control Guidelines</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Sample Testing</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Test 40-50 bags minimum</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Record moisture content</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Assign appropriate category</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Categories</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-star text-warning me-2"></i><strong>Mill:</strong> High quality wheat</li>
+                            <li><i class="fas fa-star-half text-warning me-2"></i><strong>Low Mill:</strong> Medium quality wheat</li>
+                            <li><i class="fas fa-star text-warning me-2"></i><strong>HD:</strong> High density premium wheat</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Approval Process</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-user-check text-info me-2"></i>Owner approval required</li>
+                            <li><i class="fas fa-truck-loading text-info me-2"></i>Approve for unloading</li>
+                            <li><i class="fas fa-ban text-danger me-2"></i>Reject if quality poor</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

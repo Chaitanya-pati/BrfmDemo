@@ -1,0 +1,10 @@
+# This file ensures the uploads directory is created and tracked by git
+# The uploads directory is needed for storing user-uploaded files like:
+# - Bill photos and documents
+# - Vehicle photos (before/after unloading)
+# - Evidence photos for transfers and processes
+# - Cleaning log photos (before/after cleaning)
+# - Loading and delivery proof photos
+
+# This directory should be writable by the web server
+# In production, consider using cloud storage services

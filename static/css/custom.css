@@ -1,0 +1,382 @@
+/**
+ * Custom CSS for Wheat Processing Management System
+ * Minimal custom styles following Bootstrap dark theme guidelines
+ */
+
+/* Use CSS variables for consistency with Bootstrap theme */
+:root {
+    --wp-primary: var(--bs-primary);
+    --wp-success: var(--bs-success);
+    --wp-warning: var(--bs-warning);
+    --wp-danger: var(--bs-danger);
+    --wp-info: var(--bs-info);
+    --wp-border-radius: 0.375rem;
+    --wp-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Custom loading spinner */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    width: 3rem;
+    height: 3rem;
+    color: var(--wp-primary);
+}
+
+/* Enhanced file upload preview */
+.file-preview {
+    padding: 0.75rem;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: var(--wp-border-radius);
+    text-align: center;
+}
+
+.file-preview img {
+    border-radius: var(--wp-border-radius);
+    box-shadow: var(--wp-shadow);
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.status-indicator.status-active {
+    background-color: var(--wp-success);
+    animation: pulse-green 2s infinite;
+}
+
+.status-indicator.status-warning {
+    background-color: var(--wp-warning);
+    animation: pulse-yellow 2s infinite;
+}
+
+.status-indicator.status-danger {
+    background-color: var(--wp-danger);
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(var(--bs-success-rgb), 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(var(--bs-success-rgb), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--bs-success-rgb), 0); }
+}
+
+@keyframes pulse-yellow {
+    0% { box-shadow: 0 0 0 0 rgba(var(--bs-warning-rgb), 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(var(--bs-warning-rgb), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--bs-warning-rgb), 0); }
+}
+
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(var(--bs-danger-rgb), 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(var(--bs-danger-rgb), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--bs-danger-rgb), 0); }
+}
+
+/* Enhanced progress bars */
+.progress-bar-animated {
+    animation: progress-bar-stripes 1s linear infinite;
+}
+
+/* Dashboard cards enhancement */
+.dashboard-card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Form enhancements */
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+    transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+}
+
+/* Enhanced table styles */
+.table-hover tbody tr:hover {
+    background-color: var(--bs-body-bg);
+    box-shadow: var(--wp-shadow);
+}
+
+/* Sticky table headers */
+.table-sticky-header thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--bs-dark);
+    z-index: 10;
+}
+
+/* Custom notification styles */
+.notification {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    max-width: 350px;
+    z-index: 1050;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Enhanced modal styles */
+.modal-header {
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .print-break {
+        page-break-after: always;
+    }
+    
+    .table {
+        font-size: 0.8rem;
+    }
+    
+    .navbar, .sidebar, .btn, .alert {
+        display: none !important;
+    }
+}
+
+/* Responsive enhancements */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn-group-vertical {
+        width: 100%;
+    }
+    
+    .card-columns {
+        column-count: 1;
+    }
+    
+    .dashboard-card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Accessibility enhancements */
+.sr-only-focusable:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+}
+
+/* Focus styles */
+.form-control:focus,
+.form-select:focus,
+.btn:focus {
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Enhanced button styles */
+.btn-outline-primary:hover,
+.btn-outline-success:hover,
+.btn-outline-warning:hover,
+.btn-outline-danger:hover,
+.btn-outline-info:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--wp-shadow);
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bs-body-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bs-border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--bs-secondary);
+}
+
+/* Enhanced card styles */
+.card {
+    box-shadow: var(--wp-shadow);
+    border: 1px solid var(--bs-border-color);
+}
+
+.card-header {
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+/* Enhanced navbar */
+.navbar-brand {
+    font-weight: 600;
+}
+
+.navbar-nav .nav-link {
+    font-weight: 500;
+    transition: color 0.2s ease-in-out;
+}
+
+.navbar-nav .nav-link:hover {
+    color: var(--wp-primary) !important;
+}
+
+/* Enhanced dropdowns */
+.dropdown-menu {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--bs-border-color);
+}
+
+.dropdown-item:hover {
+    background-color: var(--bs-secondary-bg);
+}
+
+/* Loading states */
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    animation: spin 1s ease infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Chart container */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Enhanced badges */
+.badge {
+    font-weight: 500;
+}
+
+/* Enhanced alerts */
+.alert {
+    border: 1px solid transparent;
+    box-shadow: var(--wp-shadow);
+}
+
+/* Utility classes */
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.border-dashed {
+    border-style: dashed !important;
+}
+
+.bg-pattern {
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.05) 2px,
+        rgba(255, 255, 255, 0.05) 4px
+    );
+}
+
+/* Form validation enhancements */
+.was-validated .form-control:valid,
+.was-validated .form-select:valid {
+    border-color: var(--wp-success);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='m2.3 6.73.8-.54-.76-1.19a.405.405 0 0 1 .06-.64l.86-.64a.38.38 0 0 1 .6.45l.74 1.84a.38.38 0 0 1-.07.43L2.3 6.73z'/%3e%3c/svg%3e");
+}
+
+.was-validated .form-control:invalid,
+.was-validated .form-select:invalid {
+    border-color: var(--wp-danger);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath d='m5.8 4.6 2.4 2.4M8.2 4.6l-2.4 2.4'/%3e%3c/svg%3e");
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .btn {
+        border-width: 2px;
+    }
+    
+    .card {
+        border-width: 2px;
+    }
+    
+    .alert {
+        border-width: 2px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
