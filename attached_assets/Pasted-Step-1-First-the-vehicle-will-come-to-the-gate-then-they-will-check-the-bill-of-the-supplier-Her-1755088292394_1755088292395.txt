@@ -1,0 +1,71 @@
+Step 1: First the vehicle  will come to the gate 
+then they will check the bill of the supplier Here We need to capture the bill in file upload/live capture give both option, Vehicle photos supplier name keep master for supplier and give dropdown for select, then arrival time and the vehicle photos live capturing before unloading/after unloading but only if the owner approves the vehicle that will come in next step 
+
+Step 2 : Before vehicle coming inside the gate the lab instructor will take the samples from the bags lets say for ex: from 40-50 bags and test the product after that they will get to know the category of the wheat consider (low mill,mill etc) then they will aks the owner about the confirmation of whether we should unload the wheat in the respective category or not once the owner confirms then the vehicle enter into the gate in this step they if the quality is not good they will call supplier for the quality claim and make entry of the quality claim if both the supplier and production manager are convinced then owner approves the to unload and the vehicle can come inside the gate Once this entry is made this details will be sent to the owner and once he approves then the vehicle will come inside 
+
+
+step 3: keep the entry of the net weight before unloading / after unloading by selecting he approved vehicle and here in the dropdown it should only display recent pending vehicles not all 
+
+Step 4: They will configure there godown type for ex they have 3 type mill,low mill and hd give master for this also and first they will select the unloading godown after that they will enter the weight so here we have update the inventory of the wheat 
+
+
+after that there is next process in that
+
+Step 1: they will configure pre cleaning like they have 6 bins 25 tons of 4 and 65 of 2 so give option to confiure this also, and in this process they will transfer the wheat from the godown to precleaning bin here give option like from which godown to which precleanig bin and how much amount, the moment he transfers then that amount quantity should be substracted from the selected godown and should be added to the precleaning bins here while transferring the wheat from godown to precleaning the waste is also collected from machines these machines are 
+1) Drum shield - Collects waste like plastic,cotton string,thread(Dhaga) etc
+2) Magnets machine - Collects waste like metal and other particles
+3) Separator - collects waste like stone
+these machines should be cleaned frequently so we have to capture the cleaning log also, lets say for every 3 hour they will clean the machines and uploads before cleaning and after cleaning photos and we should provide reminders before 10 minutes,5 mins to the respective users for cleaning and this 3 hours countdown should start once they start transfer from the godown to the precleaning bin.
+
+step 2: At the end of the day they will make entry of the total waste collected from each machine and this total weight we have to sybstract from the respective godown 
+
+
+till this step it was all inventory management and now the production will start 
+
+step 1 : the owner or production manager will create order for production in that he will mention the quantity and finished goods type and description 
+
+step 2 : the responsible person will be notified once the order is placed and after that he will make planning of how much percentage of wheat should be taken from which precleaning bin in percentage wise suppose there is order of 100tons then he will create plan like from a precleaning bin x amount should be taken , from b y amount etc the total quantity should be exactly 100% of the order quantity 
+
+In each process upload evidence photo may be selfie or image capture at the start of the process and at the end of the process 
+
+step 3 : after the planning is done the other user will start executing the transfer from different precleaning bins to 24 hours cleaning bin we want to keep track of job ids here like what jobs are done at what timing then how much time it has taken for completion we have to keep track of everything and all this should be linked to one order id the admin may search the order number they he should be able to see all the details from  order id creation to finished goods inventory once he start this transfer the timer should start this cleaning process generally takes 24 hours and but before starting this process give user a option for how much time duration the wheat will stay in this bins give 3 options 1)24, 2)12, 3)custom and based on this duration start the countdown and before this timer completed user should not access or enter further process details and after this process is completed capture the moisture the wheat and waste collected after 24 hours of cleaning with machine name here also keep the track water added to the bins 
+
+step 4: after this cleaning process the wheat will transfer to 12 hours cleaning process capture moisture once again here and then start the countdown for 12 hours for now give option to select the time duration for this also for testing purpose and also before starting this process they will mention the target moisture of wheat and after completion of this process again capture the outgoing moisture here also give reminders before process ending
+
+
+step 5 : after 12 hours cleaning process the wheat will move from the b1 scale to grinding and here we have to capture the machine cleaning logs
+here the frequency is more it should be cleaned every hour and the reminders should sent before 5  10 mins and here also they should upload before and after cleaning pics 
+ through this b1 scale the wheat will  move to the grinding process where they how much percentage of each products are required there are mainly 2 products 
+1) Main Products :Includes - Maida,Suji,Chakki Ata, Tandoori Ata,Dp Maida,Loto Maida , Nestle Maida etc which is configured 
+2) Bran : which comes automatically after the process this is basically the outer shield of the wheat
+the ratio of main products is 75-77 % for each production and rest 23 to 25 is bran if the bran is more than this then it should be highlighted
+
+Once this process is completed we have they will packed in bags or stored in the shallow so we need to capture how much of bags are packed of which weight i.e 30kg,50kg 25 kg etc, of which product and how much of finished good is stored in shallows for storing the finished goods also they have storage areas consider 4 storage for now so we need to capture in which storage area how much amount of products are there and they also shift the products from one area to another keep the track of that also shifting products between godown 
+
+
+
+
+Sales & Dispatch Stage 
+
+
+In Customer Address all the details should be captured like state,city ,address, post code and other required details 
+
+split the vehicle numbers details by state , city 
+
+While Dispatching, the product may deliver part wise suppose the order is of 100 bags and right now they have only 70-80 then even that can delivered and remaining should be kept in pending 
+
+while dispatching keep the vehment track of the vehicle (before loading and after loading)
+
+If the delivery proof is not uploaded by the driver or any other responsible person then he / she should be blocked until the admin unblocks them 
+
+capture all of these details in such a way that admin can see reports by all the parameters 
+it can be order wise, customer wise , which salesman has brought which order, and item wise , vehicle wise , driver wise, date wise etc
+
+
+
+
+
+
+
+
+
