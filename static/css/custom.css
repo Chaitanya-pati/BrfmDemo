@@ -5,16 +5,21 @@
 
 /* Enhanced CSS Variables */
 :root {
-    --wp-primary: var(--bs-primary);
-    --wp-success: var(--bs-success);
-    --wp-warning: var(--bs-warning);
-    --wp-danger: var(--bs-danger);
-    --wp-info: var(--bs-info);
+    --wp-primary: #0d6efd;
+    --wp-success: #198754;
+    --wp-warning: #ffc107;
+    --wp-danger: #dc3545;
+    --wp-info: #0dcaf0;
+    --wp-light: #f8f9fa;
+    --wp-dark: #212529;
     --wp-border-radius: 0.5rem;
-    --wp-shadow: 0 0.125rem 0.75rem rgba(0, 0, 0, 0.1);
-    --wp-shadow-lg: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+    --wp-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    --wp-shadow-lg: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     --wp-transition: all 0.2s ease-in-out;
     --wp-header-height: 120px;
+    --wp-bg-color: #ffffff;
+    --wp-text-color: #212529;
+    --wp-border-color: #dee2e6;
 }
 
 /* Typography Enhancements */
@@ -22,31 +27,35 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-weight: 400;
     line-height: 1.6;
+    background-color: #f8f9fa;
+    color: var(--wp-text-color);
 }
 
 h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
     letter-spacing: -0.025em;
+    color: var(--wp-text-color);
 }
 
 /* Main Header Styling */
 .main-header {
     min-height: var(--wp-header-height);
-    background: linear-gradient(135deg, var(--bs-primary) 0%, var(--bs-primary-dark, #0056b3) 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     box-shadow: var(--wp-shadow);
+    border-bottom: 1px solid var(--wp-border-color);
 }
 
 .logo-container {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(13, 110, 253, 0.1);
     border-radius: var(--wp-border-radius);
     padding: 0.75rem;
-    backdrop-filter: blur(10px);
+    border: 1px solid rgba(13, 110, 253, 0.2);
 }
 
 /* Enhanced Navigation */
 .navbar {
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: #ffffff !important;
+    border-bottom: 1px solid var(--wp-border-color);
 }
 
 .navbar-nav .nav-link {
@@ -55,10 +64,12 @@ h1, h2, h3, h4, h5, h6 {
     transition: var(--wp-transition);
     border-radius: var(--wp-border-radius);
     margin: 0 0.125rem;
+    color: var(--wp-text-color) !important;
 }
 
 .navbar-nav .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(13, 110, 253, 0.1);
+    color: var(--wp-primary) !important;
     transform: translateY(-1px);
 }
 
@@ -95,28 +106,31 @@ h1, h2, h3, h4, h5, h6 {
 .main-content {
     min-height: calc(100vh - var(--wp-header-height) - 120px);
     background: linear-gradient(180deg, 
-        rgba(var(--bs-primary-rgb), 0.02) 0%, 
-        transparent 50%);
+        #f8f9fa 0%, 
+        #ffffff 50%);
 }
 
 /* Enhanced Cards */
 .card {
-    border: none;
+    border: 1px solid var(--wp-border-color);
     border-radius: var(--wp-border-radius);
     box-shadow: var(--wp-shadow);
     transition: var(--wp-transition);
     overflow: hidden;
+    background-color: #ffffff;
 }
 
 .card:hover {
     box-shadow: var(--wp-shadow-lg);
     transform: translateY(-2px);
+    border-color: rgba(13, 110, 253, 0.25);
 }
 
 .card-header {
-    background: rgba(var(--bs-primary-rgb), 0.05);
-    border-bottom: 1px solid rgba(var(--bs-border-color-rgb), 0.5);
+    background: #f8f9fa;
+    border-bottom: 1px solid var(--wp-border-color);
     font-weight: 600;
+    color: var(--wp-text-color);
 }
 
 /* KPI Cards Enhancement */
@@ -291,9 +305,9 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Footer Enhancement */
 footer {
-    border-top: 1px solid rgba(var(--bs-border-color-rgb), 0.2);
-    background: rgba(var(--bs-dark-rgb), 0.95) !important;
-    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--wp-border-color);
+    background: #f8f9fa !important;
+    color: #6c757d !important;
 }
 
 /* Utility Classes */
