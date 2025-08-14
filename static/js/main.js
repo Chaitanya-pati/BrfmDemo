@@ -1,27 +1,157 @@
 /**
- * Main JavaScript file for Wheat Processing Management System
- * Handles common functionality across all pages
+ * Professional Wheat Processing Management System JavaScript
+ * Enhanced functionality with modern UI interactions
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize tooltips
+    // Initialize core functionality
+    initializeRealTimeClock();
     initializeTooltips();
-    
-    // Initialize form validation
     initializeFormValidation();
-    
-    // Handle file uploads
     initializeFileUploads();
-    
-    // Auto-refresh for real-time updates
     initializeAutoRefresh();
-    
-    // Navigation active state
     setActiveNavigation();
-    
-    // Confirmation dialogs
     initializeConfirmations();
+    initializeAnimations();
+    initializeCharts();
 });
+
+/**
+ * Real-time clock in header
+ */
+function initializeRealTimeClock() {
+    const clockElement = document.getElementById('currentTime');
+    if (clockElement) {
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            clockElement.textContent = timeString;
+        }
+        
+        updateClock(); // Initial update
+        setInterval(updateClock, 1000); // Update every second
+    }
+}
+
+/**
+ * Refresh dashboard data
+ */
+function refreshDashboard() {
+    const refreshBtn = document.querySelector('[onclick="refreshDashboard()"]');
+    if (refreshBtn) {
+        // Add loading state
+        const originalIcon = refreshBtn.querySelector('i').className;
+        refreshBtn.querySelector('i').className = 'fas fa-spinner fa-spin me-1';
+        refreshBtn.disabled = true;
+        
+        // Simulate loading (in real app, this would be an API call)
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    }
+}
+
+/**
+ * Initialize smooth animations
+ */
+function initializeAnimations() {
+    // Animate KPI cards on page load
+    const kpiCards = document.querySelectorAll('.col-xl-3 .card, .col-md-6 .card');
+    kpiCards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+    
+    // Animate progress bars
+    setTimeout(() => {
+        const progressBars = document.querySelectorAll('.progress-bar');
+        progressBars.forEach(bar => {
+            const width = bar.style.width || bar.getAttribute('style')?.match(/width:\s*(\d+%)/)?.[1];
+            if (width) {
+                bar.style.width = '0%';
+                bar.style.transition = 'width 1s ease-in-out';
+                setTimeout(() => {
+                    bar.style.width = width;
+                }, 500);
+            }
+        });
+    }, 800);
+}
+
+/**
+ * Initialize charts if Chart.js is available
+ */
+function initializeCharts() {
+    if (typeof Chart !== 'undefined') {
+        // Initialize any charts on the page
+        const chartElements = document.querySelectorAll('canvas[data-chart]');
+        chartElements.forEach(initializeChart);
+    }
+}
+
+/**
+ * Initialize individual chart
+ */
+function initializeChart(canvas) {
+    const chartType = canvas.dataset.chart;
+    const ctx = canvas.getContext('2d');
+    
+    // Default chart configuration with professional styling
+    const config = {
+        type: chartType || 'line',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [{
+                label: 'Processing Volume',
+                data: [12, 19, 3, 5, 2, 3],
+                borderColor: 'rgb(54, 162, 235)',
+                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                borderWidth: 2,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    display: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                }
+            }
+        }
+    };
+    
+    new Chart(ctx, config);
+}
 
 /**
  * Initialize Bootstrap tooltips

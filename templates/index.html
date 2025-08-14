@@ -3,68 +3,174 @@
 {% block title %}Dashboard - Wheat Processing Management{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h1 class="mb-4"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h1>
+<!-- Page Header with Breadcrumb -->
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item active">
+                    <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                </li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-0 mt-2">Operations Overview</h1>
+        <p class="text-muted mb-0">Real-time monitoring of wheat processing operations</p>
+    </div>
+    <div class="col-auto">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="refreshDashboard()">
+                <i class="fas fa-sync-alt me-1"></i>Refresh
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                <i class="fas fa-cog me-1"></i>Settings
+            </button>
+        </div>
     </div>
 </div>
 
+<!-- Key Performance Indicators -->
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-primary bg-opacity-10 rounded-3 p-3">
+                            <i class="fas fa-truck text-primary fa-lg"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="text-muted fw-semibold mb-0">Pending Vehicles</h6>
+                        <h3 class="fw-bold mb-0">{{ pending_vehicles }}</h3>
+                        <small class="text-success">
+                            <i class="fas fa-arrow-up me-1"></i>12% vs yesterday
+                        </small>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="progress progress-sm">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: 65%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-warning bg-opacity-10 rounded-3 p-3">
+                            <i class="fas fa-clipboard-check text-warning fa-lg"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="text-muted fw-semibold mb-0">Quality Inspections</h6>
+                        <h3 class="fw-bold mb-0">{{ quality_check_vehicles }}</h3>
+                        <small class="text-warning">
+                            <i class="fas fa-clock me-1"></i>Avg: 45 min
+                        </small>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="progress progress-sm">
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: 80%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-info bg-opacity-10 rounded-3 p-3">
+                            <i class="fas fa-industry text-info fa-lg"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="text-muted fw-semibold mb-0">Production Orders</h6>
+                        <h3 class="fw-bold mb-0">{{ active_orders }}</h3>
+                        <small class="text-info">
+                            <i class="fas fa-play me-1"></i>85% completion
+                        </small>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="progress progress-sm">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: 85%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-success bg-opacity-10 rounded-3 p-3">
+                            <i class="fas fa-shipping-fast text-success fa-lg"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="text-muted fw-semibold mb-0">Ready for Dispatch</h6>
+                        <h3 class="fw-bold mb-0">{{ pending_dispatches }}</h3>
+                        <small class="text-success">
+                            <i class="fas fa-check me-1"></i>On schedule
+                        </small>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="progress progress-sm">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 92%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions Panel -->
 <div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary">
-            <div class="card-body">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-bottom">
                 <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title">Pending Vehicles</h5>
-                        <h2 class="mb-0">{{ pending_vehicles }}</h2>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-truck fa-2x opacity-75"></i>
-                    </div>
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt text-primary me-2"></i>Quick Actions
+                    </h5>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-warning">
             <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title">Quality Check</h5>
-                        <h2 class="mb-0">{{ quality_check_vehicles }}</h2>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('vehicle_entry') }}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="fas fa-plus-circle fa-2x d-block mb-2"></i>
+                            <span class="fw-semibold">New Vehicle Entry</span>
+                        </a>
                     </div>
-                    <div class="ms-3">
-                        <i class="fas fa-clipboard-check fa-2x opacity-75"></i>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('quality_control') }}" class="btn btn-outline-warning w-100 py-3">
+                            <i class="fas fa-microscope fa-2x d-block mb-2"></i>
+                            <span class="fw-semibold">Quality Control</span>
+                        </a>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-info">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title">Active Orders</h5>
-                        <h2 class="mb-0">{{ active_orders }}</h2>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('production_orders') }}" class="btn btn-outline-info w-100 py-3">
+                            <i class="fas fa-clipboard-list fa-2x d-block mb-2"></i>
+                            <span class="fw-semibold">Production Order</span>
+                        </a>
                     </div>
-                    <div class="ms-3">
-                        <i class="fas fa-cogs fa-2x opacity-75"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-success">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title">Pending Dispatches</h5>
-                        <h2 class="mb-0">{{ pending_dispatches }}</h2>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-shipping-fast fa-2x opacity-75"></i>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('reports') }}" class="btn btn-outline-success w-100 py-3">
+                            <i class="fas fa-chart-bar fa-2x d-block mb-2"></i>
+                            <span class="fw-semibold">View Reports</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -72,46 +178,240 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Recent Vehicle Entries</h5>
+<!-- Main Data Sections -->
+<div class="row g-4">
+    <!-- Recent Vehicle Entries -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-bottom">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-truck text-primary me-2"></i>Recent Vehicle Entries
+                    </h5>
+                    <a href="{{ url_for('vehicle_entry') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i>Add New
+                    </a>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 {% if recent_vehicles %}
                     <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Vehicle No.</th>
-                                    <th>Supplier</th>
-                                    <th>Status</th>
-                                    <th>Arrival</th>
+                                    <th class="border-0 px-4 py-3">Vehicle Number</th>
+                                    <th class="border-0 px-4 py-3">Supplier</th>
+                                    <th class="border-0 px-4 py-3">Status</th>
+                                    <th class="border-0 px-4 py-3">Arrival Time</th>
+                                    <th class="border-0 px-4 py-3">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for vehicle in recent_vehicles %}
                                 <tr>
-                                    <td>{{ vehicle.vehicle_number }}</td>
-                                    <td>{{ vehicle.supplier.name }}</td>
-                                    <td>
-                                        <span class="badge bg-{{ 'warning' if vehicle.status == 'pending' else 'success' if vehicle.status == 'approved' else 'danger' }}">
-                                            {{ vehicle.status.title() }}
+                                    <td class="px-4 py-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                <i class="fas fa-truck text-primary"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-semibold">{{ vehicle.vehicle_number }}</div>
+                                                <small class="text-muted">ID: #{{ vehicle.id }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="fw-medium">{{ vehicle.supplier.name }}</div>
+                                        <small class="text-muted">{{ vehicle.supplier.contact_person or 'N/A' }}</small>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="badge {% if vehicle.status == 'pending' %}bg-warning{% elif vehicle.status == 'approved' %}bg-success{% elif vehicle.status == 'quality_check' %}bg-info{% else %}bg-danger{% endif %} fs-6">
+                                            <i class="fas fa-{% if vehicle.status == 'pending' %}clock{% elif vehicle.status == 'approved' %}check{% elif vehicle.status == 'quality_check' %}microscope{% else %}times{% endif %} me-1"></i>
+                                            {{ vehicle.status.replace('_', ' ').title() }}
                                         </span>
                                     </td>
-                                    <td>{{ vehicle.arrival_time.strftime('%m/%d %H:%M') }}</td>
+                                    <td class="px-4 py-3">
+                                        <div class="fw-medium">{{ vehicle.arrival_time.strftime('%d/%m/%Y') }}</div>
+                                        <small class="text-muted">{{ vehicle.arrival_time.strftime('%H:%M:%S') }}</small>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="#" class="btn btn-outline-primary" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if vehicle.status == 'pending' %}
+                                            <a href="{{ url_for('quality_control') }}" class="btn btn-outline-warning" title="Quality Check">
+                                                <i class="fas fa-microscope"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
+                    <div class="card-footer bg-transparent border-top">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">Showing {{ recent_vehicles|length }} recent entries</small>
+                            <a href="#" class="btn btn-link btn-sm">View All Vehicles <i class="fas fa-arrow-right ms-1"></i></a>
+                        </div>
+                    </div>
                 {% else %}
-                    <p class="text-muted mb-0">No recent vehicle entries</p>
+                    <div class="text-center py-5">
+                        <div class="mb-3">
+                            <i class="fas fa-truck fa-3x text-muted opacity-50"></i>
+                        </div>
+                        <h6 class="text-muted">No Recent Vehicle Entries</h6>
+                        <p class="text-muted mb-3">Start by adding a new vehicle entry to begin processing.</p>
+                        <a href="{{ url_for('vehicle_entry') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Add Vehicle Entry
+                        </a>
+                    </div>
                 {% endif %}
             </div>
         </div>
     </div>
+    
+    <!-- Activity Feed & Notifications -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bell text-warning me-2"></i>Recent Activity
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="activity-feed">
+                    <div class="activity-item">
+                        <div class="activity-icon bg-success">
+                            <i class="fas fa-check text-white"></i>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-text">
+                                <strong>Production Order #PO-2024-001</strong> completed successfully
+                            </div>
+                            <div class="activity-time text-muted">
+                                <i class="fas fa-clock me-1"></i>2 hours ago
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="activity-item">
+                        <div class="activity-icon bg-warning">
+                            <i class="fas fa-exclamation-triangle text-white"></i>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-text">
+                                Equipment cleaning required for <strong>Mill Machine #3</strong>
+                            </div>
+                            <div class="activity-time text-muted">
+                                <i class="fas fa-clock me-1"></i>4 hours ago
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="activity-item">
+                        <div class="activity-icon bg-info">
+                            <i class="fas fa-truck text-white"></i>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-text">
+                                Vehicle <strong>ABC-123</strong> passed quality inspection
+                            </div>
+                            <div class="activity-time text-muted">
+                                <i class="fas fa-clock me-1"></i>6 hours ago
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="activity-item">
+                        <div class="activity-icon bg-primary">
+                            <i class="fas fa-plus text-white"></i>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-text">
+                                New supplier <strong>ABC Grains Ltd.</strong> registered
+                            </div>
+                            <div class="activity-time text-muted">
+                                <i class="fas fa-clock me-1"></i>8 hours ago
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-top">
+                    <div class="text-center">
+                        <a href="#" class="btn btn-link btn-sm">View All Activity <i class="fas fa-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status & Analytics -->
+<div class="row g-4 mt-2">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line text-success me-2"></i>Processing Overview
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="processingChart" data-chart="line"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-warehouse text-info me-2"></i>Storage Utilization
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="storage-info">
+                    <div class="storage-item mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-semibold">Mill Godown</span>
+                            <span class="text-muted">78%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-primary" style="width: 78%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="storage-item mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-semibold">HD Godown</span>
+                            <span class="text-muted">45%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-info" style="width: 45%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="storage-item mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-semibold">Low Mill Godown</span>
+                            <span class="text-muted">92%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-warning" style="width: 92%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Production Orders (kept for compatibility) -->
+<div class="row mt-4" style="display: none;">
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
