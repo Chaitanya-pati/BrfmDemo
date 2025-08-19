@@ -1,19 +1,19 @@
 
 /* Professional Wheat Processing Management System Styles */
 :root {
-    --primary-color: #1976D2;
-    --secondary-color: #2196F3;
-    --accent-color: #64B5F6;
+    --primary-color: #6C7293;
+    --secondary-color: #8B8FA3;
+    --accent-color: #9CA0B0;
     --warning-color: #FF9800;
     --success-color: #4CAF50;
-    --info-color: #03A9F4;
-    --light-bg: #F5F7FA;
+    --info-color: #6C7293;
+    --light-bg: #F8F9FA;
     --white-bg: #FFFFFF;
     --dark-text: #212529;
-    --muted-text: #6C757D;
-    --border-color: #E3F2FD;
-    --shadow-sm: 0 2px 4px rgba(25,118,210,0.1);
-    --shadow-md: 0 4px 8px rgba(25,118,210,0.12);
+    --muted-text: #6C7293;
+    --border-color: #ECECEC;
+    --shadow-sm: 0 2px 4px rgba(108,114,147,0.1);
+    --shadow-md: 0 4px 8px rgba(108,114,147,0.12);
     --border-radius: 8px;
     --transition: all 0.3s ease;
 }
@@ -28,13 +28,13 @@ body {
 
 /* Header Enhancements */
 .main-header {
-    background: linear-gradient(135deg, var(--white-bg) 0%, #e3f2fd 100%);
+    background: linear-gradient(135deg, var(--white-bg) 0%, #ECECEC 100%);
     border-bottom: 2px solid var(--primary-color);
 }
 
 .logo-container i {
     color: var(--accent-color) !important;
-    filter: drop-shadow(2px 2px 4px rgba(25,118,210,0.1));
+    filter: drop-shadow(2px 2px 4px rgba(108,114,147,0.1));
 }
 
 /* Navigation Enhancements */
@@ -53,7 +53,7 @@ body {
 }
 
 .nav-link:hover {
-    background-color: rgba(25,118,210,0.1);
+    background-color: rgba(108,114,147,0.1);
     color: var(--primary-color) !important;
     transform: translateY(-1px);
 }
@@ -111,7 +111,7 @@ body {
 
 .form-control:focus, .form-select:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25);
+    box-shadow: 0 0 0 0.2rem rgba(108, 114, 147, 0.25);
     background-color: var(--white-bg);
 }
 
@@ -194,7 +194,7 @@ body {
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: rgba(25, 118, 210, 0.05);
+    background-color: rgba(108, 114, 147, 0.05);
 }
 
 /* Badge Enhancements */
@@ -261,7 +261,7 @@ body {
 
 .camera-container:hover {
     border-color: var(--primary-color);
-    background: rgba(25, 118, 210, 0.05);
+    background: rgba(108, 114, 147, 0.05);
 }
 
 .camera-preview {
@@ -313,7 +313,7 @@ body {
 }
 
 .status-completed {
-    background-color: rgba(25, 118, 210, 0.2);
+    background-color: rgba(108, 114, 147, 0.2);
     color: var(--primary-color);
 }
 
@@ -368,7 +368,7 @@ body {
 
 /* Dropdown Menu Items */
 .dropdown-item:hover {
-    background-color: rgba(25, 118, 210, 0.1);
+    background-color: rgba(108, 114, 147, 0.1);
     color: var(--primary-color);
 }
 
