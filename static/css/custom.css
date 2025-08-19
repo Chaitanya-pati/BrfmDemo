@@ -1,18 +1,19 @@
+
 /* Professional Wheat Processing Management System Styles */
 :root {
-    --primary-color: #2E7D32;
-    --secondary-color: #388E3C;
-    --accent-color: #FFA726;
-    --warning-color: #FF7043;
+    --primary-color: #1976D2;
+    --secondary-color: #2196F3;
+    --accent-color: #64B5F6;
+    --warning-color: #FF9800;
     --success-color: #4CAF50;
-    --info-color: #2196F3;
-    --light-bg: #F8F9FA;
+    --info-color: #03A9F4;
+    --light-bg: #F5F7FA;
     --white-bg: #FFFFFF;
     --dark-text: #212529;
     --muted-text: #6C757D;
-    --border-color: #DEE2E6;
-    --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
-    --shadow-md: 0 4px 8px rgba(0,0,0,0.12);
+    --border-color: #E3F2FD;
+    --shadow-sm: 0 2px 4px rgba(25,118,210,0.1);
+    --shadow-md: 0 4px 8px rgba(25,118,210,0.12);
     --border-radius: 8px;
     --transition: all 0.3s ease;
 }
@@ -27,13 +28,13 @@ body {
 
 /* Header Enhancements */
 .main-header {
-    background: linear-gradient(135deg, var(--white-bg) 0%, #f0f2f5 100%);
+    background: linear-gradient(135deg, var(--white-bg) 0%, #e3f2fd 100%);
     border-bottom: 2px solid var(--primary-color);
 }
 
 .logo-container i {
     color: var(--accent-color) !important;
-    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.1));
+    filter: drop-shadow(2px 2px 4px rgba(25,118,210,0.1));
 }
 
 /* Navigation Enhancements */
@@ -52,7 +53,7 @@ body {
 }
 
 .nav-link:hover {
-    background-color: var(--light-bg);
+    background-color: rgba(25,118,210,0.1);
     color: var(--primary-color) !important;
     transform: translateY(-1px);
 }
@@ -110,7 +111,7 @@ body {
 
 .form-control:focus, .form-select:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(46, 125, 50, 0.25);
+    box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25);
     background-color: var(--white-bg);
 }
 
@@ -137,7 +138,7 @@ body {
 }
 
 .btn-warning {
-    background-color: var(--accent-color);
+    background-color: var(--warning-color);
     border: none;
     color: white;
 }
@@ -193,7 +194,7 @@ body {
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: rgba(46, 125, 50, 0.05);
+    background-color: rgba(25, 118, 210, 0.05);
 }
 
 /* Badge Enhancements */
@@ -201,6 +202,22 @@ body {
     font-weight: 500;
     padding: 0.5rem 0.75rem;
     border-radius: 20px;
+}
+
+.badge.bg-success {
+    background-color: var(--success-color) !important;
+}
+
+.badge.bg-warning {
+    background-color: var(--warning-color) !important;
+}
+
+.badge.bg-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.badge.bg-info {
+    background-color: var(--info-color) !important;
 }
 
 /* Alert Enhancements */
@@ -217,8 +234,8 @@ body {
 }
 
 .alert-warning {
-    background-color: rgba(255, 167, 38, 0.1);
-    border-left-color: var(--accent-color);
+    background-color: rgba(255, 152, 0, 0.1);
+    border-left-color: var(--warning-color);
 }
 
 .alert-danger {
@@ -227,7 +244,7 @@ body {
 }
 
 .alert-info {
-    background-color: rgba(33, 150, 243, 0.1);
+    background-color: rgba(3, 169, 244, 0.1);
     border-left-color: var(--info-color);
 }
 
@@ -244,7 +261,7 @@ body {
 
 .camera-container:hover {
     border-color: var(--primary-color);
-    background: rgba(46, 125, 50, 0.05);
+    background: rgba(25, 118, 210, 0.05);
 }
 
 .camera-preview {
@@ -281,7 +298,7 @@ body {
 }
 
 .status-pending {
-    background-color: rgba(255, 167, 38, 0.2);
+    background-color: rgba(255, 152, 0, 0.2);
     color: #e65100;
 }
 
@@ -296,8 +313,8 @@ body {
 }
 
 .status-completed {
-    background-color: rgba(33, 150, 243, 0.2);
-    color: #1565c0;
+    background-color: rgba(25, 118, 210, 0.2);
+    color: var(--primary-color);
 }
 
 /* Progress Indicators */
@@ -347,6 +364,53 @@ body {
     font-size: 2.5rem;
     font-weight: 700;
     color: var(--primary-color);
+}
+
+/* Dropdown Menu Items */
+.dropdown-item:hover {
+    background-color: rgba(25, 118, 210, 0.1);
+    color: var(--primary-color);
+}
+
+/* Links */
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--secondary-color);
+}
+
+/* Text Colors */
+.text-primary {
+    color: var(--primary-color) !important;
+}
+
+.text-info {
+    color: var(--info-color) !important;
+}
+
+.text-warning {
+    color: var(--warning-color) !important;
+}
+
+/* Background Colors */
+.bg-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.bg-info {
+    background-color: var(--info-color) !important;
+}
+
+/* Border Colors */
+.border-primary {
+    border-color: var(--primary-color) !important;
+}
+
+.border-info {
+    border-color: var(--info-color) !important;
 }
 
 /* Responsive Design */
