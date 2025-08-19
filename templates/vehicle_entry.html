@@ -3,74 +3,245 @@
 {% block title %}Vehicle Entry - Wheat Processing Management{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h1 class="mb-4"><i class="fas fa-truck me-2"></i>Vehicle Entry</h1>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>New Vehicle Entry</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="vehicle_number" class="form-label">Vehicle Number</label>
-                        <input type="text" class="form-control" id="vehicle_number" name="vehicle_number" required>
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-truck me-2"></i>Vehicle Entry Management
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary" onclick="refreshPage()">
+                                <i class="fas fa-refresh me-1"></i>Refresh
+                            </button>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newVehicleModal">
+                                <i class="fas fa-plus me-1"></i>New Vehicle Entry
+                            </button>
+                        </div>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="supplier_id" class="form-label">Supplier</label>
-                        <select class="form-select" id="supplier_id" name="supplier_id" required>
-                            <option value="">Select Supplier</option>
-                            {% for supplier in suppliers %}
-                            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="driver_name" class="form-label">Driver Name</label>
-                        <input type="text" class="form-control" id="driver_name" name="driver_name">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="driver_phone" class="form-label">Driver Phone</label>
-                        <input type="tel" class="form-control" id="driver_phone" name="driver_phone">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="bill_photo" class="form-label">Bill Photo/Document</label>
-                        <input type="file" class="form-control" id="bill_photo" name="bill_photo" accept="image/*,application/pdf">
-                        <div class="form-text">Upload supplier bill or capture live photo</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="vehicle_photo" class="form-label">Vehicle Photo (Before Unloading)</label>
-                        <input type="file" class="form-control" id="vehicle_photo" name="vehicle_photo" accept="image/*">
-                        <div class="form-text">Capture vehicle photo before unloading</div>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-2"></i>Record Entry
-                    </button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
-    
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Pending Vehicles</h5>
+
+    <div class="row">
+        <!-- Vehicle Entry Form -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clipboard-list me-2"></i>Register New Vehicle
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="vehicleEntryForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="vehicle_number" class="form-label">Vehicle Number *</label>
+                                    <input type="text" class="form-control" id="vehicle_number" name="vehicle_number" 
+                                           placeholder="e.g., UP16AB1234" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="supplier_id" class="form-label">Supplier *</label>
+                                    <select class="form-select" id="supplier_id" name="supplier_id" required>
+                                        <option value="">Select Supplier</option>
+                                        {% for supplier in suppliers %}
+                                        <option value="{{ supplier.id }}">{{ supplier.company_name }} - {{ supplier.contact_person }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="driver_name" class="form-label">Driver Name</label>
+                                    <input type="text" class="form-control" id="driver_name" name="driver_name" 
+                                           placeholder="Enter driver's name">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="driver_phone" class="form-label">Driver Phone</label>
+                                    <input type="tel" class="form-control" id="driver_phone" name="driver_phone" 
+                                           placeholder="Enter driver's mobile number">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="arrival_time" class="form-label">Arrival Time</label>
+                                    <input type="datetime-local" class="form-control" id="arrival_time" name="arrival_time">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="expected_quantity" class="form-label">Expected Quantity (kg)</label>
+                                    <input type="number" class="form-control" id="expected_quantity" name="expected_quantity" 
+                                           placeholder="Enter expected wheat quantity" step="0.01">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Enhanced Photo Upload Section -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-4">
+                                    <label class="form-label">Supplier Bill Photo</label>
+                                    <div id="billPhotoContainer" class="camera-container" 
+                                         data-camera-input="bill_photo" data-multiple="false">
+                                        <div class="text-muted">
+                                            <i class="fas fa-camera fa-2x mb-2"></i>
+                                            <p>Capture or upload supplier bill photo</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-4">
+                                    <label class="form-label">Vehicle Photo</label>
+                                    <div id="vehiclePhotoContainer" class="camera-container" 
+                                         data-camera-input="vehicle_photo" data-multiple="false">
+                                        <div class="text-muted">
+                                            <i class="fas fa-camera fa-2x mb-2"></i>
+                                            <p>Capture or upload vehicle photo</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">Notes</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                              placeholder="Any additional notes or observations"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button type="reset" class="btn btn-outline-secondary">
+                                <i class="fas fa-undo me-1"></i>Reset Form
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Register Vehicle
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <div class="card-body">
-                {% if vehicles %}
+        </div>
+
+        <!-- Recent Vehicle Entries -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>Recent Vehicle Entries
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if vehicles %}
+                        <div class="list-group list-group-flush">
+                            {% for vehicle in vehicles[:10] %}
+                            <div class="list-group-item border-0 px-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ vehicle.vehicle_number }}</h6>
+                                        <p class="mb-1 text-muted small">
+                                            {{ vehicle.supplier.company_name if vehicle.supplier else 'Unknown Supplier' }}
+                                        </p>
+                                        <small class="text-muted">
+                                            {{ vehicle.arrival_time.strftime('%d/%m/%Y %H:%M') if vehicle.arrival_time else 'No arrival time' }}
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-{{ 'warning' if vehicle.status == 'pending' else 'primary' if vehicle.status == 'quality_check' else 'success' }}">
+                                        {{ vehicle.status|title }}
+                                    </span>
+                                </div>
+                                {% if vehicle.driver_name %}
+                                <small class="text-muted">
+                                    <i class="fas fa-user me-1"></i>{{ vehicle.driver_name }}
+                                    {% if vehicle.driver_phone %}
+                                        <i class="fas fa-phone ms-2 me-1"></i>{{ vehicle.driver_phone }}
+                                    {% endif %}
+                                </small>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-truck fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No recent vehicle entries</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Today's Summary
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="border-end">
+                                <h4 class="text-primary mb-1">{{ vehicles|selectattr('status', 'equalto', 'pending')|list|length }}</h4>
+                                <small class="text-muted">Pending</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border-end">
+                                <h4 class="text-warning mb-1">{{ vehicles|selectattr('status', 'equalto', 'quality_check')|list|length }}</h4>
+                                <small class="text-muted">In Check</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <h4 class="text-success mb-1">{{ vehicles|selectattr('status', 'equalto', 'approved')|list|length }}</h4>
+                            <small class="text-muted">Approved</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Vehicles Table -->
+    {% if vehicles %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>All Vehicle Entries
+                        </h5>
+                        <div class="input-group" style="width: 300px;">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" placeholder="Search vehicles..." id="vehicleSearch">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-striped">
+                        <table class="table table-hover data-table" id="vehiclesTable">
                             <thead>
                                 <tr>
                                     <th>Vehicle No.</th>
@@ -78,26 +249,194 @@
                                     <th>Driver</th>
                                     <th>Arrival Time</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for vehicle in vehicles %}
                                 <tr>
-                                    <td>{{ vehicle.vehicle_number }}</td>
-                                    <td>{{ vehicle.supplier.name }}</td>
-                                    <td>{{ vehicle.driver_name or '-' }}</td>
-                                    <td>{{ vehicle.arrival_time.strftime('%m/%d/%Y %H:%M') }}</td>
                                     <td>
-                                        <span class="badge bg-warning">{{ vehicle.status.title() }}</span>
+                                        <strong>{{ vehicle.vehicle_number }}</strong>
+                                        {% if vehicle.bill_photo %}
+                                            <br><small class="text-success">
+                                                <i class="fas fa-file-image me-1"></i>Bill Photo
+                                            </small>
+                                        {% endif %}
+                                        {% if vehicle.vehicle_photo_before %}
+                                            <br><small class="text-info">
+                                                <i class="fas fa-camera me-1"></i>Vehicle Photo
+                                            </small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if vehicle.supplier %}
+                                            <strong>{{ vehicle.supplier.company_name }}</strong>
+                                            <br><small class="text-muted">{{ vehicle.supplier.contact_person }}</small>
+                                        {% else %}
+                                            <span class="text-muted">Unknown Supplier</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if vehicle.driver_name %}
+                                            {{ vehicle.driver_name }}
+                                            {% if vehicle.driver_phone %}
+                                                <br><small class="text-muted">{{ vehicle.driver_phone }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if vehicle.arrival_time %}
+                                            {{ vehicle.arrival_time.strftime('%d/%m/%Y') }}<br>
+                                            <small class="text-muted">{{ vehicle.arrival_time.strftime('%H:%M') }}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="status-indicator status-{{ vehicle.status }}">
+                                            {{ vehicle.status|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="viewVehicleDetails({{ vehicle.id }})">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            {% if vehicle.status == 'pending' %}
+                                            <a href="{{ url_for('quality_control') }}?vehicle_id={{ vehicle.id }}" class="btn btn-outline-warning">
+                                                <i class="fas fa-microscope"></i>
+                                            </a>
+                                            {% endif %}
+                                            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="#" onclick="editVehicle({{ vehicle.id }})">
+                                                    <i class="fas fa-edit me-1"></i>Edit
+                                                </a></li>
+                                                {% if vehicle.bill_photo %}
+                                                <li><a class="dropdown-item" href="{{ url_for('uploaded_file', filename=vehicle.bill_photo) }}" target="_blank">
+                                                    <i class="fas fa-file-image me-1"></i>View Bill
+                                                </a></li>
+                                                {% endif %}
+                                                {% if vehicle.vehicle_photo_before %}
+                                                <li><a class="dropdown-item" href="{{ url_for('uploaded_file', filename=vehicle.vehicle_photo_before) }}" target="_blank">
+                                                    <i class="fas fa-camera me-1"></i>View Photo
+                                                </a></li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                {% else %}
-                    <p class="text-muted mb-0">No pending vehicles</p>
-                {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Vehicle Details Modal -->
+<div class="modal fade" id="vehicleDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Vehicle Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="vehicleDetailsContent">
+                <!-- Content loaded via JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Vehicle Modal (Duplicate of form for quick access) -->
+<div class="modal fade" id="newVehicleModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-truck me-2"></i>Quick Vehicle Entry
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Quick entry form - similar to main form but condensed -->
+                <form method="POST" enctype="multipart/form-data" id="quickVehicleForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Vehicle Number *</label>
+                                <input type="text" class="form-control" name="vehicle_number" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Supplier *</label>
+                                <select class="form-select" name="supplier_id" required>
+                                    <option value="">Select Supplier</option>
+                                    {% for supplier in suppliers %}
+                                    <option value="{{ supplier.id }}">{{ supplier.company_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Driver Name</label>
+                                <input type="text" class="form-control" name="driver_name">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Driver Phone</label>
+                                <input type="tel" class="form-control" name="driver_phone">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Camera interfaces for modal -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Bill Photo</label>
+                                <div id="modalBillPhotoContainer" class="camera-container" 
+                                     data-camera-input="bill_photo_modal" data-multiple="false">
+                                    <div class="text-muted">
+                                        <i class="fas fa-camera fa-2x mb-2"></i>
+                                        <p>Capture bill photo</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Vehicle Photo</label>
+                                <div id="modalVehiclePhotoContainer" class="camera-container" 
+                                     data-camera-input="vehicle_photo_modal" data-multiple="false">
+                                    <div class="text-muted">
+                                        <i class="fas fa-camera fa-2x mb-2"></i>
+                                        <p>Capture vehicle photo</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitQuickForm()">
+                    <i class="fas fa-save me-1"></i>Register Vehicle
+                </button>
             </div>
         </div>
     </div>
@@ -106,19 +445,103 @@
 
 {% block scripts %}
 <script>
-// Add camera capture functionality if needed
-document.getElementById('bill_photo').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        console.log('Bill photo selected:', file.name);
+document.addEventListener('DOMContentLoaded', function() {
+    // Set current datetime for arrival time
+    const arrivalTime = document.getElementById('arrival_time');
+    if (arrivalTime && !arrivalTime.value) {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        arrivalTime.value = now.toISOString().slice(0, 16);
     }
+    
+    // Initialize search functionality
+    const searchInput = document.getElementById('vehicleSearch');
+    const table = document.getElementById('vehiclesTable');
+    
+    if (searchInput && table) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = table.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+    }
+    
+    // Auto-capitalize vehicle numbers
+    document.querySelectorAll('input[name="vehicle_number"]').forEach(input => {
+        input.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+    });
 });
 
-document.getElementById('vehicle_photo').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        console.log('Vehicle photo selected:', file.name);
-    }
-});
+// Vehicle details modal
+function viewVehicleDetails(vehicleId) {
+    fetch(`/api/vehicle/${vehicleId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('vehicleDetailsContent').innerHTML = generateVehicleDetailsHTML(data);
+            new bootstrap.Modal(document.getElementById('vehicleDetailsModal')).show();
+        })
+        .catch(error => {
+            showNotification('Error loading vehicle details', 'danger');
+            console.error('Error:', error);
+        });
+}
+
+function generateVehicleDetailsHTML(vehicle) {
+    return `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Basic Information</h6>
+                <table class="table table-sm">
+                    <tr><th>Vehicle Number:</th><td>${vehicle.vehicle_number}</td></tr>
+                    <tr><th>Supplier:</th><td>${vehicle.supplier_name || '-'}</td></tr>
+                    <tr><th>Driver:</th><td>${vehicle.driver_name || '-'}</td></tr>
+                    <tr><th>Phone:</th><td>${vehicle.driver_phone || '-'}</td></tr>
+                    <tr><th>Arrival Time:</th><td>${vehicle.arrival_time || '-'}</td></tr>
+                    <tr><th>Status:</th><td><span class="badge bg-primary">${vehicle.status}</span></td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Documents & Photos</h6>
+                ${vehicle.bill_photo ? `<p><a href="/uploads/${vehicle.bill_photo}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-file-image me-1"></i>View Bill</a></p>` : ''}
+                ${vehicle.vehicle_photo_before ? `<p><a href="/uploads/${vehicle.vehicle_photo_before}" target="_blank" class="btn btn-sm btn-outline-info"><i class="fas fa-camera me-1"></i>View Vehicle Photo</a></p>` : ''}
+                ${vehicle.notes ? `<p><strong>Notes:</strong><br>${vehicle.notes}</p>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function editVehicle(vehicleId) {
+    // Implement edit functionality
+    showNotification('Edit functionality will be implemented', 'info');
+}
+
+function submitQuickForm() {
+    const form = document.getElementById('quickVehicleForm');
+    const formData = new FormData(form);
+    
+    // Submit via fetch API
+    fetch(window.location.pathname, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(() => {
+        bootstrap.Modal.getInstance(document.getElementById('newVehicleModal')).hide();
+        location.reload();
+    })
+    .catch(error => {
+        showNotification('Error submitting form', 'danger');
+    });
+}
+
+function refreshPage() {
+    location.reload();
+}
 </script>
 {% endblock %}
