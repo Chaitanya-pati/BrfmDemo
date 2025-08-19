@@ -1,21 +1,23 @@
 
 /* Professional Wheat Processing Management System Styles */
 :root {
-    --primary-color: #6C7293;
-    --secondary-color: #8B8FA3;
-    --accent-color: #9CA0B0;
+    --primary-color: #3B86D1;
+    --secondary-color: #1E90FF;
+    --accent-color: #34495E;
     --warning-color: #FF9800;
     --success-color: #4CAF50;
-    --info-color: #6C7293;
+    --info-color: #3B86D1;
     --light-bg: #F8F9FA;
     --white-bg: #FFFFFF;
     --dark-text: #212529;
-    --muted-text: #6C7293;
-    --border-color: #ECECEC;
-    --shadow-sm: 0 2px 4px rgba(108,114,147,0.1);
-    --shadow-md: 0 4px 8px rgba(108,114,147,0.12);
+    --muted-text: #34495E;
+    --border-color: #E3F2FD;
+    --shadow-sm: 0 2px 4px rgba(59,134,209,0.1);
+    --shadow-md: 0 4px 8px rgba(59,134,209,0.12);
     --border-radius: 8px;
     --transition: all 0.3s ease;
+    --sidebar-width: 280px;
+    --sidebar-bg: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
 }
 
 /* Global Styles */
@@ -28,34 +30,152 @@ body {
 
 /* Header Enhancements */
 .main-header {
-    background: linear-gradient(135deg, var(--white-bg) 0%, #ECECEC 100%);
+    background: linear-gradient(135deg, var(--white-bg) 0%, #E3F2FD 100%);
     border-bottom: 2px solid var(--primary-color);
 }
 
 .logo-container i {
-    color: var(--accent-color) !important;
-    filter: drop-shadow(2px 2px 4px rgba(108,114,147,0.1));
+    color: var(--primary-color) !important;
+    filter: drop-shadow(2px 2px 4px rgba(59,134,209,0.1));
+}
+
+/* Sidebar Layout */
+.layout-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--sidebar-bg);
+    color: white;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 1030;
+    transition: transform 0.3s ease;
+}
+
+.sidebar.collapsed {
+    transform: translateX(-100%);
+}
+
+.main-wrapper {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    transition: margin-left 0.3s ease;
+}
+
+.main-wrapper.expanded {
+    margin-left: 0;
+}
+
+.sidebar-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar-brand {
+    color: white;
+    text-decoration: none;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.sidebar-brand:hover {
+    color: white;
+}
+
+.sidebar-nav {
+    padding: 1rem 0;
+}
+
+.nav-item {
+    margin-bottom: 0.25rem;
+}
+
+.nav-link {
+    color: rgba(255,255,255,0.8) !important;
+    font-weight: 500;
+    padding: 0.75rem 1.5rem !important;
+    transition: var(--transition);
+    border-radius: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+.nav-link:hover {
+    background-color: rgba(255,255,255,0.1);
+    color: white !important;
+    transform: none;
+}
+
+.nav-link.active {
+    background-color: rgba(255,255,255,0.2);
+    color: white !important;
+}
+
+.nav-link i {
+    width: 20px;
+    margin-right: 0.75rem;
+}
+
+.dropdown-menu {
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(59,134,209,0.2);
+}
+
+.dropdown-item {
+    color: var(--dark-text) !important;
+    padding: 0.5rem 1rem;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(59,134,209,0.1);
+    color: var(--primary-color) !important;
+}
+
+.sidebar-toggle {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1040;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .sidebar.show {
+        transform: translateX(0);
+    }
+    
+    .main-wrapper {
+        margin-left: 0;
+    }
+    
+    .sidebar-toggle {
+        display: block;
+    }
 }
 
 /* Navigation Enhancements */
 .navbar {
     background: var(--white-bg) !important;
     box-shadow: var(--shadow-sm);
-}
-
-.nav-link {
-    color: var(--dark-text) !important;
-    font-weight: 500;
-    padding: 0.75rem 1rem !important;
-    transition: var(--transition);
-    border-radius: var(--border-radius);
-    margin: 0 0.25rem;
-}
-
-.nav-link:hover {
-    background-color: rgba(108,114,147,0.1);
-    color: var(--primary-color) !important;
-    transform: translateY(-1px);
+    display: none; /* Hide original navbar as we're using sidebar */
 }
 
 .navbar-nav .dropdown-menu {
@@ -111,7 +231,7 @@ body {
 
 .form-control:focus, .form-select:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(108, 114, 147, 0.25);
+    box-shadow: 0 0 0 0.2rem rgba(59, 134, 209, 0.25);
     background-color: var(--white-bg);
 }
 
@@ -194,7 +314,7 @@ body {
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: rgba(108, 114, 147, 0.05);
+    background-color: rgba(59, 134, 209, 0.05);
 }
 
 /* Badge Enhancements */
@@ -261,7 +381,7 @@ body {
 
 .camera-container:hover {
     border-color: var(--primary-color);
-    background: rgba(108, 114, 147, 0.05);
+    background: rgba(59, 134, 209, 0.05);
 }
 
 .camera-preview {
@@ -313,7 +433,7 @@ body {
 }
 
 .status-completed {
-    background-color: rgba(108, 114, 147, 0.2);
+    background-color: rgba(59, 134, 209, 0.2);
     color: var(--primary-color);
 }
 
@@ -368,7 +488,7 @@ body {
 
 /* Dropdown Menu Items */
 .dropdown-item:hover {
-    background-color: rgba(108, 114, 147, 0.1);
+    background-color: rgba(59, 134, 209, 0.1);
     color: var(--primary-color);
 }
 
