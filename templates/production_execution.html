@@ -1,0 +1,839 @@
+{% extends "base.html" %}
+
+{% block title %}Production Execution - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>Production Execution & Job Tracking
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary" onclick="location.reload()">
+                                <i class="fas fa-refresh me-1"></i>Refresh
+                            </button>
+                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#startJobModal">
+                                <i class="fas fa-play me-1"></i>Start New Job
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Pipeline Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-sitemap me-2"></i>Production Pipeline Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-info">
+                                    <i class="fas fa-exchange-alt"></i>
+                                </div>
+                                <h6>Transfer</h6>
+                                <span class="badge bg-info">{{ active_jobs['transfer'] or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-warning">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <h6>24h Cleaning</h6>
+                                <span class="badge bg-warning">{{ active_jobs['cleaning_24h'] or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-primary">
+                                    <i class="fas fa-hourglass-half"></i>
+                                </div>
+                                <h6>12h Cleaning</h6>
+                                <span class="badge bg-primary">{{ active_jobs['cleaning_12h'] or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-danger">
+                                    <i class="fas fa-cog"></i>
+                                </div>
+                                <h6>Grinding</h6>
+                                <span class="badge bg-danger">{{ active_jobs['grinding'] or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-success">
+                                    <i class="fas fa-box"></i>
+                                </div>
+                                <h6>Packing</h6>
+                                <span class="badge bg-success">{{ active_jobs['packing'] or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-dark">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <h6>Completed</h6>
+                                <span class="badge bg-dark">{{ completed_jobs or 0 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Active Jobs -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tasks me-2"></i>Active Production Jobs
+                        </h5>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary active" onclick="filterJobs('all')">All</button>
+                            <button class="btn btn-outline-primary" onclick="filterJobs('in_progress')">In Progress</button>
+                            <button class="btn btn-outline-primary" onclick="filterJobs('pending')">Pending</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if active_production_jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="jobsTable">
+                            <thead>
+                                <tr>
+                                    <th>Job #</th>
+                                    <th>Order</th>
+                                    <th>Stage</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Time Left</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in active_production_jobs %}
+                                <tr class="job-row" data-status="{{ job.status }}" data-stage="{{ job.stage }}">
+                                    <td>
+                                        <strong>{{ job.job_number }}</strong>
+                                        <br><small class="text-muted">{{ job.created_at.strftime('%d/%m %H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ job.order.order_number }}</strong>
+                                        <br><small class="text-muted">{{ job.order.quantity }} kg</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'info' if job.stage == 'transfer' else 'warning' if job.stage == 'cleaning_24h' else 'primary' if job.stage == 'cleaning_12h' else 'danger' if job.stage == 'grinding' else 'success' }}">
+                                            {{ job.stage|replace('_', ' ')|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="status-indicator status-{{ job.status }}">
+                                            {{ job.status|replace('_', ' ')|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if job.status == 'in_progress' %}
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar" 
+                                                 style="width: {{ job.progress_percentage or 0 }}%"
+                                                 data-job-id="{{ job.id }}">
+                                            </div>
+                                        </div>
+                                        <small>{{ job.progress_percentage or 0 }}%</small>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if job.time_remaining %}
+                                        <div class="countdown" data-end-time="{{ job.end_time.isoformat() }}">
+                                            {{ job.time_remaining }}
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="viewJobDetails({{ job.id }})">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            {% if job.status == 'pending' %}
+                                            <button class="btn btn-outline-success" onclick="startJob({{ job.id }})">
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                            {% elif job.status == 'in_progress' %}
+                                            <button class="btn btn-outline-info" onclick="updateProgress({{ job.id }})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-outline-warning" onclick="pauseJob({{ job.id }})">
+                                                <i class="fas fa-pause"></i>
+                                            </button>
+                                            {% endif %}
+                                            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="#" onclick="viewJobTimeline({{ job.id }})">
+                                                    <i class="fas fa-history me-1"></i>Timeline
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="downloadJobReport({{ job.id }})">
+                                                    <i class="fas fa-download me-1"></i>Export Report
+                                                </a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                        <h5>No Active Production Jobs</h5>
+                        <p class="text-muted">Start executing production plans to track jobs here.</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#startJobModal">
+                            <i class="fas fa-plus me-1"></i>Start New Job
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions & Reminders -->
+        <div class="col-lg-4">
+            <!-- Pending Reminders -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0 text-warning">
+                        <i class="fas fa-bell me-2"></i>Pending Reminders
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if pending_reminders %}
+                    <div class="list-group list-group-flush">
+                        {% for reminder in pending_reminders[:5] %}
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">{{ reminder.process_type|replace('_', ' ')|title }}</h6>
+                                    <p class="mb-1 text-muted small">
+                                        Job: {{ reminder.job.job_number }}
+                                    </p>
+                                    <small class="text-danger">
+                                        <i class="fas fa-clock me-1"></i>{{ reminder.reminder_time.strftime('%H:%M') }}
+                                    </small>
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="dismissReminder({{ reminder.id }})">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <p class="text-muted small">No pending reminders</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#transferModal">
+                            <i class="fas fa-exchange-alt me-1"></i>Start Transfer
+                        </button>
+                        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#cleaningModal">
+                            <i class="fas fa-tint me-1"></i>Start Cleaning Process
+                        </button>
+                        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#grindingModal">
+                            <i class="fas fa-cog me-1"></i>Start Grinding
+                        </button>
+                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#packingModal">
+                            <i class="fas fa-box me-1"></i>Start Packing
+                        </button>
+                        <button class="btn btn-info" onclick="showMachineCleaningLog()">
+                            <i class="fas fa-tools me-1"></i>Machine Cleaning Log
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Timeline -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-gantt me-2"></i>Production Timeline (Today)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="productionTimeline" class="timeline-container">
+                        <!-- Timeline content will be loaded via JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start Job Modal -->
+<div class="modal fade" id="startJobModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-play me-2"></i>Start New Production Job
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="startJobForm" method="POST">
+                    <input type="hidden" name="action" value="start_job">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Select Approved Plan *</label>
+                                <select class="form-select" name="plan_id" required>
+                                    <option value="">Choose production plan</option>
+                                    {% for plan in approved_plans %}
+                                    <option value="{{ plan.id }}" 
+                                            data-order="{{ plan.order.order_number }}" 
+                                            data-quantity="{{ plan.order.quantity }}">
+                                        {{ plan.order.order_number }} - {{ plan.order.quantity }} kg
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Job Stage *</label>
+                                <select class="form-select" name="stage" required>
+                                    <option value="transfer">Transfer to 24h Cleaning</option>
+                                    <option value="cleaning_24h">24-Hour Cleaning Process</option>
+                                    <option value="cleaning_12h">12-Hour Cleaning Process</option>
+                                    <option value="grinding">Grinding Process</option>
+                                    <option value="packing">Packing & Storage</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Operator Name *</label>
+                                <input type="text" class="form-control" name="operator_name" required
+                                       placeholder="Name of the operator">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Priority</label>
+                                <select class="form-select" name="priority">
+                                    <option value="normal">Normal</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label class="form-label">Start Process Photo</label>
+                                <div id="startProcessPhotoContainer" class="camera-container" 
+                                     data-camera-input="start_process_photo" data-multiple="false">
+                                    <div class="text-muted">
+                                        <i class="fas fa-camera fa-2x mb-2"></i>
+                                        <p>Capture photo at process start</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label class="form-label">Initial Notes</label>
+                                <textarea class="form-control" name="notes" rows="3"
+                                          placeholder="Any initial observations or instructions"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="submitStartJob()">
+                    <i class="fas fa-play me-1"></i>Start Job
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transfer Process Modal -->
+<div class="modal fade" id="transferModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exchange-alt me-2"></i>Transfer Process - Precleaning to 24h Cleaning
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="transferForm" method="POST">
+                    <input type="hidden" name="action" value="execute_transfer">
+                    
+                    <!-- Transfer Details -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Select Job *</label>
+                                <select class="form-select" name="job_id" required onchange="loadTransferPlan()">
+                                    <option value="">Choose active transfer job</option>
+                                    {% for job in transfer_jobs %}
+                                    <option value="{{ job.id }}">
+                                        {{ job.job_number }} - {{ job.order.order_number }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Operator Name *</label>
+                                <input type="text" class="form-control" name="operator_name" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Transfer Plan Display -->
+                    <div id="transferPlanSection" style="display: none;">
+                        <h6><i class="fas fa-list me-1"></i>Transfer Plan</h6>
+                        <div id="transferPlanContent"></div>
+                    </div>
+                    
+                    <!-- Individual Transfer Execution -->
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">From Precleaning Bin *</label>
+                                <select class="form-select" name="from_bin_id" required>
+                                    <option value="">Select source bin</option>
+                                    {% for bin in precleaning_bins %}
+                                    <option value="{{ bin.id }}">
+                                        {{ bin.name }} ({{ bin.current_stock }} kg available)
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Quantity to Transfer (kg) *</label>
+                                <input type="number" class="form-control" name="transfer_quantity" 
+                                       required step="0.01" min="0.01">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">To 24h Cleaning Bin *</label>
+                                <select class="form-select" name="to_cleaning_bin" required>
+                                    <option value="1">Cleaning Bin 1</option>
+                                    <option value="2">Cleaning Bin 2</option>
+                                    <option value="3">Cleaning Bin 3</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Photo Evidence -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Start Photo</label>
+                                <div id="transferStartPhotoContainer" class="camera-container" 
+                                     data-camera-input="transfer_start_photo" data-multiple="false">
+                                    <div class="text-muted">
+                                        <i class="fas fa-camera fa-2x mb-2"></i>
+                                        <p>Photo before transfer</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">End Photo</label>
+                                <div id="transferEndPhotoContainer" class="camera-container" 
+                                     data-camera-input="transfer_end_photo" data-multiple="false">
+                                    <div class="text-muted">
+                                        <i class="fas fa-camera fa-2x mb-2"></i>
+                                        <p>Photo after transfer</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="executeTransfer()">
+                    <i class="fas fa-play me-1"></i>Execute Transfer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Job Details Modal -->
+<div class="modal fade" id="jobDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Production Job Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="jobDetailsContent">
+                <!-- Content loaded via JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize countdown timers
+    initializeCountdowns();
+    
+    // Update progress bars every 30 seconds
+    setInterval(updateProgressBars, 30000);
+    
+    // Check for new reminders every minute
+    setInterval(checkReminders, 60000);
+});
+
+function initializeCountdowns() {
+    document.querySelectorAll('.countdown').forEach(element => {
+        const endTime = new Date(element.dataset.endTime);
+        updateCountdown(element, endTime);
+        
+        // Update every minute
+        setInterval(() => updateCountdown(element, endTime), 60000);
+    });
+}
+
+function updateCountdown(element, endTime) {
+    const now = new Date();
+    const timeLeft = endTime - now;
+    
+    if (timeLeft <= 0) {
+        element.innerHTML = '<span class="text-danger">Overdue</span>';
+        return;
+    }
+    
+    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+    
+    element.innerHTML = `${hours}h ${minutes}m`;
+    
+    // Warning colors
+    if (timeLeft <= 30 * 60 * 1000) { // 30 minutes
+        element.className = 'countdown text-danger';
+    } else if (timeLeft <= 60 * 60 * 1000) { // 1 hour
+        element.className = 'countdown text-warning';
+    }
+}
+
+function filterJobs(status) {
+    const rows = document.querySelectorAll('.job-row');
+    const buttons = document.querySelectorAll('.btn-group .btn');
+    
+    // Update active button
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    rows.forEach(row => {
+        if (status === 'all' || row.dataset.status === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function viewJobDetails(jobId) {
+    fetch(`/api/production_job/${jobId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('jobDetailsContent').innerHTML = generateJobDetailsHTML(data);
+            new bootstrap.Modal(document.getElementById('jobDetailsModal')).show();
+        })
+        .catch(error => {
+            showNotification('Error loading job details', 'danger');
+        });
+}
+
+function generateJobDetailsHTML(job) {
+    return `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Job Information</h6>
+                <table class="table table-sm">
+                    <tr><th>Job Number:</th><td>${job.job_number}</td></tr>
+                    <tr><th>Order:</th><td>${job.order_number}</td></tr>
+                    <tr><th>Stage:</th><td>${job.stage}</td></tr>
+                    <tr><th>Status:</th><td><span class="badge bg-primary">${job.status}</span></td></tr>
+                    <tr><th>Started:</th><td>${job.started_at || '-'}</td></tr>
+                    <tr><th>Operator:</th><td>${job.started_by || '-'}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Progress Details</h6>
+                <div class="progress mb-2">
+                    <div class="progress-bar" style="width: ${job.progress || 0}%"></div>
+                </div>
+                <p><strong>Timeline:</strong></p>
+                <div class="timeline">
+                    ${generateTimelineHTML(job.timeline)}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function startJob(jobId) {
+    if (confirm('Are you sure you want to start this job?')) {
+        fetch('/api/start_job', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({job_id: jobId})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Job started successfully', 'success');
+                location.reload();
+            } else {
+                showNotification(data.message, 'danger');
+            }
+        });
+    }
+}
+
+function pauseJob(jobId) {
+    if (confirm('Are you sure you want to pause this job?')) {
+        fetch('/api/pause_job', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({job_id: jobId})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Job paused', 'warning');
+                location.reload();
+            } else {
+                showNotification(data.message, 'danger');
+            }
+        });
+    }
+}
+
+function updateProgressBars() {
+    fetch('/api/job_progress')
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(job => {
+                const progressBar = document.querySelector(`[data-job-id="${job.id}"]`);
+                if (progressBar) {
+                    progressBar.style.width = `${job.progress}%`;
+                    progressBar.nextElementSibling.textContent = `${job.progress}%`;
+                }
+            });
+        });
+}
+
+function checkReminders() {
+    fetch('/api/check_reminders')
+        .then(response => response.json())
+        .then(data => {
+            if (data.new_reminders > 0) {
+                showNotification(`${data.new_reminders} new reminder(s)`, 'warning');
+                location.reload();
+            }
+        });
+}
+
+function submitStartJob() {
+    const form = document.getElementById('startJobForm');
+    const formData = new FormData(form);
+    
+    fetch('/production_execution', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(() => {
+        bootstrap.Modal.getInstance(document.getElementById('startJobModal')).hide();
+        showNotification('Job started successfully', 'success');
+        location.reload();
+    })
+    .catch(error => {
+        showNotification('Error starting job', 'danger');
+    });
+}
+
+function executeTransfer() {
+    const form = document.getElementById('transferForm');
+    const formData = new FormData(form);
+    
+    fetch('/production_execution', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(() => {
+        bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide();
+        showNotification('Transfer executed successfully', 'success');
+        location.reload();
+    })
+    .catch(error => {
+        showNotification('Error executing transfer', 'danger');
+    });
+}
+
+function loadTransferPlan() {
+    const jobSelect = document.querySelector('select[name="job_id"]');
+    const selectedJobId = jobSelect.value;
+    
+    if (selectedJobId) {
+        fetch(`/api/transfer_plan/${selectedJobId}`)
+            .then(response => response.json())
+            .then(data => {
+                const planSection = document.getElementById('transferPlanSection');
+                const planContent = document.getElementById('transferPlanContent');
+                
+                planContent.innerHTML = generateTransferPlanHTML(data);
+                planSection.style.display = 'block';
+            });
+    }
+}
+
+function generateTransferPlanHTML(plan) {
+    let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Bin</th><th>Planned Quantity</th><th>Transferred</th><th>Remaining</th></tr></thead><tbody>';
+    
+    plan.items.forEach(item => {
+        html += `<tr>
+            <td>${item.bin_name}</td>
+            <td>${item.planned_quantity} kg</td>
+            <td>${item.transferred_quantity} kg</td>
+            <td>${item.remaining_quantity} kg</td>
+        </tr>`;
+    });
+    
+    html += '</tbody></table></div>';
+    return html;
+}
+</script>
+
+<style>
+.pipeline-stage {
+    text-align: center;
+    padding: 1rem;
+}
+
+.stage-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.5rem;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.timeline-container {
+    height: 300px;
+    overflow-x: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
+.countdown {
+    font-weight: bold;
+}
+
+.job-row[data-status="in_progress"] {
+    background-color: rgba(13, 202, 240, 0.1);
+}
+
+.job-row[data-status="paused"] {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.camera-container {
+    border: 2px dashed #dee2e6;
+    border-radius: 0.375rem;
+    padding: 2rem;
+    text-align: center;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.camera-container:hover {
+    border-color: #0d6efd;
+    background-color: #e7f1ff;
+}
+</style>
+{% endblock %}

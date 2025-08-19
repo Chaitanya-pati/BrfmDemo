@@ -4,10 +4,13 @@ from sqlalchemy import func
 
 class Supplier(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    company_name = db.Column(db.String(100), nullable=False)
     contact_person = db.Column(db.String(100))
     phone = db.Column(db.String(20))
     address = db.Column(db.Text)
+    city = db.Column(db.String(50))
+    state = db.Column(db.String(50))
+    postal_code = db.Column(db.String(10))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationship
@@ -49,7 +52,7 @@ class Product(db.Model):
 
 class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    company_name = db.Column(db.String(100), nullable=False)
     contact_person = db.Column(db.String(100))
     phone = db.Column(db.String(20))
     email = db.Column(db.String(100))
@@ -140,7 +143,7 @@ class ProductionOrder(db.Model):
     
     # Relationships
     production_plan = db.relationship('ProductionPlan', backref='order', uselist=False)
-    production_jobs = db.relationship('ProductionJob', backref='order', lazy=True)
+    production_jobs = db.relationship('ProductionJobNew', back_populates='order', lazy=True)
 
 class ProductionPlan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -152,6 +155,7 @@ class ProductionPlan(db.Model):
     
     # Relationship
     plan_items = db.relationship('ProductionPlanItem', backref='plan', lazy=True)
+    jobs = db.relationship('ProductionJobNew', back_populates='plan', lazy=True)
 
 class ProductionPlanItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -163,23 +167,7 @@ class ProductionPlanItem(db.Model):
     # Relationship
     precleaning_bin = db.relationship('PrecleaningBin', backref='plan_items')
 
-class ProductionJob(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    job_id = db.Column(db.String(50), unique=True, nullable=False)
-    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
-    job_type = db.Column(db.String(50), nullable=False)  # transfer, cleaning_24h, cleaning_12h, grinding
-    status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed
-    assigned_to = db.Column(db.String(100))
-    start_time = db.Column(db.DateTime)
-    end_time = db.Column(db.DateTime)
-    duration_minutes = db.Column(db.Integer)
-    quantity = db.Column(db.Float)
-    moisture_in = db.Column(db.Float)
-    moisture_out = db.Column(db.Float)
-    target_moisture = db.Column(db.Float)
-    evidence_photo_start = db.Column(db.String(200))
-    evidence_photo_end = db.Column(db.String(200))
-    notes = db.Column(db.Text)
+# Removed duplicate ProductionJob - using the enhanced version below
 
 class FinishedGoodsStorage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -286,3 +274,138 @@ class CleaningReminder(db.Model):
     reminder_sent = db.Column(db.Boolean, default=False)
     user_notified = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Enhanced Production Execution Models for Step-by-Step Production Tracking
+class ProductionJobNew(db.Model):
+    __tablename__ = 'production_job_new'
+    id = db.Column(db.Integer, primary_key=True)
+    job_number = db.Column(db.String(50), unique=True, nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    plan_id = db.Column(db.Integer, db.ForeignKey('production_plan.id'), nullable=False)
+    stage = db.Column(db.String(50), nullable=False)  # transfer, cleaning_24h, cleaning_12h, grinding, packing
+    status = db.Column(db.String(50), default='pending')  # pending, in_progress, completed, paused
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    started_by = db.Column(db.String(100))
+    completed_by = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    order = db.relationship('ProductionOrder', back_populates='production_jobs')
+    plan = db.relationship('ProductionPlan', back_populates='jobs')
+
+class ProductionTransfer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
+    from_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=False)
+    quantity_transferred = db.Column(db.Float, nullable=False)
+    transfer_time = db.Column(db.DateTime, default=datetime.utcnow)
+    operator_name = db.Column(db.String(100), nullable=False)
+    start_photo = db.Column(db.String(255))
+    end_photo = db.Column(db.String(255))
+    
+    job = db.relationship('ProductionJobNew', backref=db.backref('transfers', lazy=True))
+    from_bin = db.relationship('PrecleaningBin', backref=db.backref('transfers', lazy=True))
+
+class CleaningProcess(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
+    process_type = db.Column(db.String(20), nullable=False)  # 24_hour, 12_hour
+    cleaning_bin_id = db.Column(db.Integer, nullable=False)  # Which cleaning bin
+    duration_hours = db.Column(db.Integer, nullable=False)
+    target_moisture = db.Column(db.Float)  # For 12-hour process
+    start_time = db.Column(db.DateTime, nullable=False)
+    end_time = db.Column(db.DateTime, nullable=False)
+    actual_end_time = db.Column(db.DateTime)
+    start_moisture = db.Column(db.Float)
+    end_moisture = db.Column(db.Float)
+    water_added_liters = db.Column(db.Float)
+    waste_collected_kg = db.Column(db.Float)
+    machine_name = db.Column(db.String(100))
+    status = db.Column(db.String(20), default='pending')  # pending, running, completed
+    start_photo = db.Column(db.String(255))
+    end_photo = db.Column(db.String(255))
+    operator_name = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    
+    job = db.relationship('ProductionJobNew', backref=db.backref('cleaning_processes', lazy=True))
+
+class GrindingProcess(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
+    machine_name = db.Column(db.String(100), nullable=False)
+    start_time = db.Column(db.DateTime, nullable=False)
+    end_time = db.Column(db.DateTime)
+    input_quantity_kg = db.Column(db.Float, nullable=False)
+    total_output_kg = db.Column(db.Float)
+    main_products_kg = db.Column(db.Float)  # Should be 75-77%
+    bran_kg = db.Column(db.Float)  # Should be 23-25%
+    bran_percentage = db.Column(db.Float)
+    status = db.Column(db.String(20), default='pending')
+    operator_name = db.Column(db.String(100))
+    start_photo = db.Column(db.String(255))
+    end_photo = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    
+    job = db.relationship('ProductionJobNew', backref=db.backref('grinding_processes', lazy=True))
+
+class ProductOutput(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    grinding_process_id = db.Column(db.Integer, db.ForeignKey('grinding_process.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    quantity_produced_kg = db.Column(db.Float, nullable=False)
+    percentage = db.Column(db.Float, nullable=False)
+    
+    grinding_process = db.relationship('GrindingProcess', backref=db.backref('product_outputs', lazy=True))
+    product = db.relationship('Product', backref=db.backref('production_outputs', lazy=True))
+
+class PackingProcess(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    bag_weight_kg = db.Column(db.Float, nullable=False)  # 30, 50, 25 kg bags
+    number_of_bags = db.Column(db.Integer, nullable=False)
+    total_packed_kg = db.Column(db.Float, nullable=False)
+    packed_time = db.Column(db.DateTime, default=datetime.utcnow)
+    operator_name = db.Column(db.String(100), nullable=False)
+    storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'))
+    stored_in_shallow_kg = db.Column(db.Float, default=0)
+    packing_photo = db.Column(db.String(255))
+    
+    job = db.relationship('ProductionJobNew', backref=db.backref('packing_processes', lazy=True))
+    product = db.relationship('Product', backref=db.backref('packing_processes', lazy=True))
+    storage_area = db.relationship('StorageArea', backref=db.backref('packed_goods', lazy=True))
+
+class StorageArea(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    capacity_kg = db.Column(db.Float, nullable=False)
+    current_stock_kg = db.Column(db.Float, default=0)
+    location = db.Column(db.String(200))
+    
+class StorageTransfer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    from_storage_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=False)
+    to_storage_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    quantity_kg = db.Column(db.Float, nullable=False)
+    transfer_time = db.Column(db.DateTime, default=datetime.utcnow)
+    operator_name = db.Column(db.String(100), nullable=False)
+    reason = db.Column(db.String(200))
+    
+    from_storage = db.relationship('StorageArea', foreign_keys=[from_storage_id], backref=db.backref('outgoing_transfers', lazy=True))
+    to_storage = db.relationship('StorageArea', foreign_keys=[to_storage_id], backref=db.backref('incoming_transfers', lazy=True))
+    product = db.relationship('Product', backref=db.backref('storage_transfers', lazy=True))
+
+class ProcessReminder(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
+    process_type = db.Column(db.String(50), nullable=False)  # cleaning_24h, cleaning_12h, machine_cleaning
+    reminder_time = db.Column(db.DateTime, nullable=False)
+    reminder_type = db.Column(db.String(20), nullable=False)  # 5min, 10min, 30min
+    status = db.Column(db.String(20), default='pending')  # pending, sent, dismissed
+    message = db.Column(db.Text)
+    
+    job = db.relationship('ProductionJobNew', backref=db.backref('reminders', lazy=True))
+
+# Enhanced models already exist above - removing duplicates
