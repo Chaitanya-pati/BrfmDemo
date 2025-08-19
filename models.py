@@ -70,8 +70,10 @@ class Vehicle(db.Model):
     driver_phone = db.Column(db.String(20))
     arrival_time = db.Column(db.DateTime, default=datetime.utcnow)
     bill_photo = db.Column(db.String(200))  # file path
+    vehicle_photo = db.Column(db.String(200))
     vehicle_photo_before = db.Column(db.String(200))
     vehicle_photo_after = db.Column(db.String(200))
+    supplier_bill = db.Column(db.String(200))
     status = db.Column(db.String(20), default='pending')  # pending, quality_check, approved, rejected, unloaded
     quality_category = db.Column(db.String(50))  # low mill, mill, etc
     owner_approved = db.Column(db.Boolean, default=False)
@@ -91,7 +93,12 @@ class QualityTest(db.Model):
     total_bags = db.Column(db.Integer, nullable=False)
     category_assigned = db.Column(db.String(50), nullable=False)
     moisture_content = db.Column(db.Float)
+    foreign_matter = db.Column(db.Float)
+    broken_grains = db.Column(db.Float)
+    test_result = db.Column(db.String(50))
+    tested_by = db.Column(db.String(100))
     quality_notes = db.Column(db.Text)
+    notes = db.Column(db.Text)
     lab_instructor = db.Column(db.String(100))
     test_time = db.Column(db.DateTime, default=datetime.utcnow)
     approved = db.Column(db.Boolean, default=False)
@@ -100,6 +107,7 @@ class Transfer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     from_godown_id = db.Column(db.Integer, db.ForeignKey('godown.id'))
     to_godown_id = db.Column(db.Integer, db.ForeignKey('godown.id'))
+    from_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'))
     to_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'))
     quantity = db.Column(db.Float, nullable=False)
     transfer_type = db.Column(db.String(50), nullable=False)  # godown_to_precleaning, precleaning_to_cleaning, etc
@@ -245,9 +253,19 @@ class Dispatch(db.Model):
     status = db.Column(db.String(20), default='loaded')  # loaded, in_transit, delivered
     delivered_by = db.Column(db.String(100))
     delivery_date = db.Column(db.DateTime)
-    
-    # Relationship
-    dispatch_items = db.relationship('DispatchItem', backref='dispatch', lazy=True)
+
+class SalesDispatch(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    dispatch_date = db.Column(db.Date)
+    vehicle_number = db.Column(db.String(20))
+    driver_name = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.String(100))
 
 class DispatchItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)

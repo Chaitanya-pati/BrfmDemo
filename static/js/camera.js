@@ -1,308 +1,220 @@
-// Live Camera Capture Functionality
-class CameraCapture {
-    constructor() {
-        this.stream = null;
-        this.video = null;
-        this.canvas = null;
-        this.capturedImages = [];
+// Camera functionality for file uploads
+
+let currentStream = null;
+let currentCamera = null;
+
+function initializeCamera(inputId, previewId) {
+    const input = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    
+    if (!input || !preview) {
+        console.error('Camera initialization failed: elements not found');
+        return;
     }
+    
+    // Create camera controls
+    const controls = createCameraControls(inputId);
+    input.parentNode.insertBefore(controls, input.nextSibling);
+}
 
-    // Initialize camera for a specific input
-    async initCamera(containerId, inputName, multiple = false) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
+function createCameraControls(inputId) {
+    const controls = document.createElement('div');
+    controls.className = 'camera-controls mt-2';
+    controls.innerHTML = `
+        <div class="d-flex gap-2 mb-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="startCamera('${inputId}')">
+                <i class="fas fa-camera me-1"></i>Start Camera
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="stopCamera('${inputId}')" disabled>
+                <i class="fas fa-stop me-1"></i>Stop Camera
+            </button>
+            <button type="button" class="btn btn-outline-success btn-sm" onclick="capturePhoto('${inputId}')" disabled>
+                <i class="fas fa-camera-retro me-1"></i>Capture
+            </button>
+        </div>
+        <video id="${inputId}_video" class="camera-preview" style="display: none; max-width: 100%; height: 200px; background: #000;" autoplay muted playsinline></video>
+        <canvas id="${inputId}_canvas" style="display: none;"></canvas>
+        <div id="${inputId}_photo_preview" class="photo-preview"></div>
+    `;
+    return controls;
+}
 
-        // Create camera interface
-        const cameraHTML = `
-            <div class="camera-interface">
-                <div class="camera-preview-container mb-3">
-                    <video id="video-${inputName}" class="camera-preview d-none" autoplay playsinline></video>
-                    <canvas id="canvas-${inputName}" class="d-none"></canvas>
-                </div>
-                <div class="camera-controls text-center mb-3">
-                    <button type="button" class="btn btn-primary me-2" onclick="startCamera('${inputName}')">
-                        <i class="fas fa-camera me-1"></i>Start Camera
-                    </button>
-                    <button type="button" class="btn btn-success me-2 d-none" onclick="captureImage('${inputName}', ${multiple})">
-                        <i class="fas fa-camera-retro me-1"></i>Capture Photo
-                    </button>
-                    <button type="button" class="btn btn-secondary me-2 d-none" onclick="stopCamera('${inputName}')">
-                        <i class="fas fa-stop me-1"></i>Stop Camera
-                    </button>
-                    <button type="button" class="btn btn-warning me-2" onclick="selectFile('${inputName}', ${multiple})">
-                        <i class="fas fa-upload me-1"></i>Upload File
-                    </button>
-                </div>
-                <input type="file" id="file-${inputName}" name="${inputName}${multiple ? '[]' : ''}" 
-                       accept="image/*,application/pdf,.doc,.docx" ${multiple ? 'multiple' : ''} class="d-none">
-                <div id="preview-${inputName}" class="captured-images"></div>
-            </div>
-        `;
-        container.innerHTML = cameraHTML;
-    }
-
-    // Start camera stream
-    async startCamera(inputName) {
-        try {
-            const video = document.getElementById(`video-${inputName}`);
-            const constraints = {
-                video: {
-                    facingMode: 'environment', // Use back camera on mobile
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
-            };
-
-            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-            video.srcObject = this.stream;
-            
-            // Show/hide controls
-            video.classList.remove('d-none');
-            document.querySelector(`#video-${inputName}`).parentElement.parentElement
-                .querySelector('button[onclick*="startCamera"]').classList.add('d-none');
-            document.querySelector(`#video-${inputName}`).parentElement.parentElement
-                .querySelector('button[onclick*="captureImage"]').classList.remove('d-none');
-            document.querySelector(`#video-${inputName}`).parentElement.parentElement
-                .querySelector('button[onclick*="stopCamera"]').classList.remove('d-none');
-                
-        } catch (error) {
-            console.error('Error accessing camera:', error);
-            alert('Unable to access camera. Please check permissions or use file upload.');
+async function startCamera(inputId) {
+    try {
+        const video = document.getElementById(inputId + '_video');
+        const startBtn = document.querySelector(`button[onclick="startCamera('${inputId}')"]`);
+        const stopBtn = document.querySelector(`button[onclick="stopCamera('${inputId}')"]`);
+        const captureBtn = document.querySelector(`button[onclick="capturePhoto('${inputId}')"]`);
+        
+        if (!video) {
+            throw new Error('Video element not found');
         }
+        
+        // Stop any existing stream
+        if (currentStream) {
+            stopCamera(inputId);
+        }
+        
+        // Request camera access
+        const constraints = {
+            video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'environment' // Use rear camera if available
+            },
+            audio: false
+        };
+        
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+        video.style.display = 'block';
+        
+        // Update button states
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        captureBtn.disabled = false;
+        
+        currentCamera = inputId;
+        
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        let errorMessage = 'Failed to access camera. ';
+        
+        if (error.name === 'NotAllowedError') {
+            errorMessage += 'Please allow camera access and try again.';
+        } else if (error.name === 'NotFoundError') {
+            errorMessage += 'No camera found on this device.';
+        } else if (error.name === 'NotSupportedError') {
+            errorMessage += 'Camera is not supported in this browser.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        showAlert(errorMessage, 'danger');
     }
+}
 
-    // Capture image from video stream
-    captureImage(inputName, multiple = false) {
-        const video = document.getElementById(`video-${inputName}`);
-        const canvas = document.getElementById(`canvas-${inputName}`);
-        const context = canvas.getContext('2d');
+function stopCamera(inputId) {
+    try {
+        const video = document.getElementById(inputId + '_video');
+        const startBtn = document.querySelector(`button[onclick="startCamera('${inputId}')"]`);
+        const stopBtn = document.querySelector(`button[onclick="stopCamera('${inputId}')"]`);
+        const captureBtn = document.querySelector(`button[onclick="capturePhoto('${inputId}')"]`);
+        
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+        
+        if (video) {
+            video.style.display = 'none';
+            video.srcObject = null;
+        }
+        
+        // Update button states
+        if (startBtn) startBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = true;
+        if (captureBtn) captureBtn.disabled = true;
+        
+        currentCamera = null;
+        
+    } catch (error) {
+        console.error('Error stopping camera:', error);
+    }
+}
+
+function capturePhoto(inputId) {
+    try {
+        const video = document.getElementById(inputId + '_video');
+        const canvas = document.getElementById(inputId + '_canvas');
+        const preview = document.getElementById(inputId + '_photo_preview');
+        const fileInput = document.getElementById(inputId);
+        
+        if (!video || !canvas || !video.videoWidth) {
+            throw new Error('Camera not ready');
+        }
         
         // Set canvas dimensions to match video
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
         // Draw video frame to canvas
+        const context = canvas.getContext('2d');
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // Convert to blob and create file
-        canvas.toBlob((blob) => {
+        // Convert canvas to blob
+        canvas.toBlob(function(blob) {
+            if (!blob) {
+                throw new Error('Failed to capture photo');
+            }
+            
+            // Create file from blob
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `captured_${inputName}_${timestamp}.jpg`;
+            const filename = `capture_${timestamp}.jpg`;
             const file = new File([blob], filename, { type: 'image/jpeg' });
             
-            // Add to captured images
-            this.addCapturedImage(inputName, file, multiple);
-            
-        }, 'image/jpeg', 0.8);
-    }
-
-    // Add captured image to preview
-    addCapturedImage(inputName, file, multiple) {
-        const preview = document.getElementById(`preview-${inputName}`);
-        const fileInput = document.getElementById(`file-${inputName}`);
-        
-        // Create preview element
-        const imageDiv = document.createElement('div');
-        imageDiv.className = 'captured-image-item d-inline-block m-2 position-relative';
-        imageDiv.innerHTML = `
-            <img src="${URL.createObjectURL(file)}" class="img-thumbnail" style="max-width: 150px; max-height: 150px;">
-            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 rounded-circle" 
-                    onclick="removeCapturedImage(this, '${inputName}')">
-                <i class="fas fa-times"></i>
-            </button>
-            <div class="text-center mt-1">
-                <small class="text-muted">${file.name}</small>
-            </div>
-        `;
-        
-        if (multiple) {
-            preview.appendChild(imageDiv);
-            // Add to file input's files (this is tricky with regular inputs)
-            this.updateFileInput(inputName, file, true);
-        } else {
-            preview.innerHTML = '';
-            preview.appendChild(imageDiv);
-            this.updateFileInput(inputName, file, false);
-        }
-    }
-
-    // Update file input with captured files
-    updateFileInput(inputName, file, multiple) {
-        const fileInput = document.getElementById(`file-${inputName}`);
-        
-        if (multiple) {
-            // For multiple files, we need to maintain an array
-            if (!fileInput.files_array) {
-                fileInput.files_array = [];
-            }
-            fileInput.files_array.push(file);
-        } else {
-            // For single file, replace
+            // Create FileList object
             const dataTransfer = new DataTransfer();
             dataTransfer.items.add(file);
             fileInput.files = dataTransfer.files;
-        }
-    }
-
-    // Stop camera stream
-    stopCamera(inputName) {
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-            this.stream = null;
-        }
-        
-        const video = document.getElementById(`video-${inputName}`);
-        video.classList.add('d-none');
-        video.srcObject = null;
-        
-        // Show/hide controls
-        document.querySelector(`#video-${inputName}`).parentElement.parentElement
-            .querySelector('button[onclick*="startCamera"]').classList.remove('d-none');
-        document.querySelector(`#video-${inputName}`).parentElement.parentElement
-            .querySelector('button[onclick*="captureImage"]').classList.add('d-none');
-        document.querySelector(`#video-${inputName}`).parentElement.parentElement
-            .querySelector('button[onclick*="stopCamera"]').classList.add('d-none');
-    }
-
-    // Select file from device
-    selectFile(inputName, multiple) {
-        const fileInput = document.getElementById(`file-${inputName}`);
-        fileInput.click();
-        
-        fileInput.onchange = () => {
-            const files = Array.from(fileInput.files);
-            const preview = document.getElementById(`preview-${inputName}`);
             
-            if (!multiple) {
-                preview.innerHTML = '';
-            }
-            
-            files.forEach(file => {
-                if (file.type.startsWith('image/')) {
-                    this.addFilePreview(inputName, file, multiple);
-                } else {
-                    this.addDocumentPreview(inputName, file, multiple);
-                }
-            });
-        };
-    }
-
-    // Add file preview
-    addFilePreview(inputName, file, multiple) {
-        const preview = document.getElementById(`preview-${inputName}`);
-        const imageDiv = document.createElement('div');
-        imageDiv.className = 'captured-image-item d-inline-block m-2 position-relative';
-        
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            imageDiv.innerHTML = `
-                <img src="${e.target.result}" class="img-thumbnail" style="max-width: 150px; max-height: 150px;">
-                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 rounded-circle" 
-                        onclick="removeCapturedImage(this, '${inputName}')">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="text-center mt-1">
-                    <small class="text-muted">${file.name}</small>
+            // Show preview
+            const imageUrl = URL.createObjectURL(blob);
+            preview.innerHTML = `
+                <div class="captured-photo">
+                    <img src="${imageUrl}" class="img-thumbnail" style="max-width: 200px; max-height: 200px;">
+                    <div class="mt-1">
+                        <small class="text-success"><i class="fas fa-check me-1"></i>Photo captured: ${filename}</small>
+                    </div>
                 </div>
             `;
-        };
-        reader.readAsDataURL(file);
+            
+            // Trigger change event
+            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            
+            // Stop camera after capture
+            stopCamera(inputId);
+            
+            showAlert('Photo captured successfully!', 'success');
+            
+        }, 'image/jpeg', 0.8);
         
-        preview.appendChild(imageDiv);
-    }
-
-    // Add document preview
-    addDocumentPreview(inputName, file, multiple) {
-        const preview = document.getElementById(`preview-${inputName}`);
-        const docDiv = document.createElement('div');
-        docDiv.className = 'captured-image-item d-inline-block m-2 position-relative';
-        
-        const fileIcon = this.getFileIcon(file.type);
-        docDiv.innerHTML = `
-            <div class="text-center p-3 border rounded" style="width: 150px; height: 150px; display: flex; flex-direction: column; justify-content: center;">
-                <i class="${fileIcon} fa-3x text-primary mb-2"></i>
-                <small class="text-muted">${file.name}</small>
-            </div>
-            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 rounded-circle" 
-                    onclick="removeCapturedImage(this, '${inputName}')">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        
-        preview.appendChild(docDiv);
-    }
-
-    // Get file icon based on type
-    getFileIcon(fileType) {
-        if (fileType.includes('pdf')) return 'fas fa-file-pdf';
-        if (fileType.includes('doc')) return 'fas fa-file-word';
-        if (fileType.includes('image')) return 'fas fa-file-image';
-        return 'fas fa-file';
-    }
-
-    // Remove captured image
-    removeCapturedImage(button, inputName) {
-        const imageItem = button.closest('.captured-image-item');
-        imageItem.remove();
-        
-        // Update file input
-        const fileInput = document.getElementById(`file-${inputName}`);
-        if (fileInput.files_array) {
-            // Remove from array logic would go here
-            // This is complex with regular file inputs, might need form data handling
-        }
+    } catch (error) {
+        console.error('Error capturing photo:', error);
+        showAlert('Failed to capture photo: ' + error.message, 'danger');
     }
 }
 
-// Global camera instance
-const cameraCapture = new CameraCapture();
-
-// Global functions for onclick handlers
-function startCamera(inputName) {
-    cameraCapture.startCamera(inputName);
+// Check if camera is supported
+function isCameraSupported() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 
-function captureImage(inputName, multiple) {
-    cameraCapture.captureImage(inputName, multiple);
-}
-
-function stopCamera(inputName) {
-    cameraCapture.stopCamera(inputName);
-}
-
-function selectFile(inputName, multiple) {
-    cameraCapture.selectFile(inputName, multiple);
-}
-
-function removeCapturedImage(button, inputName) {
-    cameraCapture.removeCapturedImage(button, inputName);
-}
-
-// Initialize cameras when page loads
+// Initialize camera controls on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-initialize camera containers
-    document.querySelectorAll('[data-camera-input]').forEach(container => {
-        const inputName = container.dataset.cameraInput;
-        const multiple = container.dataset.multiple === 'true';
-        cameraCapture.initCamera(container.id, inputName, multiple);
+    if (!isCameraSupported()) {
+        console.warn('Camera not supported in this browser');
+        return;
+    }
+    
+    // Auto-initialize camera controls for file inputs with camera class
+    const cameraInputs = document.querySelectorAll('input[type="file"].camera-enabled');
+    cameraInputs.forEach(input => {
+        const previewId = input.id + '_preview';
+        initializeCamera(input.id, previewId);
     });
 });
 
-// Form submission handler for multiple files
-function handleFormSubmission(formId) {
-    const form = document.getElementById(formId);
-    const formData = new FormData(form);
-    
-    // Handle multiple file inputs with captured images
-    document.querySelectorAll('input[type="file"]').forEach(input => {
-        if (input.files_array && input.files_array.length > 0) {
-            // Remove original files and add captured files
-            formData.delete(input.name);
-            input.files_array.forEach(file => {
-                formData.append(input.name, file);
-            });
-        }
-    });
-    
-    return formData;
-}
+// Cleanup when page unloads
+window.addEventListener('beforeunload', function() {
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+    }
+});
+
+// Export functions for global use
+window.initializeCamera = initializeCamera;
+window.startCamera = startCamera;
+window.stopCamera = stopCamera;
+window.capturePhoto = capturePhoto;
+window.isCameraSupported = isCameraSupported;
