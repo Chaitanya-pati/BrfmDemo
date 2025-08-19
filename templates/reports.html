@@ -72,7 +72,7 @@
             </div>
             <div class="card-body">
                 <canvas id="vehicleStatusChart" width="400" height="200"></canvas>
-                
+
                 <div class="table-responsive mt-3">
                     <table class="table table-sm">
                         <thead>
@@ -101,7 +101,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
@@ -109,7 +109,7 @@
             </div>
             <div class="card-body">
                 <canvas id="inventoryChart" width="400" height="200"></canvas>
-                
+
                 <div class="table-responsive mt-3">
                     <table class="table table-sm">
                         <thead>
@@ -131,7 +131,7 @@
                                 <td>
                                     {% set utilization = (godown.current_stock / godown.capacity * 100) if godown.capacity > 0 else 0 %}
                                     <div class="progress" style="height: 15px;">
-                                        <div class="progress-bar bg-{{ 'success' if utilization < 80 else 'warning' if utilization < 100 else 'danger' }}" 
+                                        <div class="progress-bar bg-{{ 'success' if utilization < 80 else 'warning' if utilization < 100 else 'danger' }}"
                                              style="width: {{ utilization }}%">
                                             {{ "%.1f"|format(utilization) }}%
                                         </div>
@@ -155,7 +155,7 @@
             </div>
             <div class="card-body">
                 <canvas id="productionChart" width="400" height="200"></canvas>
-                
+
                 <div class="table-responsive mt-3">
                     <table class="table table-sm">
                         <thead>
@@ -184,7 +184,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
@@ -192,7 +192,7 @@
             </div>
             <div class="card-body">
                 <canvas id="dispatchChart" width="400" height="200"></canvas>
-                
+
                 <div class="table-responsive mt-3">
                     <table class="table table-sm">
                         <thead>
@@ -280,7 +280,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="row mt-4">
                     <div class="col-md-6 mb-3">
                         <div class="card border-secondary">
@@ -372,7 +372,14 @@ document.addEventListener('DOMContentLoaded', function() {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15,
+                        font: {
+                            size: 11
+                        }
+                    }
                 }
             }
         }
@@ -453,7 +460,14 @@ document.addEventListener('DOMContentLoaded', function() {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15,
+                        font: {
+                            size: 11
+                        }
+                    }
                 }
             }
         }
@@ -489,7 +503,14 @@ document.addEventListener('DOMContentLoaded', function() {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15,
+                        font: {
+                            size: 11
+                        }
+                    }
                 }
             }
         }
