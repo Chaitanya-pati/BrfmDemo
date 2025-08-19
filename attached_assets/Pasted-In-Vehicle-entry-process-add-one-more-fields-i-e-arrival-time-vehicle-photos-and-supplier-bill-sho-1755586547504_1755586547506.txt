@@ -1,0 +1,43 @@
+In Vehicle entry process add one more fields i.e arrival time 
+vehicle photos and supplier bill should be captured live and give option to capture multiple files 
+And in entire application wherever there is file upload make it live capture 
+all the forms which are used to fill the details should be displayed in the popup 
+make the theme professional and decent and alss covnvert all the textbox colours , grid colours according to the theme and don't make dark theme
+
+
+
+Remove sample bags tested, total bags  fields option from the quality control
+and add the following form exact form fields in the quality control
+
+In teh weight entry also give live capture to upload vehicle image 
+In the master while adding supliers , customers  give options to select state,city , pincode and in teh dispatch vehicle also give the same options 
+In Reports view the graphs are not proper and give user different tabs like Dispatch reports where the user can see all the dispatch details by selecting vehicle, daterange, customers ,salesman who took the order also give optiosn to select state and city which are avilable in the matser details  and by defaulf display current pending dispatches , Suppliers reports where he can see which supplier has delivered how much of wheat here also give options to select daterange, supplier, another dropdown to select without quality claim or with quality claim , then also give teh options to select state wise and city wise and her for both the customers and supplier reoprts  only the daterange field in mendatory and also give presets in the daterange like today,last  month, this month, this year, last year and all ans keep all the fields optional 
+Production Reports : in this the user can query the date range, moisture input user can enter two moistire fields for eg: in the first field the user will enter 12 and int the second field the user will enter 14 so we can get the prodcution details whose finished goods mositure was so and so and in the while displaying production details display minimal data in grid like , order id , start date of the production , end date of the production, and total quantity etc and give view details button and on click of that display all the details related to that production like when it started at what time it has gone to 24 hours cleaning and at what time it has gone to 12 hours cleaning then respective mostures during that processses , cleaning logs with timings and other deatails from the prudction start to bags packing / stroting the finised goods to shallows 
+
+
+In the production order don't give the option to select finished product as it is configured in the grinding process 
+remove Waste collected field from the cleanig process of precleaning as it will be collected at the end of the day
+
+after dispatching the selected vehicle still it is getting displayed in the available vehicle it should nto display it should display as pending and once that vehicle delivers the product to the customer then the driver will live capture his image with location and mark that product is deliveres if driver has delivered that product then the driver will be blocked and should not do any operation until admin approves here keep the track of wheather the driver has uploaded the delivered entry or not by estimated date while dispatching give option as estimated delevery date and give 24 hours buffer timing like if the driver has not uploaded any eveindence until the delivery timing + 24 hours buffer period then the driver will be blocked and send reminders to the driver before 5,10,30 mins of the estimated date and time to upload evidence 
+
+There is no execution of the plan we are unable to excute the production plan step 3 : after the planning is done the other user will start executing the transfer from different precleaning bins to 24 hours cleaning bin we want to keep track of job ids here like what jobs are done at what timing then how much time it has taken for completion we have to keep track of everything and all this should be linked to one order id the admin may search the order number they he should be able to see all the details from  order id creation to finished goods inventory once he start this transfer the timer should start this cleaning process generally takes 24 hours and but before starting this process give user a option for how much time duration the wheat will stay in this bins give 3 options 1)24, 2)12, 3)custom and based on this duration start the countdown and before this timer completed user should not access or enter further process details and after this process is completed capture the moisture the wheat and waste collected after 24 hours of cleaning with machine name here also keep the track water added to the bins 
+
+step 4: after this cleaning process the wheat will transfer to 12 hours cleaning process capture moisture once again here and then start the countdown for 12 hours for now give option to select the time duration for this also for testing purpose and also before starting this process they will mention the target moisture of wheat and after completion of this process again capture the outgoing moisture here also give reminders before process ending
+
+
+step 5 : after 12 hours cleaning process the wheat will move from the b1 scale to grinding and here we have to capture the machine cleaning logs
+here the frequency is more it should be cleaned every hour and the reminders should sent before 5  10 mins and here also they should upload before and after cleaning pics 
+ through this b1 scale the wheat will  move to the grinding process where they how much percentage of each products are required there are mainly 2 products 
+1) Main Products :Includes - Maida,Suji,Chakki Ata, Tandoori Ata,Dp Maida,Loto Maida , Nestle Maida etc which is configured 
+2) Bran : which comes automatically after the process this is basically the outer shield of the wheat
+the ratio of main products is 75-77 % for each production and rest 23 to 25 is bran if the bran is more than this then it should be highlighted
+
+Once this process is completed we have they will packed in bags or stored in the shallow so we need to capture how much of bags are packed of which weight i.e 30kg,50kg 25 kg etc, of which product and how much of finished good is stored in shallows for storing the finished goods also they have storage areas consider 4 storage for now so we need to capture in which storage area how much amount of products are there and they also shift the products from one area to another keep the track of that also shifting products between godown 
+
+
+Remove salesman field from the sales orders and give dropdown there where the dropdown will only be selected by the admin and if any other user is looged in then only the logged in salesman will binded to that dropdown and is disabled 
+And while taking orders give options like first they will select 
+Give option to execute this jobs and also make the UI Responsive and easily understandable by the users finished goods type which is already configured in the master then they will select package wise there can be multiple packages like 20 bag of 30kg, 50 bags of 50kg etc and also the finished good will directly dispatched from the container in tons os give both options 
+Here while taking this order there can be multiple orders like for one cusotmer they required 30kf s of 10 bags , 50 kgs of 10 bags like this so give dynamic option for ordering and while dispatching when the customers select an order then automatically bind all the ordered items 
+
+
