@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 
 {% block title %}Transfer Execution - Job {{ job.job_number }}{% endblock %}
@@ -34,7 +35,7 @@
                 <div class="card-body">
                     <p><strong>Order:</strong> {{ job.order.order_number }}</p>
                     <p><strong>Product:</strong> {{ job.order.product }}</p>
-                    <p><strong>Quantity:</strong> {{ job.order.quantity }} tons</p>
+                    <p><strong>Total Quantity:</strong> {{ job.order.quantity }} tons</p>
                     <p><strong>Status:</strong> <span class="badge bg-primary">{{ job.status.title() }}</span></p>
                 </div>
             </div>
@@ -42,50 +43,58 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Plan Items</h5>
+                    <h5 class="mb-0">Transfer Plan</h5>
                 </div>
                 <div class="card-body">
-                    {% for item in plan_items %}
-                    <div class="mb-2">
-                        <strong>{{ item.precleaning_bin.name }}:</strong> {{ item.percentage }}% ({{ item.quantity }} kg)
-                    </div>
-                    {% endfor %}
+                    {% if plan_items %}
+                        {% for item in plan_items %}
+                        <div class="mb-3 p-3 border rounded">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>From:</strong> {{ item.precleaning_bin.name }}<br>
+                                    <strong>Available:</strong> {{ "%.2f"|format(item.precleaning_bin.current_stock) }} kg
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>To Transfer:</strong> {{ "%.2f"|format(item.quantity) }} kg<br>
+                                    <strong>Percentage:</strong> {{ item.percentage }}%
+                                </div>
+                            </div>
+                            {% if item.precleaning_bin.current_stock < item.quantity %}
+                            <div class="alert alert-danger mt-2 mb-0">
+                                <small><i class="fas fa-exclamation-triangle me-1"></i>Insufficient stock!</small>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-success mt-2 mb-0">
+                                <small><i class="fas fa-check me-1"></i>Ready for transfer</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>No valid transfer items found or insufficient stock.
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Transfer Form -->
+    {% if plan_items %}
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Execute Transfer to 24-Hour Cleaning Bin</h5>
+                    <h5 class="mb-0">Execute Automatic Transfer</h5>
                 </div>
                 <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This will automatically transfer all planned quantities from the precleaning bins to the 24-hour cleaning process.
+                    </div>
+                    
                     <form method="POST" enctype="multipart/form-data">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">From Precleaning Bin *</label>
-                                    <select name="from_bin_id" class="form-select" required>
-                                        <option value="">Select bin...</option>
-                                        {% for bin in precleaning_bins %}
-                                        <option value="{{ bin.id }}">
-                                            {{ bin.name }} ({{ bin.current_stock }} kg available)
-                                        </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Quantity to Transfer (kg) *</label>
-                                    <input type="number" name="quantity" class="form-control" step="0.01" min="0.01" required>
-                                </div>
-                            </div>
-                        </div>
-                        
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -93,29 +102,19 @@
                                     <input type="text" name="operator_name" class="form-control" required>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Start Photo</label>
+                                    <label class="form-label">Start Photo (Optional)</label>
                                     <input type="file" name="start_photo" class="form-control" accept="image/*">
                                     <small class="form-text text-muted">Photo before starting transfer</small>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">End Photo</label>
-                                    <input type="file" name="end_photo" class="form-control" accept="image/*">
-                                    <small class="form-text text-muted">Photo after completing transfer</small>
                                 </div>
                             </div>
                         </div>
 
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-check me-1"></i>Complete Transfer
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-play me-1"></i>Start Transfer
                             </button>
                         </div>
                     </form>
@@ -123,5 +122,13 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
+
+<script>
+// Auto-refresh stock status every 30 seconds
+setInterval(function() {
+    location.reload();
+}, 30000);
+</script>
 {% endblock %}

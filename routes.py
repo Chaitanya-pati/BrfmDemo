@@ -583,10 +583,23 @@ def start_transfer(order_id):
 def transfer_execution(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
     plan_items = ProductionPlanItem.query.filter_by(plan_id=job.plan_id).all()
-    cleaning_bins = CleaningBin.query.filter_by(status='empty').all()
+    
+    # Get only the precleaning bins that are in the plan and have sufficient stock
+    valid_plan_items = []
+    for item in plan_items:
+        precleaning_bin = PrecleaningBin.query.get(item.precleaning_bin_id)
+        if precleaning_bin and precleaning_bin.current_stock >= item.quantity:
+            valid_plan_items.append(item)
     
     if request.method == 'POST':
         try:
+            # Check if all plan items have sufficient stock
+            for item in plan_items:
+                precleaning_bin = PrecleaningBin.query.get(item.precleaning_bin_id)
+                if not precleaning_bin or precleaning_bin.current_stock < item.quantity:
+                    flash(f'Insufficient stock in {precleaning_bin.name if precleaning_bin else "Unknown bin"}', 'error')
+                    return redirect(url_for('transfer_execution', job_id=job_id))
+            
             # Mark job as started
             job.status = 'in_progress'
             job.started_at = datetime.utcnow()
@@ -594,7 +607,7 @@ def transfer_execution(job_id):
             
             total_transferred = 0
             
-            # Process each precleaning bin transfer
+            # Process each precleaning bin transfer automatically
             for plan_item in plan_items:
                 quantity_to_transfer = plan_item.quantity
                 
@@ -638,7 +651,7 @@ def transfer_execution(job_id):
             db.session.add(cleaning_job)
             db.session.commit()
             
-            flash(f'Transfer completed successfully! Total transferred: {total_transferred:.2f} tons', 'success')
+            flash(f'Transfer completed successfully! Total transferred: {total_transferred:.2f} kg', 'success')
             return redirect(url_for('cleaning_setup', job_id=cleaning_job.id))
             
         except Exception as e:
@@ -647,8 +660,7 @@ def transfer_execution(job_id):
     
     return render_template('transfer_execution.html', 
                          job=job, 
-                         plan_items=plan_items,
-                         cleaning_bins=cleaning_bins)
+                         plan_items=valid_plan_items)
 
 @app.route('/production_execution/cleaning_setup/<int:job_id>', methods=['GET', 'POST'])
 def cleaning_setup(job_id):
