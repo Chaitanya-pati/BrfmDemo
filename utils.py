@@ -45,3 +45,28 @@ def get_file_url(filename):
     if filename:
         return f"/uploads/{filename}"
     return None
+import os
+from datetime import datetime
+
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    """Check if file has allowed extension"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def generate_order_number(prefix='ORD'):
+    """Generate unique order number with timestamp"""
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    return f"{prefix}{timestamp}"
+
+def generate_job_id():
+    """Generate unique job ID"""
+    return f"JOB{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+def calculate_production_percentages(quantities):
+    """Calculate production percentages"""
+    total = sum(quantities)
+    if total == 0:
+        return [0] * len(quantities)
+    return [(q / total) * 100 for q in quantities]
