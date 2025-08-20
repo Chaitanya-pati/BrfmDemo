@@ -146,12 +146,30 @@ function showNotification(message, type = 'info') {
 }
 
 // Production stage specific functions
+function startJob(jobId, stage) {
+    if (stage === 'transfer') {
+        window.location.href = `/production_execution/transfer/${jobId}`;
+    } else if (stage === 'cleaning_24h') {
+        window.location.href = `/production_execution/cleaning_24h/${jobId}`;
+    } else if (stage === 'cleaning_12h') {
+        window.location.href = `/production_execution/cleaning_12h/${jobId}`;
+    } else if (stage === 'grinding') {
+        window.location.href = `/production_execution/grinding/${jobId}`;
+    } else if (stage === 'packing') {
+        window.location.href = `/production_execution/packing/${jobId}`;
+    }
+}
+
 function startTransferProcess(jobId) {
     window.location.href = `/production_execution/transfer/${jobId}`;
 }
 
 function startCleaningProcess(jobId, processType) {
-    window.location.href = `/production_execution/cleaning/${jobId}?type=${processType}`;
+    if (processType === '24h') {
+        window.location.href = `/production_execution/cleaning_24h/${jobId}`;
+    } else if (processType === '12h') {
+        window.location.href = `/production_execution/cleaning_12h/${jobId}`;
+    }
 }
 
 function startGrindingProcess(jobId) {

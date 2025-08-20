@@ -913,6 +913,10 @@ def packing_execution(job_id):
                          products=products,
                          storage_areas=storage_areas)
 
+
+
+
+
 @app.route('/production_planning', methods=['GET', 'POST'])
 @app.route('/production_planning/<int:order_id>', methods=['GET', 'POST'])
 def production_planning(order_id=None):
