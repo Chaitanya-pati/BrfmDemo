@@ -90,18 +90,50 @@ def quality_control():
             vehicle_id = request.form['vehicle_id']
             vehicle = Vehicle.query.get_or_404(vehicle_id)
             
+            # Handle file uploads for sample photos
+            sample_photos_before = None
+            sample_photos_after = None
+            
+            if 'sample_photos_before' in request.files:
+                file = request.files['sample_photos_before']
+                if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filename = f"sample_before_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    sample_photos_before = filename
+            
+            if 'sample_photos_after' in request.files:
+                file = request.files['sample_photos_after']
+                if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filename = f"sample_after_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    sample_photos_after = filename
+            
             # Create quality test record
             quality_test = QualityTest()
-            quality_test.vehicle_id = vehicle_id
-            quality_test.moisture_content = float(request.form['moisture_content'])
-            quality_test.foreign_matter = float(request.form['foreign_matter'])
-            quality_test.broken_grains = float(request.form['broken_grains'])
-            quality_test.test_result = request.form['test_result']
-            quality_test.tested_by = request.form['tested_by']
-            quality_test.notes = request.form.get('notes')
+            quality_test.vehicle_id = int(vehicle_id)
+            quality_test.sample_bags_tested = int(request.form['sample_bags_tested'])
+            quality_test.total_bags = int(request.form['total_bags'])
+            quality_test.category_assigned = request.form['category_assigned']
+            quality_test.moisture_content = float(request.form.get('moisture_content', 0)) if request.form.get('moisture_content') else None
+            quality_test.quality_notes = request.form.get('quality_notes')
+            quality_test.lab_instructor = request.form['lab_instructor']
+            quality_test.approved = request.form.get('approved') == 'on'
+            quality_test.sample_photos_before = sample_photos_before
+            quality_test.sample_photos_after = sample_photos_after
+            
+            # Set test date if provided, otherwise use current time
+            if request.form.get('test_date'):
+                quality_test.test_time = datetime.strptime(request.form['test_date'], '%Y-%m-%dT%H:%M')
             
             # Update vehicle with quality info
             vehicle.quality_category = request.form['category_assigned']
+            vehicle.status = 'quality_check'
+            
+            if quality_test.approved:
+                vehicle.owner_approved = True
+                vehicle.status = 'approved'
             
             db.session.add(quality_test)
             db.session.commit()
@@ -503,6 +535,27 @@ def masters():
                          godown_types=godown_types,
                          godowns=godowns,
                          precleaning_bins=precleaning_bins)
+
+@app.route('/api/quality_test/<int:test_id>')
+def get_quality_test_details(test_id):
+    """API endpoint to get quality test details"""
+    try:
+        test = QualityTest.query.get_or_404(test_id)
+        return jsonify({
+            'id': test.id,
+            'vehicle_number': test.vehicle.vehicle_number,
+            'supplier_name': test.vehicle.supplier.company_name if test.vehicle.supplier else None,
+            'test_time': test.test_time.strftime('%d/%m/%Y %H:%M'),
+            'lab_instructor': test.lab_instructor,
+            'sample_bags_tested': test.sample_bags_tested,
+            'total_bags': test.total_bags,
+            'moisture_content': test.moisture_content,
+            'category_assigned': test.category_assigned,
+            'approved': test.approved,
+            'quality_notes': test.quality_notes
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/init_data')
 def init_data():

@@ -103,6 +103,8 @@ class QualityTest(db.Model):
     lab_instructor = db.Column(db.String(100))
     test_time = db.Column(db.DateTime, default=datetime.utcnow)
     approved = db.Column(db.Boolean, default=False)
+    sample_photos_before = db.Column(db.String(200))  # file path for before photos
+    sample_photos_after = db.Column(db.String(200))   # file path for after photos
 
 class Transfer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
