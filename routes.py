@@ -503,3 +503,14 @@ def masters():
                          godown_types=godown_types,
                          godowns=godowns,
                          precleaning_bins=precleaning_bins)
+
+@app.route('/init_data')
+def init_data():
+    """Initialize sample data for the application"""
+    try:
+        from app import init_sample_data
+        init_sample_data()
+        flash('Sample data initialized successfully!', 'success')
+    except Exception as e:
+        flash(f'Error initializing data: {str(e)}', 'error')
+    return redirect(url_for('index'))
