@@ -288,10 +288,12 @@ def production_orders():
             production_order.order_number = generate_order_number('PO')
             production_order.quantity = float(request.form['quantity'])
             production_order.product = request.form['product']
-            production_order.customer = request.form['customer']
+            production_order.customer_id = int(request.form['customer_id']) if request.form.get('customer_id') else None
+            production_order.customer = request.form.get('customer')  # Keep the string field too
             production_order.deadline = datetime.strptime(request.form['deadline'], '%Y-%m-%d')
             production_order.priority = request.form.get('priority', 'normal')
             production_order.description = request.form.get('notes')
+            production_order.created_by = request.form.get('created_by', 'System')
             
             db.session.add(production_order)
             db.session.commit()
@@ -389,7 +391,7 @@ def production_planning():
     
     orders = ProductionOrder.query.filter_by(status='pending').all()
     bins = PrecleaningBin.query.all()
-    plans = ProductionPlan.query.order_by(ProductionPlan.created_at.desc()).all()
+    plans = ProductionPlan.query.order_by(ProductionPlan.planning_date.desc()).all()
     
     return render_template('production_planning.html', orders=orders, bins=bins, plans=plans)
 
@@ -570,6 +572,33 @@ def get_quality_test_details(test_id):
             'approved': test.approved,
             'quality_notes': test.quality_notes
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/customers')
+def get_customers():
+    """API endpoint to get customers data for dropdowns"""
+    try:
+        customers = Customer.query.all()
+        return jsonify([{
+            'id': customer.id,
+            'company_name': customer.company_name,
+            'contact_person': customer.contact_person,
+            'phone': customer.phone
+        } for customer in customers])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/products')
+def get_products():
+    """API endpoint to get products data for dropdowns"""
+    try:
+        products = Product.query.filter_by(category='Main Product').all()
+        return jsonify([{
+            'id': product.id,
+            'name': product.name,
+            'category': product.category
+        } for product in products])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
