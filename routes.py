@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 
 from app import app, db
 from models import (Vehicle, Supplier, Godown, GodownType, QualityTest, Transfer, 
-                   PrecleaningBin, ProductionOrder, ProductionPlan, ProductionJobNew,
+                   PrecleaningBin, ProductionOrder, ProductionPlan, ProductionPlanItem, ProductionJobNew,
                    Customer, Product, SalesDispatch, CleaningProcess)
 from utils import allowed_file, generate_order_number
 
@@ -367,33 +367,92 @@ def production_execution():
                          pending_reminders=pending_reminders)
 
 @app.route('/production_planning', methods=['GET', 'POST'])
-def production_planning():
-    if request.method == 'POST':
-        try:
-            plan = ProductionPlan()
-            plan.order_id = int(request.form['order_id'])
-            plan.stage_1_bin_id = request.form.get('stage_1_bin_id')
-            plan.stage_1_percentage = float(request.form.get('stage_1_percentage', 0))
-            plan.stage_2_bin_id = request.form.get('stage_2_bin_id')
-            plan.stage_2_percentage = float(request.form.get('stage_2_percentage', 0))
-            plan.stage_3_bin_id = request.form.get('stage_3_bin_id')
-            plan.stage_3_percentage = float(request.form.get('stage_3_percentage', 0))
-            plan.priority = request.form.get('priority', 'normal')
-            plan.status = 'draft'
-            
-            db.session.add(plan)
-            db.session.commit()
-            flash('Production plan created successfully!', 'success')
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error creating plan: {str(e)}', 'error')
+@app.route('/production_planning/<int:order_id>', methods=['GET', 'POST'])
+def production_planning(order_id=None):
+    order = None
+    existing_plan = None
+    precleaning_bins = []
     
-    orders = ProductionOrder.query.filter_by(status='pending').all()
-    bins = PrecleaningBin.query.all()
-    plans = ProductionPlan.query.order_by(ProductionPlan.planning_date.desc()).all()
-    
-    return render_template('production_planning.html', orders=orders, bins=bins, plans=plans)
+    if order_id:
+        order = ProductionOrder.query.get_or_404(order_id)
+        existing_plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+        precleaning_bins = PrecleaningBin.query.filter(PrecleaningBin.current_stock > 0).all()
+        
+        if request.method == 'POST' and not existing_plan:
+            try:
+                # Create production plan for specific order
+                plan = ProductionPlan()
+                plan.order_id = order_id
+                plan.planned_by = request.form['planned_by']
+                db.session.add(plan)
+                db.session.flush()  # Get the plan ID
+                
+                total_percentage = 0
+                precleaning_bin_ids = request.form.getlist('precleaning_bin_id')
+                percentages = request.form.getlist('percentage')
+                
+                for i, bin_id in enumerate(precleaning_bin_ids):
+                    if bin_id and i < len(percentages) and percentages[i]:
+                        percentage = float(percentages[i])
+                        quantity = (percentage / 100) * order.quantity
+                        
+                        plan_item = ProductionPlanItem()
+                        plan_item.plan_id = plan.id
+                        plan_item.precleaning_bin_id = int(bin_id)
+                        plan_item.percentage = percentage
+                        plan_item.quantity = quantity
+                        db.session.add(plan_item)
+                        total_percentage += percentage
+                
+                if abs(total_percentage - 100) > 0.1:
+                    flash('Total percentage must equal 100%!', 'error')
+                    db.session.rollback()
+                    return redirect(url_for('production_planning', order_id=order_id))
+                
+                plan.total_percentage = total_percentage
+                plan.status = 'approved'
+                order.status = 'planned'
+                
+                db.session.commit()
+                flash('Production plan created successfully!', 'success')
+                return redirect(url_for('production_orders'))
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error creating production plan: {str(e)}', 'error')
+        
+        return render_template('production_planning.html', 
+                             order=order, 
+                             precleaning_bins=precleaning_bins, 
+                             existing_plan=existing_plan)
+    else:
+        # General planning page
+        if request.method == 'POST':
+            try:
+                plan = ProductionPlan()
+                plan.order_id = int(request.form['order_id'])
+                plan.stage_1_bin_id = request.form.get('stage_1_bin_id')
+                plan.stage_1_percentage = float(request.form.get('stage_1_percentage', 0))
+                plan.stage_2_bin_id = request.form.get('stage_2_bin_id')
+                plan.stage_2_percentage = float(request.form.get('stage_2_percentage', 0))
+                plan.stage_3_bin_id = request.form.get('stage_3_bin_id')
+                plan.stage_3_percentage = float(request.form.get('stage_3_percentage', 0))
+                plan.priority = request.form.get('priority', 'normal')
+                plan.status = 'draft'
+                
+                db.session.add(plan)
+                db.session.commit()
+                flash('Production plan created successfully!', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error creating plan: {str(e)}', 'error')
+        
+        orders = ProductionOrder.query.filter_by(status='pending').all()
+        bins = PrecleaningBin.query.all()
+        plans = ProductionPlan.query.order_by(ProductionPlan.planning_date.desc()).all()
+        
+        return render_template('production_planning.html', orders=orders, bins=bins, plans=plans)
 
 @app.route('/sales_dispatch', methods=['GET', 'POST'])
 def sales_dispatch():
