@@ -518,6 +518,45 @@ def generate_job_id():
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     return f"{prefix}{timestamp}"
 
+@app.route('/start_execution/<int:order_id>')
+def start_execution(order_id):
+    """Start production execution for a planned order"""
+    try:
+        order = ProductionOrder.query.get_or_404(order_id)
+        plan = ProductionPlan.query.filter_by(order_id=order_id, status='approved').first()
+        
+        if not plan:
+            flash('No approved production plan found for this order', 'error')
+            return redirect(url_for('production_orders'))
+        
+        # Check if execution already started
+        existing_job = ProductionJobNew.query.filter_by(order_id=order_id).first()
+        if existing_job:
+            flash('Execution already started for this order', 'warning')
+            return redirect(url_for('production_execution'))
+        
+        # Create first job (transfer stage)
+        job = ProductionJobNew()
+        job.job_number = generate_job_id()
+        job.order_id = order_id
+        job.plan_id = plan.id
+        job.stage = 'transfer'
+        job.status = 'pending'
+        
+        # Update order status
+        order.status = 'in_progress'
+        
+        db.session.add(job)
+        db.session.commit()
+        
+        flash(f'Production execution started! Job {job.job_number} created.', 'success')
+        return redirect(url_for('production_execution'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error starting execution: {str(e)}', 'error')
+        return redirect(url_for('production_orders'))
+
 @app.route('/production_execution/start_transfer/<int:order_id>')
 def start_transfer(order_id):
     order = ProductionOrder.query.get_or_404(order_id)
@@ -812,9 +851,26 @@ def cleaning_12h_setup(job_id):
 
 @app.route('/production_tracking')
 def production_tracking():
-    # Get recent orders for display
-    recent_orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).limit(10).all()
-    return render_template('production_tracking.html', recent_orders=recent_orders)
+    # Get all orders with their plans and jobs
+    orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
+    
+    # Get orders with plans
+    planned_orders = []
+    for order in orders:
+        plan = ProductionPlan.query.filter_by(order_id=order.id).first()
+        jobs = ProductionJobNew.query.filter_by(order_id=order.id).all()
+        
+        order_data = {
+            'order': order,
+            'plan': plan,
+            'jobs': jobs,
+            'job_count': len(jobs),
+            'completed_jobs': len([j for j in jobs if j.status == 'completed']),
+            'progress_percentage': (len([j for j in jobs if j.status == 'completed']) / len(jobs) * 100) if jobs else 0
+        }
+        planned_orders.append(order_data)
+    
+    return render_template('production_tracking.html', planned_orders=planned_orders)
 
 @app.route('/order_tracking/<order_number>')
 def order_tracking_detail(order_number):
