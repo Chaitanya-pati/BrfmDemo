@@ -117,6 +117,22 @@ def quality_control():
             quality_test.total_bags = int(request.form['total_bags'])
             quality_test.category_assigned = request.form['category_assigned']
             quality_test.moisture_content = float(request.form.get('moisture_content', 0)) if request.form.get('moisture_content') else None
+            quality_test.foreign_matter = float(request.form.get('foreign_matter', 0)) if request.form.get('foreign_matter') else None
+            quality_test.broken_grains = float(request.form.get('broken_grains', 0)) if request.form.get('broken_grains') else None
+            quality_test.shrivelled_broken = float(request.form.get('shrivelled_broken', 0)) if request.form.get('shrivelled_broken') else None
+            quality_test.damaged = float(request.form.get('damaged', 0)) if request.form.get('damaged') else None
+            quality_test.weevilled = float(request.form.get('weevilled', 0)) if request.form.get('weevilled') else None
+            quality_test.other_food_grains = float(request.form.get('other_food_grains', 0)) if request.form.get('other_food_grains') else None
+            quality_test.sprouted = float(request.form.get('sprouted', 0)) if request.form.get('sprouted') else None
+            quality_test.immature = float(request.form.get('immature', 0)) if request.form.get('immature') else None
+            quality_test.test_weight = float(request.form.get('test_weight', 0)) if request.form.get('test_weight') else None
+            quality_test.gluten = float(request.form.get('gluten', 0)) if request.form.get('gluten') else None
+            quality_test.protein = float(request.form.get('protein', 0)) if request.form.get('protein') else None
+            quality_test.falling_number = float(request.form.get('falling_number', 0)) if request.form.get('falling_number') else None
+            quality_test.ash_content = float(request.form.get('ash_content', 0)) if request.form.get('ash_content') else None
+            quality_test.wet_gluten = float(request.form.get('wet_gluten', 0)) if request.form.get('wet_gluten') else None
+            quality_test.dry_gluten = float(request.form.get('dry_gluten', 0)) if request.form.get('dry_gluten') else None
+            quality_test.sedimentation_value = float(request.form.get('sedimentation_value', 0)) if request.form.get('sedimentation_value') else None
             quality_test.quality_notes = request.form.get('quality_notes')
             quality_test.lab_instructor = request.form['lab_instructor']
             quality_test.approved = request.form.get('approved') == 'on'
