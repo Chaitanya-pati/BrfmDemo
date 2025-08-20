@@ -268,7 +268,7 @@
                                     
                                     <div class="mt-2">
                                         {% if job.status == 'pending' %}
-                                        <button class="btn btn-primary btn-sm w-100" onclick="startJob({{ job.id }})">
+                                        <button class="btn btn-primary btn-sm w-100" onclick="startJob({{ job.id }}, '{{ job.stage }}')">
                                             <i class="fas fa-play me-1"></i>Start Job
                                         </button>
                                         {% elif job.status == 'in_progress' %}
@@ -588,5 +588,64 @@ function showNotification(message, type = 'info') {
         }
     }, 10000);
 }
+
+// Make sure all functions are globally available
+console.log('Loading production execution functions...');
+
+// Check if functions exist, if not define them
+if (typeof window.startJob === 'undefined') {
+    window.startJob = function(jobId, stage) {
+        console.log('Starting job:', jobId, 'stage:', stage);
+        if (stage === 'transfer') {
+            window.location.href = `/production_execution/transfer/${jobId}`;
+        } else if (stage === 'cleaning_24h') {
+            window.location.href = `/production_execution/cleaning_24h/${jobId}`;
+        } else if (stage === 'cleaning_12h') {
+            window.location.href = `/production_execution/cleaning_12h/${jobId}`;
+        } else if (stage === 'grinding') {
+            window.location.href = `/production_execution/grinding/${jobId}`;
+        } else if (stage === 'packing') {
+            window.location.href = `/production_execution/packing/${jobId}`;
+        }
+    };
+}
+
+if (typeof window.viewJobDetails === 'undefined') {
+    window.viewJobDetails = function(jobId) {
+        fetch(`/api/job_details/${jobId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showJobDetailsModal(data.job);
+                } else {
+                    showNotification('Failed to load job details', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading job details:', error);
+                showNotification('Error loading job details', 'error');
+            });
+    };
+}
+
+if (typeof window.filterJobs === 'undefined') {
+    window.filterJobs = function(status) {
+        const rows = document.querySelectorAll('.job-item');
+        
+        rows.forEach(row => {
+            if (status === 'all') {
+                row.style.display = '';
+            } else {
+                if (row.dataset.stage === status) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    };
+}
+
+console.log('All production execution functions loaded successfully');
 </script>
 {% endblock %}
