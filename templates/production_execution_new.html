@@ -422,22 +422,7 @@ function completeJob(jobId) {
     window.location.href = `/production_execution/complete_job/${jobId}`;
 }
 
-function viewJobDetails(jobId) {
-    // Use the API to get job details and show in modal
-    fetch(`/api/job_details/${jobId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showJobDetailsModal(data.job);
-            } else {
-                showNotification('Failed to load job details', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error loading job details:', error);
-            showNotification('Error loading job details', 'error');
-        });
-}
+// Removed duplicate - using window.viewJobDetails instead
 
 function showJobDetailsModal(job) {
     // Create and show a modal with job details
@@ -481,19 +466,7 @@ function showJobDetailsModal(job) {
     });
 }
 
-function startCleaning(jobId, type) {
-    if (type === '24h') {
-        window.location.href = `/production_execution/cleaning_24h/${jobId}`;
-    } else if (type === '12h') {
-        window.location.href = `/production_execution/cleaning_12h/${jobId}`;
-    } else {
-        window.location.href = `/production_execution/machine_cleaning/${jobId}`;
-    }
-}
-
-
-
-// Make startJob function globally available
+// Define all functions globally from the start
 window.startJob = function(jobId, stage) {
     console.log('Starting job:', jobId, 'stage:', stage);
     if (stage === 'transfer') {
@@ -507,9 +480,8 @@ window.startJob = function(jobId, stage) {
     } else if (stage === 'packing') {
         window.location.href = `/production_execution/packing/${jobId}`;
     }
-}
+};
 
-// Also make other functions globally available
 window.filterJobs = function(status) {
     const rows = document.querySelectorAll('.job-row');
     
@@ -524,7 +496,17 @@ window.filterJobs = function(status) {
             }
         }
     });
-}
+};
+
+window.startCleaning = function(jobId, type) {
+    if (type === '24h') {
+        window.location.href = `/production_execution/cleaning_24h/${jobId}`;
+    } else if (type === '12h') {
+        window.location.href = `/production_execution/cleaning_12h/${jobId}`;
+    } else {
+        window.location.href = `/production_execution/machine_cleaning/${jobId}`;
+    }
+};
 
 window.viewJobDetails = function(jobId) {
     // Use the API to get job details and show in modal
@@ -541,17 +523,7 @@ window.viewJobDetails = function(jobId) {
             console.error('Error loading job details:', error);
             showNotification('Error loading job details', 'error');
         });
-}
-
-window.startCleaning = function(jobId, type) {
-    if (type === '24h') {
-        window.location.href = `/production_execution/cleaning_24h/${jobId}`;
-    } else if (type === '12h') {
-        window.location.href = `/production_execution/cleaning_12h/${jobId}`;
-    } else {
-        window.location.href = `/production_execution/machine_cleaning/${jobId}`;
-    }
-}
+};
 
 function initializeCountdown(elementId, endTime) {
     const countdownElement = document.getElementById(elementId);
