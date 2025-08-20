@@ -507,6 +507,20 @@ function filterJobs(status) {
     });
 }
 
+function startJob(jobId, stage) {
+    if (stage === 'transfer') {
+        window.location.href = `/production_execution/transfer/${jobId}`;
+    } else if (stage === 'cleaning_24h') {
+        window.location.href = `/production_execution/cleaning_24h/${jobId}`;
+    } else if (stage === 'cleaning_12h') {
+        window.location.href = `/production_execution/cleaning_12h/${jobId}`;
+    } else if (stage === 'grinding') {
+        window.location.href = `/production_execution/grinding/${jobId}`;
+    } else if (stage === 'packing') {
+        window.location.href = `/production_execution/packing/${jobId}`;
+    }
+}
+
 function initializeCountdown(elementId, endTime) {
     const countdownElement = document.getElementById(elementId);
     if (!countdownElement) return;
