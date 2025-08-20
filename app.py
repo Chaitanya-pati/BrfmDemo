@@ -1,3 +1,4 @@
+
 import os
 import logging
 from flask import Flask
@@ -39,12 +40,93 @@ scheduler.start()
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+def init_sample_data():
+    """Initialize sample data for testing"""
+    try:
+        # Create godown types
+        if not db.session.query(models.GodownType).first():
+            mill_type = models.GodownType(name='Mill', description='Regular mill quality wheat')
+            low_mill_type = models.GodownType(name='Low Mill', description='Lower quality wheat')
+            hd_type = models.GodownType(name='HD', description='High density wheat')
+            
+            db.session.add_all([mill_type, low_mill_type, hd_type])
+            db.session.commit()
+        
+        # Create sample godowns
+        if not db.session.query(models.Godown).first():
+            godown1 = models.Godown(name='Godown A', type_id=1, capacity=100.0)
+            godown2 = models.Godown(name='Godown B', type_id=2, capacity=150.0)
+            godown3 = models.Godown(name='Godown C', type_id=3, capacity=200.0)
+            
+            db.session.add_all([godown1, godown2, godown3])
+            db.session.commit()
+        
+        # Create sample precleaning bins
+        if not db.session.query(models.PrecleaningBin).first():
+            bin1 = models.PrecleaningBin(name='Pre-cleaning Bin 1', capacity=50.0)
+            bin2 = models.PrecleaningBin(name='Pre-cleaning Bin 2', capacity=75.0)
+            bin3 = models.PrecleaningBin(name='Pre-cleaning Bin 3', capacity=60.0)
+            
+            db.session.add_all([bin1, bin2, bin3])
+            db.session.commit()
+        
+        # Create sample suppliers
+        if not db.session.query(models.Supplier).first():
+            supplier1 = models.Supplier(
+                company_name='ABC Wheat Suppliers',
+                contact_person='John Doe',
+                phone='9876543210',
+                city='Delhi'
+            )
+            supplier2 = models.Supplier(
+                company_name='XYZ Grain Traders',
+                contact_person='Jane Smith',
+                phone='9876543211',
+                city='Mumbai'
+            )
+            
+            db.session.add_all([supplier1, supplier2])
+            db.session.commit()
+        
+        # Create sample products
+        if not db.session.query(models.Product).first():
+            maida = models.Product(name='Maida', category='Main Product', description='Refined wheat flour')
+            suji = models.Product(name='Suji', category='Main Product', description='Semolina')
+            chakki_ata = models.Product(name='Chakki Ata', category='Main Product', description='Whole wheat flour')
+            bran = models.Product(name='Bran', category='Bran', description='Wheat bran')
+            
+            db.session.add_all([maida, suji, chakki_ata, bran])
+            db.session.commit()
+        
+        # Create sample customers
+        if not db.session.query(models.Customer).first():
+            customer1 = models.Customer(
+                company_name='ABC Bakery',
+                contact_person='Ram Kumar',
+                phone='9876543220',
+                city='Delhi'
+            )
+            customer2 = models.Customer(
+                company_name='XYZ Food Products',
+                contact_person='Shyam Gupta',
+                phone='9876543221',
+                city='Mumbai'
+            )
+            
+            db.session.add_all([customer1, customer2])
+            db.session.commit()
+            
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error initializing sample data: {e}")
+
 with app.app_context():
     # Import models and routes
-    import models  # noqa: F401
-    import routes  # noqa: F401
+    import models
+    import routes
     
     db.create_all()
+    init_sample_data()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

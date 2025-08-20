@@ -26,6 +26,7 @@ def index():
                          total_vehicles=total_vehicles,
                          pending_vehicles=pending_vehicles,
                          approved_vehicles=approved_vehicles,
+                         quality_check_vehicles=pending_vehicles,  # Add this for template
                          total_stock=total_stock,
                          active_orders=active_orders,
                          recent_vehicles=recent_vehicles,
@@ -62,6 +63,7 @@ def vehicle_entry():
             vehicle.driver_name = request.form['driver_name']
             vehicle.driver_phone = request.form.get('driver_phone')
             vehicle.arrival_time = datetime.strptime(request.form['arrival_time'], '%Y-%m-%dT%H:%M')
+            vehicle.entry_time = vehicle.arrival_time  # Add entry_time field
             vehicle.vehicle_photo = vehicle_photo
             vehicle.supplier_bill = supplier_bill
             vehicle.notes = request.form.get('notes')
@@ -241,7 +243,7 @@ def production_orders():
             production_order.customer = request.form['customer']
             production_order.deadline = datetime.strptime(request.form['deadline'], '%Y-%m-%d')
             production_order.priority = request.form.get('priority', 'normal')
-            production_order.notes = request.form.get('notes')
+            production_order.description = request.form.get('notes')
             
             db.session.add(production_order)
             db.session.commit()
@@ -417,15 +419,87 @@ def cleaning_management():
                          active_cleanings=active_cleanings,
                          recent_cleanings=recent_cleanings)
 
-@app.route('/masters')
+@app.route('/masters', methods=['GET', 'POST'])
 def masters():
+    if request.method == 'POST':
+        try:
+            form_type = request.form.get('form_type')
+            
+            if form_type == 'supplier':
+                supplier = Supplier()
+                supplier.company_name = request.form['company_name']
+                supplier.contact_person = request.form.get('contact_person')
+                supplier.phone = request.form.get('phone')
+                supplier.address = request.form.get('address')
+                supplier.city = request.form.get('city')
+                supplier.state = request.form.get('state')
+                supplier.postal_code = request.form.get('postal_code')
+                
+                db.session.add(supplier)
+                db.session.commit()
+                flash('Supplier added successfully!', 'success')
+                
+            elif form_type == 'customer':
+                customer = Customer()
+                customer.company_name = request.form['company_name']
+                customer.contact_person = request.form.get('contact_person')
+                customer.phone = request.form.get('phone')
+                customer.email = request.form.get('email')
+                customer.address = request.form.get('address')
+                customer.city = request.form.get('city')
+                customer.state = request.form.get('state')
+                customer.postal_code = request.form.get('postal_code')
+                
+                db.session.add(customer)
+                db.session.commit()
+                flash('Customer added successfully!', 'success')
+                
+            elif form_type == 'product':
+                product = Product()
+                product.name = request.form['name']
+                product.category = request.form['category']
+                product.description = request.form.get('description')
+                
+                db.session.add(product)
+                db.session.commit()
+                flash('Product added successfully!', 'success')
+                
+            elif form_type == 'godown':
+                godown = Godown()
+                godown.name = request.form['name']
+                godown.type_id = int(request.form['type_id'])
+                godown.capacity = float(request.form['capacity'])
+                
+                db.session.add(godown)
+                db.session.commit()
+                flash('Godown added successfully!', 'success')
+                
+            elif form_type == 'precleaning_bin':
+                bin_obj = PrecleaningBin()
+                bin_obj.name = request.form['name']
+                bin_obj.capacity = float(request.form['capacity'])
+                
+                db.session.add(bin_obj)
+                db.session.commit()
+                flash('Pre-cleaning bin added successfully!', 'success')
+                
+            return redirect(url_for('masters'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding record: {str(e)}', 'error')
+    
     suppliers = Supplier.query.all()
     customers = Customer.query.all()
     products = Product.query.all()
     godown_types = GodownType.query.all()
+    godowns = Godown.query.join(GodownType).all()
+    precleaning_bins = PrecleaningBin.query.all()
     
     return render_template('masters.html',
                          suppliers=suppliers,
                          customers=customers,
                          products=products,
-                         godown_types=godown_types)
+                         godown_types=godown_types,
+                         godowns=godowns,
+                         precleaning_bins=precleaning_bins)

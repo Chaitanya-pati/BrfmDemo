@@ -69,6 +69,7 @@ class Vehicle(db.Model):
     driver_name = db.Column(db.String(100))
     driver_phone = db.Column(db.String(20))
     arrival_time = db.Column(db.DateTime, default=datetime.utcnow)
+    entry_time = db.Column(db.DateTime, default=datetime.utcnow)
     bill_photo = db.Column(db.String(200))  # file path
     vehicle_photo = db.Column(db.String(200))
     vehicle_photo_before = db.Column(db.String(200))
@@ -142,7 +143,10 @@ class ProductionOrder(db.Model):
     order_number = db.Column(db.String(50), unique=True, nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
     quantity = db.Column(db.Float, nullable=False)  # in tons
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    product = db.Column(db.String(100))  # Change to string field instead of foreign key
+    customer = db.Column(db.String(100))  # Change to string field instead of foreign key
+    deadline = db.Column(db.DateTime)
+    priority = db.Column(db.String(20), default='normal')
     description = db.Column(db.Text)
     status = db.Column(db.String(20), default='pending')  # pending, planned, in_progress, completed
     created_by = db.Column(db.String(100))
