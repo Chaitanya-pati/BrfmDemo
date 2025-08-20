@@ -738,7 +738,32 @@ def complete_cleaning(process_id):
 
 @app.route('/production_tracking')
 def production_tracking():
-    return render_template('order_tracking.html')
+    # Get recent orders for display
+    recent_orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).limit(10).all()
+    return render_template('production_tracking.html', recent_orders=recent_orders)
+
+@app.route('/order_tracking/<order_number>')
+def order_tracking_detail(order_number):
+    """Display detailed tracking for a specific order"""
+    order = ProductionOrder.query.filter_by(order_number=order_number).first_or_404()
+    plan = ProductionPlan.query.filter_by(order_id=order.id).first()
+    jobs = ProductionJobNew.query.filter_by(order_id=order.id).order_by(ProductionJobNew.created_at).all()
+    
+    # Build job details with associated processes
+    job_details = []
+    for job in jobs:
+        job_detail = {
+            'job': job,
+            'transfers': ProductionTransfer.query.filter_by(job_id=job.id).all(),
+            'cleaning_processes': CleaningProcess.query.filter_by(job_id=job.id).all(),
+            'grinding_processes': GrindingProcess.query.filter_by(job_id=job.id).all() if hasattr(job, 'grinding_processes') else []
+        }
+        job_details.append(job_detail)
+    
+    return render_template('order_tracking.html', 
+                         order=order, 
+                         plan=plan, 
+                         job_details=job_details)
 
 @app.route('/api/order_tracking/<order_number>')
 def api_order_tracking(order_number):
