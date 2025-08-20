@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Cleaning Monitor{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-eye me-2"></i>Cleaning Process Monitor</h2>
+                <a href="{{ url_for('production_execution') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Execution
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timer Display -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Cleaning Timer</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div id="timer-display" class="display-1 fw-bold mb-3" 
+                         data-time-remaining="{{ time_remaining }}">
+                        <span id="hours">00</span>:<span id="minutes">00</span>:<span id="seconds">00</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 20px;">
+                        <div class="progress-bar" role="progressbar" id="progress-bar" 
+                             style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                    <div id="timer-status" class="alert alert-info">
+                        {% if time_remaining > 0 %}
+                        <i class="fas fa-play-circle me-2"></i>Cleaning process is running...
+                        {% else %}
+                        <i class="fas fa-check-circle me-2"></i>Cleaning process completed!
+                        {% endif %}
+                    </div>
+                    {% if time_remaining <= 0 %}
+                    <a href="{{ url_for('complete_cleaning', process_id=process.id) }}" 
+                       class="btn btn-success btn-lg">
+                        <i class="fas fa-check me-2"></i>Complete Cleaning Process
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Information -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Process Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>Job Number:</strong></td>
+                            <td>{{ process.job.job_number }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Order Number:</strong></td>
+                            <td>{{ process.job.order.order_number }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Process Type:</strong></td>
+                            <td><span class="badge bg-info">{{ process.process_type }}</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Duration:</strong></td>
+                            <td>{{ process.duration_hours }} hours</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Machine:</strong></td>
+                            <td>{{ process.machine_name }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Operator:</strong></td>
+                            <td>{{ process.operator_name }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-calendar me-2"></i>Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>Started:</strong></td>
+                            <td>{{ process.start_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Expected End:</strong></td>
+                            <td>{{ process.end_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% if process.status == 'running' %}
+                                <span class="badge bg-warning">{{ process.status }}</span>
+                                {% elif process.status == 'completed' %}
+                                <span class="badge bg-success">{{ process.status }}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ process.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cleaning Bin:</strong></td>
+                            <td>{{ process.cleaning_bin.name }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let timeRemaining = {{ time_remaining }};
+const totalDuration = {{ process.duration_hours * 3600 }};
+
+function updateTimer() {
+    const hours = Math.floor(timeRemaining / 3600);
+    const minutes = Math.floor((timeRemaining % 3600) / 60);
+    const seconds = Math.floor(timeRemaining % 60);
+    
+    document.getElementById('hours').textContent = hours.toString().padStart(2, '0');
+    document.getElementById('minutes').textContent = minutes.toString().padStart(2, '0');
+    document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
+    
+    // Update progress bar
+    const progress = ((totalDuration - timeRemaining) / totalDuration) * 100;
+    const progressBar = document.getElementById('progress-bar');
+    progressBar.style.width = progress + '%';
+    progressBar.setAttribute('aria-valuenow', progress);
+    
+    // Update status
+    const statusDiv = document.getElementById('timer-status');
+    if (timeRemaining <= 0) {
+        statusDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i>Cleaning process completed!';
+        statusDiv.className = 'alert alert-success';
+        
+        // Show completion button
+        if (!document.querySelector('.btn-success')) {
+            statusDiv.insertAdjacentHTML('afterend', 
+                '<a href="{{ url_for("complete_cleaning", process_id=process.id) }}" ' +
+                'class="btn btn-success btn-lg mt-3">' +
+                '<i class="fas fa-check me-2"></i>Complete Cleaning Process</a>'
+            );
+        }
+        
+        // Stop the timer
+        clearInterval(timerInterval);
+    } else {
+        timeRemaining--;
+    }
+}
+
+// Update timer every second
+const timerInterval = setInterval(updateTimer, 1000);
+
+// Initial update
+updateTimer();
+
+// Auto-refresh page data every 30 seconds
+setInterval(function() {
+    fetch('/api/cleaning_timer/{{ process.id }}')
+        .then(response => response.json())
+        .then(data => {
+            timeRemaining = data.time_remaining;
+            
+            if (data.can_complete && timeRemaining <= 0) {
+                location.reload();
+            }
+        })
+        .catch(error => console.error('Error fetching timer data:', error));
+}, 30000);
+</script>
+{% endblock %}

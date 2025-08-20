@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Complete Cleaning{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-check-circle me-2"></i>Complete Cleaning Process</h2>
+                <a href="{{ url_for('cleaning_monitor', process_id=process.id) }}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Monitor
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Summary -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Process Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Job Number:</strong><br>
+                            <span class="badge bg-primary fs-6">{{ process.job.job_number }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Process Type:</strong><br>
+                            <span class="badge bg-info">{{ process.process_type }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Duration:</strong><br>
+                            {{ process.duration_hours }} hours
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Machine:</strong><br>
+                            {{ process.machine_name }}
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <strong>Started:</strong> {{ process.start_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Expected End:</strong> {{ process.end_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completion Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Completion Details</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="end_moisture" class="form-label">
+                                    <i class="fas fa-tint me-2"></i>Final Moisture Level (%) *
+                                </label>
+                                <input type="number" class="form-control" id="end_moisture" 
+                                       name="end_moisture" step="0.1" min="0" max="100" required>
+                                <div class="form-text">Enter the moisture level after cleaning</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="waste_collected" class="form-label">
+                                    <i class="fas fa-trash me-2"></i>Waste Collected (kg) *
+                                </label>
+                                <input type="number" class="form-control" id="waste_collected" 
+                                       name="waste_collected" step="0.1" min="0" required>
+                                <div class="form-text">Total waste collected during cleaning</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="water_added" class="form-label">
+                                    <i class="fas fa-water me-2"></i>Water Added (liters) *
+                                </label>
+                                <input type="number" class="form-control" id="water_added" 
+                                       name="water_added" step="0.1" min="0" required>
+                                <div class="form-text">Total water added during the process</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="completed_by" class="form-label">
+                                    <i class="fas fa-user-check me-2"></i>Completed By *
+                                </label>
+                                <input type="text" class="form-control" id="completed_by" 
+                                       name="completed_by" required>
+                                <div class="form-text">Name of person completing the process</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="end_photo" class="form-label">
+                                    <i class="fas fa-camera me-2"></i>Completion Photo
+                                </label>
+                                <input type="file" class="form-control" id="end_photo" 
+                                       name="end_photo" accept="image/*">
+                                <div class="form-text">Photo of completed cleaning process</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label for="notes" class="form-label">
+                                    <i class="fas fa-sticky-note me-2"></i>Notes
+                                </label>
+                                <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                          placeholder="Any observations or comments about the cleaning process"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Ready to Complete:</strong> 
+                            The cleaning timer has finished. You can now complete this process and move to the next stage.
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-check me-2"></i>Complete Process
+                            </button>
+                            <a href="{{ url_for('cleaning_monitor', process_id=process.id) }}" 
+                               class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

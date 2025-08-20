@@ -317,36 +317,7 @@ def production_orders():
 
 
 
-# Order Tracking
-@app.route('/order_tracking')
-def order_tracking():
-    order_number = request.args.get('order_number')
-    if not order_number:
-        flash('Please provide an order number to search.', 'error')
-        return redirect(url_for('production_orders'))
-    
-    order = ProductionOrder.query.filter_by(order_number=order_number).first()
-    if not order:
-        flash(f'Order {order_number} not found.', 'error')
-        return redirect(url_for('production_orders'))
-    
-    # Get all jobs for this order
-    jobs = ProductionJobNew.query.filter_by(order_id=order.id).order_by(ProductionJobNew.created_at.asc()).all()
-    
-    # Get detailed process data for each job
-    job_details = []
-    for job in jobs:
-        details = {
-            'job': job,
-            'transfers': ProductionTransfer.query.filter_by(job_id=job.id).all(),
-            'cleaning_processes': CleaningProcess.query.filter_by(job_id=job.id).all(),
-            'grinding_processes': GrindingProcess.query.filter_by(job_id=job.id).all()
-        }
-        job_details.append(details)
-    
-    return render_template('order_tracking.html', 
-                         order=order, 
-                         job_details=job_details)
+# Legacy route - replaced by production_tracking
 
 # API Routes for reminders and status
 @app.route('/api/check_reminders')
@@ -529,6 +500,341 @@ def production_planning(order_id=None):
         plans = ProductionPlan.query.order_by(ProductionPlan.planning_date.desc()).all()
         
         return render_template('production_planning.html', orders=orders, bins=bins, plans=plans)
+
+# Production Execution System with Timer Controls
+@app.route('/production_execution')
+def production_execution():
+    # Get pending jobs from approved plans
+    pending_jobs = ProductionJobNew.query.filter_by(status='pending').all()
+    running_processes = CleaningProcess.query.filter_by(status='running').all()
+    
+    return render_template('production_execution.html', 
+                         pending_jobs=pending_jobs,
+                         running_processes=running_processes)
+
+def generate_job_id():
+    """Generate unique job ID"""
+    prefix = "JOB"
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"{prefix}{timestamp}"
+
+@app.route('/production_execution/start_transfer/<int:order_id>')
+def start_transfer(order_id):
+    order = ProductionOrder.query.get_or_404(order_id)
+    plan = ProductionPlan.query.filter_by(order_id=order_id, status='approved').first()
+    
+    if not plan:
+        flash('No approved production plan found for this order', 'error')
+        return redirect(url_for('production_execution'))
+    
+    # Create transfer job
+    job = ProductionJobNew()
+    job.job_number = generate_job_id()
+    job.order_id = order_id
+    job.plan_id = plan.id
+    job.stage = 'transfer'
+    job.status = 'pending'
+    
+    db.session.add(job)
+    db.session.commit()
+    
+    return redirect(url_for('transfer_execution', job_id=job.id))
+
+@app.route('/production_execution/transfer/<int:job_id>', methods=['GET', 'POST'])
+def transfer_execution(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    plan_items = ProductionPlanItem.query.filter_by(plan_id=job.plan_id).all()
+    cleaning_bins = CleaningBin.query.filter_by(status='empty').all()
+    
+    if request.method == 'POST':
+        try:
+            # Mark job as started
+            job.status = 'in_progress'
+            job.started_at = datetime.utcnow()
+            job.started_by = request.form['operator_name']
+            
+            total_transferred = 0
+            
+            # Process each precleaning bin transfer
+            for plan_item in plan_items:
+                quantity_to_transfer = plan_item.quantity
+                
+                # Create transfer record
+                transfer = ProductionTransfer()
+                transfer.job_id = job_id
+                transfer.from_precleaning_bin_id = plan_item.precleaning_bin_id
+                transfer.quantity_transferred = quantity_to_transfer
+                transfer.operator_name = request.form['operator_name']
+                
+                # Handle photos
+                if 'start_photo' in request.files:
+                    file = request.files['start_photo']
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        filename = f"transfer_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        transfer.start_photo = filename
+                
+                # Update precleaning bin stock
+                precleaning_bin = PrecleaningBin.query.get(plan_item.precleaning_bin_id)
+                if precleaning_bin:
+                    precleaning_bin.current_stock -= quantity_to_transfer
+                
+                total_transferred += quantity_to_transfer
+                db.session.add(transfer)
+            
+            # Complete transfer job
+            job.status = 'completed'
+            job.completed_at = datetime.utcnow()
+            job.completed_by = request.form['operator_name']
+            
+            # Create cleaning job
+            cleaning_job = ProductionJobNew()
+            cleaning_job.job_number = generate_job_id()
+            cleaning_job.order_id = job.order_id
+            cleaning_job.plan_id = job.plan_id
+            cleaning_job.stage = 'cleaning'
+            cleaning_job.status = 'pending'
+            
+            db.session.add(cleaning_job)
+            db.session.commit()
+            
+            flash(f'Transfer completed successfully! Total transferred: {total_transferred:.2f} tons', 'success')
+            return redirect(url_for('cleaning_setup', job_id=cleaning_job.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error during transfer: {str(e)}', 'error')
+    
+    return render_template('transfer_execution.html', 
+                         job=job, 
+                         plan_items=plan_items,
+                         cleaning_bins=cleaning_bins)
+
+@app.route('/production_execution/cleaning_setup/<int:job_id>', methods=['GET', 'POST'])
+def cleaning_setup(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    cleaning_bins = CleaningBin.query.filter_by(status='empty').all()
+    
+    if request.method == 'POST':
+        try:
+            duration_option = request.form['duration_option']
+            duration_hours = 24  # default
+            
+            if duration_option == '24':
+                duration_hours = 24
+            elif duration_option == '12':
+                duration_hours = 12
+            elif duration_option == 'custom':
+                duration_hours = int(request.form['custom_hours'])
+            
+            # Create cleaning process
+            cleaning = CleaningProcess()
+            cleaning.job_id = job_id
+            cleaning.process_type = f"{duration_hours}_hour"
+            cleaning.cleaning_bin_id = int(request.form['cleaning_bin_id'])
+            cleaning.duration_hours = duration_hours
+            cleaning.start_time = datetime.utcnow()
+            cleaning.end_time = datetime.utcnow() + timedelta(hours=duration_hours)
+            cleaning.machine_name = request.form['machine_name']
+            cleaning.operator_name = request.form['operator_name']
+            cleaning.status = 'running'
+            
+            # Update cleaning bin status
+            cleaning_bin = CleaningBin.query.get(cleaning.cleaning_bin_id)
+            if cleaning_bin:
+                cleaning_bin.status = 'cleaning'
+            
+            # Update job
+            job.status = 'in_progress'
+            job.started_at = datetime.utcnow()
+            job.started_by = request.form['operator_name']
+            
+            db.session.add(cleaning)
+            db.session.commit()
+            
+            flash(f'Cleaning process started! Duration: {duration_hours} hours', 'success')
+            return redirect(url_for('cleaning_monitor', process_id=cleaning.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting cleaning process: {str(e)}', 'error')
+    
+    return render_template('cleaning_setup.html', job=job, cleaning_bins=cleaning_bins)
+
+@app.route('/production_execution/cleaning_monitor/<int:process_id>')
+def cleaning_monitor(process_id):
+    process = CleaningProcess.query.get_or_404(process_id)
+    
+    # Calculate remaining time
+    now = datetime.utcnow()
+    time_remaining = (process.end_time - now).total_seconds()
+    
+    if time_remaining <= 0:
+        time_remaining = 0
+        if process.status == 'running':
+            process.status = 'completed'
+            # Update cleaning bin status
+            cleaning_bin = CleaningBin.query.get(process.cleaning_bin_id)
+            if cleaning_bin:
+                cleaning_bin.status = 'empty'
+            db.session.commit()
+    
+    return render_template('cleaning_monitor.html', 
+                         process=process, 
+                         time_remaining=time_remaining)
+
+@app.route('/production_execution/complete_cleaning/<int:process_id>', methods=['GET', 'POST'])
+def complete_cleaning(process_id):
+    process = CleaningProcess.query.get_or_404(process_id)
+    
+    # Check if timer is completed
+    now = datetime.utcnow()
+    if now < process.end_time:
+        flash('Cannot complete cleaning process until timer finishes!', 'error')
+        return redirect(url_for('cleaning_monitor', process_id=process_id))
+    
+    if request.method == 'POST':
+        try:
+            # Update cleaning process with completion data
+            process.actual_end_time = datetime.utcnow()
+            process.end_moisture = float(request.form['end_moisture'])
+            process.waste_collected_kg = float(request.form['waste_collected'])
+            process.water_added_liters = float(request.form['water_added'])
+            process.completed_by = request.form['completed_by']
+            process.notes = request.form.get('notes', '')
+            process.status = 'completed'
+            
+            # Handle end photo
+            if 'end_photo' in request.files:
+                file = request.files['end_photo']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"cleaning_end_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    process.end_photo = filename
+            
+            # Update cleaning bin status
+            cleaning_bin = CleaningBin.query.get(process.cleaning_bin_id)
+            if cleaning_bin:
+                cleaning_bin.status = 'empty'
+            
+            # Complete the job
+            job = ProductionJobNew.query.get(process.job_id)
+            job.status = 'completed'
+            job.completed_at = datetime.utcnow()
+            job.completed_by = request.form['completed_by']
+            
+            db.session.commit()
+            
+            flash('Cleaning process completed successfully!', 'success')
+            return redirect(url_for('production_execution'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing cleaning process: {str(e)}', 'error')
+    
+    return render_template('complete_cleaning.html', process=process)
+
+@app.route('/production_tracking')
+def production_tracking():
+    return render_template('order_tracking.html')
+
+@app.route('/api/order_tracking/<order_number>')
+def api_order_tracking(order_number):
+    """API endpoint to get complete order lifecycle data"""
+    order = ProductionOrder.query.filter_by(order_number=order_number).first()
+    
+    if not order:
+        return jsonify({'error': 'Order not found'}), 404
+    
+    # Get production plan
+    plan = ProductionPlan.query.filter_by(order_id=order.id).first()
+    
+    # Get all jobs
+    jobs = ProductionJobNew.query.filter_by(order_id=order.id).order_by(ProductionJobNew.created_at).all()
+    
+    # Get all transfers
+    transfers = []
+    for job in jobs:
+        job_transfers = ProductionTransfer.query.filter_by(job_id=job.id).all()
+        transfers.extend(job_transfers)
+    
+    # Get all cleaning processes
+    cleaning_processes = []
+    for job in jobs:
+        job_cleanings = CleaningProcess.query.filter_by(job_id=job.id).all()
+        cleaning_processes.extend(job_cleanings)
+    
+    # Build response
+    tracking_data = {
+        'order': {
+            'id': order.id,
+            'order_number': order.order_number,
+            'customer': order.customer,
+            'quantity': order.quantity,
+            'product': order.product,
+            'status': order.status,
+            'created_at': order.created_at.isoformat() if order.created_at else None,
+            'deadline': order.deadline.isoformat() if order.deadline else None
+        },
+        'plan': {
+            'id': plan.id,
+            'planned_by': plan.planned_by,
+            'planning_date': plan.planning_date.isoformat() if plan.planning_date else None,
+            'status': plan.status,
+            'total_percentage': plan.total_percentage
+        } if plan else None,
+        'jobs': [{
+            'id': job.id,
+            'job_number': job.job_number,
+            'stage': job.stage,
+            'status': job.status,
+            'started_at': job.started_at.isoformat() if job.started_at else None,
+            'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+            'started_by': job.started_by,
+            'completed_by': job.completed_by
+        } for job in jobs],
+        'transfers': [{
+            'id': transfer.id,
+            'from_bin': transfer.from_bin.name if transfer.from_bin else 'Unknown',
+            'quantity_transferred': transfer.quantity_transferred,
+            'transfer_time': transfer.transfer_time.isoformat() if transfer.transfer_time else None,
+            'operator_name': transfer.operator_name
+        } for transfer in transfers],
+        'cleaning_processes': [{
+            'id': cleaning.id,
+            'process_type': cleaning.process_type,
+            'duration_hours': cleaning.duration_hours,
+            'machine_name': cleaning.machine_name,
+            'start_time': cleaning.start_time.isoformat() if cleaning.start_time else None,
+            'end_time': cleaning.end_time.isoformat() if cleaning.end_time else None,
+            'actual_end_time': cleaning.actual_end_time.isoformat() if cleaning.actual_end_time else None,
+            'start_moisture': cleaning.start_moisture,
+            'end_moisture': cleaning.end_moisture,
+            'water_added_liters': cleaning.water_added_liters,
+            'waste_collected_kg': cleaning.waste_collected_kg,
+            'status': cleaning.status,
+            'operator_name': cleaning.operator_name,
+            'completed_by': cleaning.completed_by
+        } for cleaning in cleaning_processes]
+    }
+    
+    return jsonify(tracking_data)
+
+@app.route('/api/cleaning_timer/<int:process_id>')
+def api_cleaning_timer(process_id):
+    """API endpoint for real-time timer updates"""
+    process = CleaningProcess.query.get_or_404(process_id)
+    
+    now = datetime.utcnow()
+    time_remaining = (process.end_time - now).total_seconds()
+    
+    return jsonify({
+        'time_remaining': max(0, time_remaining),
+        'status': process.status,
+        'can_complete': time_remaining <= 0 and process.status == 'running'
+    })
 
 @app.route('/sales_dispatch', methods=['GET', 'POST'])
 def sales_dispatch():

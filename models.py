@@ -345,11 +345,23 @@ class ProductionTransfer(db.Model):
     job = db.relationship('ProductionJobNew', backref=db.backref('transfers', lazy=True))
     from_bin = db.relationship('PrecleaningBin', backref=db.backref('transfers', lazy=True))
 
+class CleaningBin(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    capacity = db.Column(db.Float, nullable=False)  # in tons
+    current_stock = db.Column(db.Float, default=0)
+    status = db.Column(db.String(20), default='empty')  # empty, occupied, cleaning
+    location = db.Column(db.String(100))
+    cleaning_type = db.Column(db.String(20), default='24_hour')  # 24_hour, 12_hour
+    
+    # Relationship
+    cleaning_processes = db.relationship('CleaningProcess', backref='cleaning_bin', lazy=True)
+
 class CleaningProcess(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
     process_type = db.Column(db.String(20), nullable=False)  # 24_hour, 12_hour
-    cleaning_bin_id = db.Column(db.Integer, nullable=False)  # Which cleaning bin
+    cleaning_bin_id = db.Column(db.Integer, db.ForeignKey('cleaning_bin.id'), nullable=False)
     duration_hours = db.Column(db.Integer, nullable=False)
     target_moisture = db.Column(db.Float)  # For 12-hour process
     start_time = db.Column(db.DateTime, nullable=False)
@@ -364,7 +376,9 @@ class CleaningProcess(db.Model):
     start_photo = db.Column(db.String(255))
     end_photo = db.Column(db.String(255))
     operator_name = db.Column(db.String(100))
+    completed_by = db.Column(db.String(100))
     notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     job = db.relationship('ProductionJobNew', backref=db.backref('cleaning_processes', lazy=True))
 
