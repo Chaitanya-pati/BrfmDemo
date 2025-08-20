@@ -218,6 +218,74 @@ function exportJobReport(jobId) {
     window.open(`/production_execution/export_report/${jobId}`, '_blank');
 }
 
+// Missing functions that are called from the template
+function startCleaning(jobId, type) {
+    if (type === '24h') {
+        window.location.href = `/production_execution/cleaning_24h/${jobId}`;
+    } else if (type === '12h') {
+        window.location.href = `/production_execution/cleaning_12h/${jobId}`;
+    }
+}
+
+function viewJobDetails(jobId) {
+    // Open job details in a modal or navigate to details page
+    fetch(`/api/job_details/${jobId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showJobDetailsModal(data.job);
+            } else {
+                showNotification('Failed to load job details', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading job details:', error);
+            showNotification('Error loading job details', 'error');
+        });
+}
+
+function showJobDetailsModal(job) {
+    // Create and show a modal with job details
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Job Details - ${job.job_number}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Order:</strong> ${job.order_number}</p>
+                            <p><strong>Stage:</strong> ${job.stage}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-${job.status === 'completed' ? 'success' : job.status === 'in_progress' ? 'warning' : 'secondary'}">${job.status}</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Started:</strong> ${job.started_at || 'Not started'}</p>
+                            <p><strong>Started By:</strong> ${job.started_by || 'N/A'}</p>
+                            <p><strong>Completed:</strong> ${job.completed_at || 'Not completed'}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Remove modal from DOM when hidden
+    modal.addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+    });
+}
+
 // Quality control functions
 function recordQualityCheck(processId, processType) {
     window.location.href = `/production_execution/quality_check/${processType}/${processId}`;

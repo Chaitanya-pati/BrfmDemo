@@ -1260,6 +1260,30 @@ def api_get_production_job(job_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/job_details/<int:job_id>')
+def api_job_details(job_id):
+    """Get detailed information about a job for modal display"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        order = ProductionOrder.query.get(job.order_id) if job.order_id else None
+        
+        job_data = {
+            'id': job.id,
+            'job_number': job.job_number,
+            'order_number': order.order_number if order else 'N/A',
+            'stage': job.stage.replace('_', ' ').title(),
+            'status': job.status,
+            'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else None,
+            'started_by': job.started_by,
+            'completed_at': job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else None,
+            'completed_by': job.completed_by,
+            'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else None
+        }
+        
+        return jsonify({'success': True, 'job': job_data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/job_progress')
 def api_job_progress():
     """API endpoint to get job progress updates"""
