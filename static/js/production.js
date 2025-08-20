@@ -43,7 +43,12 @@ function filterJobs(status) {
 
 function updateJobProgress() {
     fetch('/api/job_progress')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             data.forEach(job => {
                 const progressBar = document.querySelector(`[data-job-id="${job.id}"]`);
@@ -56,18 +61,30 @@ function updateJobProgress() {
                 }
             });
         })
-        .catch(error => console.error('Error updating job progress:', error));
+        .catch(error => {
+            console.error('Error updating job progress:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Error updating job progress', 'error');
+            }
+        });
 }
 
 function checkReminders() {
     fetch('/api/check_reminders')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.new_reminders > 0) {
                 showNotification(`You have ${data.new_reminders} new reminders!`, 'warning');
             }
         })
-        .catch(error => console.error('Error checking reminders:', error));
+        .catch(error => {
+            console.error('Error checking reminders:', error);
+        });
 }
 
 function initializeCountdowns() {
@@ -130,7 +147,12 @@ function startJob(jobId) {
         },
         body: JSON.stringify({ job_id: jobId })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             showNotification(data.message, 'success');
@@ -141,7 +163,7 @@ function startJob(jobId) {
     })
     .catch(error => {
         console.error('Error:', error);
-        showNotification('An error occurred', 'error');
+        showNotification('An error occurred starting the job', 'error');
     });
 }
 
@@ -157,7 +179,12 @@ function pauseJob(jobId) {
         },
         body: JSON.stringify({ job_id: jobId })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             showNotification(data.message, 'success');
@@ -168,13 +195,18 @@ function pauseJob(jobId) {
     })
     .catch(error => {
         console.error('Error:', error);
-        showNotification('An error occurred', 'error');
+        showNotification('An error occurred pausing the job', 'error');
     });
 }
 
 function viewJobDetails(jobId) {
     fetch(`/api/production_job/${jobId}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(job => {
             // Populate job details modal
             const modal = document.getElementById('jobDetailsModal');
@@ -190,19 +222,23 @@ function viewJobDetails(jobId) {
                 const timeline = modal.querySelector('#jobTimeline');
                 timeline.innerHTML = '';
                 
-                job.timeline.forEach(event => {
-                    const timelineItem = document.createElement('div');
-                    timelineItem.className = 'timeline-item';
-                    timelineItem.innerHTML = `
-                        <div class="d-flex justify-content-between">
-                            <strong>${event.stage}</strong>
-                            <small class="text-muted">${new Date(event.time).toLocaleString()}</small>
-                        </div>
-                        <small class="text-muted">By: ${event.operator}</small>
-                        ${event.quantity ? `<small class="text-info">Quantity: ${event.quantity}</small>` : ''}
-                    `;
-                    timeline.appendChild(timelineItem);
-                });
+                if (job.timeline && job.timeline.length > 0) {
+                    job.timeline.forEach(event => {
+                        const timelineItem = document.createElement('div');
+                        timelineItem.className = 'timeline-item';
+                        timelineItem.innerHTML = `
+                            <div class="d-flex justify-content-between">
+                                <strong>${event.stage}</strong>
+                                <small class="text-muted">${new Date(event.time).toLocaleString()}</small>
+                            </div>
+                            <small class="text-muted">By: ${event.operator}</small>
+                            ${event.quantity ? `<small class="text-info">Quantity: ${event.quantity}</small>` : ''}
+                        `;
+                        timeline.appendChild(timelineItem);
+                    });
+                } else {
+                    timeline.innerHTML = '<p class="text-muted">No timeline events yet.</p>';
+                }
                 
                 new bootstrap.Modal(modal).show();
             }
@@ -237,6 +273,9 @@ function showNotification(message, type) {
         }
     }, 5000);
 }
+
+// Make showNotification globally available
+window.showNotification = showNotification;
 
 // File upload preview
 function previewFile(input, previewId) {

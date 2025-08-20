@@ -661,6 +661,75 @@ def get_products():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/start_job', methods=['POST'])
+def api_start_job():
+    """API endpoint to start a production job"""
+    try:
+        data = request.get_json()
+        job_id = data.get('job_id')
+        
+        job = ProductionJobNew.query.get_or_404(job_id)
+        job.status = 'in_progress'
+        job.started_at = datetime.now()
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Job started successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/pause_job', methods=['POST'])
+def api_pause_job():
+    """API endpoint to pause a production job"""
+    try:
+        data = request.get_json()
+        job_id = data.get('job_id')
+        
+        job = ProductionJobNew.query.get_or_404(job_id)
+        job.status = 'paused'
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Job paused successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/production_job/<int:job_id>')
+def api_get_production_job(job_id):
+    """API endpoint to get production job details"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        return jsonify({
+            'id': job.id,
+            'job_number': job.job_number,
+            'order_number': job.plan.order.order_number if job.plan and job.plan.order else 'N/A',
+            'stage': job.stage,
+            'status': job.status,
+            'progress': 50,  # Default progress
+            'timeline': []  # Add timeline data as needed
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/job_progress')
+def api_job_progress():
+    """API endpoint to get job progress updates"""
+    try:
+        jobs = ProductionJobNew.query.filter(ProductionJobNew.status.in_(['in_progress', 'pending'])).all()
+        return jsonify([{
+            'id': job.id,
+            'progress': 75 if job.status == 'in_progress' else 0
+        } for job in jobs])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/check_reminders')
+def api_check_reminders():
+    """API endpoint to check for new reminders"""
+    try:
+        # Placeholder for reminders logic
+        return jsonify({'new_reminders': 0})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/init_data')
 def init_data():
     """Initialize sample data for the application"""
