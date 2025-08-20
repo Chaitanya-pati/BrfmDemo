@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from app import app, db
 from models import (Vehicle, Supplier, Godown, GodownType, QualityTest, Transfer, 
                    PrecleaningBin, ProductionOrder, ProductionPlan, ProductionPlanItem, ProductionJobNew,
-                   Customer, Product, SalesDispatch, CleaningProcess, CleaningMachine,
+                   Customer, Product, SalesDispatch, CleaningProcess, CleaningMachine, CleaningBin,
                    ProductionTransfer, GrindingProcess, ProductOutput, PackingProcess,
                    CleaningLog, StorageArea, StorageTransfer)
 from utils import allowed_file, generate_order_number, generate_job_id
@@ -588,12 +588,12 @@ def transfer_execution(job_id):
             job.completed_at = datetime.utcnow()
             job.completed_by = request.form['operator_name']
             
-            # Create cleaning job
+            # Create cleaning_24h job
             cleaning_job = ProductionJobNew()
             cleaning_job.job_number = generate_job_id()
             cleaning_job.order_id = job.order_id
             cleaning_job.plan_id = job.plan_id
-            cleaning_job.stage = 'cleaning'
+            cleaning_job.stage = 'cleaning_24h'
             cleaning_job.status = 'pending'
             
             db.session.add(cleaning_job)
@@ -631,13 +631,14 @@ def cleaning_setup(job_id):
             # Create cleaning process
             cleaning = CleaningProcess()
             cleaning.job_id = job_id
-            cleaning.process_type = f"{duration_hours}_hour"
+            cleaning.process_type = f"{duration_hours}_hour_cleaning"
             cleaning.cleaning_bin_id = int(request.form['cleaning_bin_id'])
             cleaning.duration_hours = duration_hours
             cleaning.start_time = datetime.utcnow()
             cleaning.end_time = datetime.utcnow() + timedelta(hours=duration_hours)
             cleaning.machine_name = request.form['machine_name']
             cleaning.operator_name = request.form['operator_name']
+            cleaning.start_moisture = float(request.form.get('start_moisture', 0))
             cleaning.status = 'running'
             
             # Update cleaning bin status
@@ -670,6 +671,11 @@ def cleaning_monitor(process_id):
     now = datetime.utcnow()
     time_remaining = (process.end_time - now).total_seconds()
     
+    # Check if reminder should be shown (1 hour before completion)
+    show_reminder = False
+    if time_remaining > 0 and time_remaining <= 3600:  # 1 hour = 3600 seconds
+        show_reminder = True
+    
     if time_remaining <= 0:
         time_remaining = 0
         if process.status == 'running':
@@ -682,7 +688,8 @@ def cleaning_monitor(process_id):
     
     return render_template('cleaning_monitor.html', 
                          process=process, 
-                         time_remaining=time_remaining)
+                         time_remaining=time_remaining,
+                         show_reminder=show_reminder)
 
 @app.route('/production_execution/complete_cleaning/<int:process_id>', methods=['GET', 'POST'])
 def complete_cleaning(process_id):
@@ -725,16 +732,83 @@ def complete_cleaning(process_id):
             job.completed_at = datetime.utcnow()
             job.completed_by = request.form['completed_by']
             
-            db.session.commit()
-            
-            flash('Cleaning process completed successfully!', 'success')
-            return redirect(url_for('production_execution'))
+            # If this was 24-hour cleaning, create 12-hour cleaning job
+            if job.stage == 'cleaning_24h':
+                cleaning_12h_job = ProductionJobNew()
+                cleaning_12h_job.job_number = generate_job_id()
+                cleaning_12h_job.order_id = job.order_id
+                cleaning_12h_job.plan_id = job.plan_id
+                cleaning_12h_job.stage = 'cleaning_12h'
+                cleaning_12h_job.status = 'pending'
+                db.session.add(cleaning_12h_job)
+                
+                db.session.commit()
+                flash('24-hour cleaning completed! Ready for 12-hour cleaning process.', 'success')
+                return redirect(url_for('cleaning_12h_setup', job_id=cleaning_12h_job.id))
+            else:
+                db.session.commit()
+                flash('Cleaning process completed successfully!', 'success')
+                return redirect(url_for('production_execution'))
             
         except Exception as e:
             db.session.rollback()
             flash(f'Error completing cleaning process: {str(e)}', 'error')
     
     return render_template('complete_cleaning.html', process=process)
+
+# 12-Hour Cleaning Setup Route
+@app.route('/production_execution/cleaning_12h_setup/<int:job_id>', methods=['GET', 'POST'])
+def cleaning_12h_setup(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    cleaning_bins_12h = CleaningBin.query.filter_by(status='empty', cleaning_type='12_hour').all()
+    
+    if request.method == 'POST':
+        try:
+            duration_option = request.form['duration_option']
+            duration_hours = 12  # default
+            
+            if duration_option == '24':
+                duration_hours = 24
+            elif duration_option == '12':
+                duration_hours = 12
+            elif duration_option == 'custom':
+                duration_hours = int(request.form['custom_hours'])
+            
+            # Create 12-hour cleaning process
+            cleaning = CleaningProcess()
+            cleaning.job_id = job_id
+            cleaning.process_type = f"{duration_hours}_hour_cleaning_12h"
+            cleaning.cleaning_bin_id = int(request.form['cleaning_bin_id'])
+            cleaning.duration_hours = duration_hours
+            cleaning.start_time = datetime.utcnow()
+            cleaning.end_time = datetime.utcnow() + timedelta(hours=duration_hours)
+            cleaning.machine_name = request.form['machine_name']
+            cleaning.operator_name = request.form['operator_name']
+            cleaning.start_moisture = float(request.form.get('start_moisture', 0))
+            cleaning.target_moisture = float(request.form.get('target_moisture', 0))
+            cleaning.status = 'running'
+            
+            # Update cleaning bin status
+            cleaning_bin = CleaningBin.query.get(cleaning.cleaning_bin_id)
+            if cleaning_bin:
+                cleaning_bin.status = 'cleaning'
+            
+            # Update job
+            job.status = 'in_progress'
+            job.started_at = datetime.utcnow()
+            job.started_by = request.form['operator_name']
+            
+            db.session.add(cleaning)
+            db.session.commit()
+            
+            flash(f'12-hour cleaning process started! Duration: {duration_hours} hours', 'success')
+            return redirect(url_for('cleaning_monitor', process_id=cleaning.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting 12-hour cleaning process: {str(e)}', 'error')
+    
+    return render_template('cleaning_12h_setup.html', job=job, cleaning_bins=cleaning_bins_12h)
 
 @app.route('/production_tracking')
 def production_tracking():
@@ -855,10 +929,17 @@ def api_cleaning_timer(process_id):
     now = datetime.utcnow()
     time_remaining = (process.end_time - now).total_seconds()
     
+    # Check if reminder should be shown (1 hour before completion for 12h process)
+    show_reminder = False
+    if '12h' in process.process_type and time_remaining > 0 and time_remaining <= 3600:
+        show_reminder = True
+    
     return jsonify({
         'time_remaining': max(0, time_remaining),
         'status': process.status,
-        'can_complete': time_remaining <= 0 and process.status == 'running'
+        'can_complete': time_remaining <= 0 and process.status == 'running',
+        'show_reminder': show_reminder,
+        'process_type': process.process_type
     })
 
 @app.route('/sales_dispatch', methods=['GET', 'POST'])
