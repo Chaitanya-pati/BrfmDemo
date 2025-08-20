@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Machine Cleaning - {{ machine.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-wrench me-2"></i>Machine Cleaning - {{ machine.name }}
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Production
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Machine Information -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Machine Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Name:</strong> {{ machine.name }}</p>
+                            <p><strong>Type:</strong> {{ machine.machine_type.replace('_', ' ').title() }}</p>
+                            <p><strong>Location:</strong> {{ machine.location or 'Not specified' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Cleaning Frequency:</strong> Every {{ machine.cleaning_frequency_hours }} hours</p>
+                            <p><strong>Last Cleaned:</strong> 
+                                {% if machine.last_cleaned %}
+                                    {{ machine.last_cleaned.strftime('%d/%m/%Y %H:%M') }}
+                                {% else %}
+                                    <span class="text-danger">Never</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-header">
+                    <h5 class="mb-0">Cleaning Status</h5>
+                </div>
+                <div class="card-body">
+                    {% if machine.last_cleaned %}
+                        {% set hours_since = (moment.utcnow() - machine.last_cleaned).total_seconds() / 3600 %}
+                        {% if hours_since < machine.cleaning_frequency_hours %}
+                            <i class="fas fa-check-circle fa-3x text-success mb-2"></i>
+                            <h5 class="text-success">Clean</h5>
+                            <small class="text-muted">Next cleaning in {{ (machine.cleaning_frequency_hours - hours_since)|int }} hours</small>
+                        {% else %}
+                            <i class="fas fa-exclamation-triangle fa-3x text-danger mb-2"></i>
+                            <h5 class="text-danger">Needs Cleaning</h5>
+                            <small class="text-muted">Overdue by {{ (hours_since - machine.cleaning_frequency_hours)|int }} hours</small>
+                        {% endif %}
+                    {% else %}
+                        <i class="fas fa-exclamation-triangle fa-3x text-danger mb-2"></i>
+                        <h5 class="text-danger">Never Cleaned</h5>
+                        <small class="text-muted">Requires immediate cleaning</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cleaning Form -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Record Machine Cleaning</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Cleaned By *</label>
+                                    <input type="text" name="cleaned_by" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Waste Collected (kg)</label>
+                                    <input type="number" name="waste_collected" class="form-control" step="0.01" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Photo Before Cleaning *</label>
+                                    <input type="file" name="photo_before" class="form-control" accept="image/*" required>
+                                    <small class="form-text text-muted">Photo showing machine condition before cleaning</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Photo After Cleaning *</label>
+                                    <input type="file" name="photo_after" class="form-control" accept="image/*" required>
+                                    <small class="form-text text-muted">Photo showing machine condition after cleaning</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Cleaning Notes</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="Any issues found, special procedures used, etc."></textarea>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Important:</strong> Both before and after photos are required to complete the cleaning record. 
+                            This ensures proper documentation of the cleaning process.
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-1"></i>Record Cleaning
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cleaning History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Cleaning History</h5>
+                </div>
+                <div class="card-body">
+                    {% if cleaning_logs %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>Cleaned By</th>
+                                    <th>Waste Collected</th>
+                                    <th>Photos</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in cleaning_logs %}
+                                <tr>
+                                    <td>{{ log.cleaning_time.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>{{ log.cleaned_by }}</td>
+                                    <td>
+                                        {% if log.waste_collected %}
+                                            {{ log.waste_collected }} kg
+                                        {% else %}
+                                            Not recorded
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.photo_before %}
+                                        <a href="{{ url_for('static', filename='uploads/' + log.photo_before) }}" target="_blank" class="btn btn-sm btn-outline-primary me-1">
+                                            <i class="fas fa-eye"></i> Before
+                                        </a>
+                                        {% endif %}
+                                        {% if log.photo_after %}
+                                        <a href="{{ url_for('static', filename='uploads/' + log.photo_after) }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                            <i class="fas fa-eye"></i> After
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.notes %}
+                                            {{ log.notes[:50] }}{% if log.notes|length > 50 %}...{% endif %}
+                                        {% else %}
+                                            No notes
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No cleaning history available for this machine.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

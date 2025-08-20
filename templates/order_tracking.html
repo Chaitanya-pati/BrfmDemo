@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Order Tracking - {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-search me-2"></i>Order Tracking - {{ order.order_number }}
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Production
+                            </a>
+                            <button class="btn btn-outline-primary" onclick="window.print()">
+                                <i class="fas fa-print me-1"></i>Print Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Summary -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p><strong>Order Number:</strong> {{ order.order_number }}</p>
+                            <p><strong>Product:</strong> {{ order.product }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Customer:</strong> {{ order.customer }}</p>
+                            <p><strong>Quantity:</strong> {{ order.quantity }} tons</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Status:</strong> 
+                                <span class="badge bg-{{ 'success' if order.status == 'completed' else 'primary' if order.status == 'in_progress' else 'secondary' }}">
+                                    {{ order.status.title() }}
+                                </span>
+                            </p>
+                            <p><strong>Priority:</strong> {{ order.priority.title() }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Created:</strong> {{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                            <p><strong>Deadline:</strong> {{ order.deadline.strftime('%d/%m/%Y') if order.deadline else 'N/A' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Timeline -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Production Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for job_detail in job_details %}
+                        {% set job = job_detail.job %}
+                        <div class="timeline-item {{ 'active' if job.status == 'in_progress' else 'completed' if job.status == 'completed' else 'pending' }}">
+                            <div class="timeline-icon">
+                                {% if job.stage == 'transfer' %}
+                                    <i class="fas fa-exchange-alt"></i>
+                                {% elif job.stage == 'cleaning_24h' %}
+                                    <i class="fas fa-clock"></i>
+                                {% elif job.stage == 'cleaning_12h' %}
+                                    <i class="fas fa-hourglass-half"></i>
+                                {% elif job.stage == 'grinding' %}
+                                    <i class="fas fa-cog"></i>
+                                {% elif job.stage == 'packing' %}
+                                    <i class="fas fa-box"></i>
+                                {% endif %}
+                            </div>
+                            <div class="timeline-content">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <div class="d-flex justify-content-between">
+                                            <h6 class="mb-0">{{ job.stage.replace('_', ' ').title() }} - {{ job.job_number }}</h6>
+                                            <span class="badge bg-{{ 'success' if job.status == 'completed' else 'primary' if job.status == 'in_progress' else 'secondary' }}">
+                                                {{ job.status.title() }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p class="mb-1"><strong>Started:</strong> {{ job.started_at.strftime('%d/%m/%Y %H:%M') if job.started_at else 'Not started' }}</p>
+                                                <p class="mb-1"><strong>Started By:</strong> {{ job.started_by or 'N/A' }}</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p class="mb-1"><strong>Completed:</strong> {{ job.completed_at.strftime('%d/%m/%Y %H:%M') if job.completed_at else 'In progress' }}</p>
+                                                <p class="mb-1"><strong>Completed By:</strong> {{ job.completed_by or 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {% if job.notes %}
+                                        <p class="mb-1"><strong>Notes:</strong> {{ job.notes }}</p>
+                                        {% endif %}
+
+                                        <!-- Process Details -->
+                                        {% if job.stage == 'transfer' and job_detail.transfers %}
+                                        <div class="mt-3">
+                                            <h6>Transfer Details:</h6>
+                                            {% for transfer in job_detail.transfers %}
+                                            <div class="border p-2 mb-2">
+                                                <p class="mb-1"><strong>From:</strong> {{ transfer.from_bin.name }}</p>
+                                                <p class="mb-1"><strong>Quantity:</strong> {{ transfer.quantity_transferred }} kg</p>
+                                                <p class="mb-1"><strong>Time:</strong> {{ transfer.transfer_time.strftime('%d/%m/%Y %H:%M') }}</p>
+                                                <p class="mb-1"><strong>Operator:</strong> {{ transfer.operator_name }}</p>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+
+                                        {% if job.stage in ['cleaning_24h', 'cleaning_12h'] and job_detail.cleaning_processes %}
+                                        <div class="mt-3">
+                                            <h6>Cleaning Process Details:</h6>
+                                            {% for cleaning in job_detail.cleaning_processes %}
+                                            <div class="border p-2 mb-2">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <p class="mb-1"><strong>Type:</strong> {{ cleaning.process_type.replace('_', ' ').title() }}</p>
+                                                        <p class="mb-1"><strong>Duration:</strong> {{ cleaning.duration_hours }} hours</p>
+                                                        <p class="mb-1"><strong>Start Moisture:</strong> {{ cleaning.start_moisture }}%</p>
+                                                        {% if cleaning.target_moisture %}
+                                                        <p class="mb-1"><strong>Target Moisture:</strong> {{ cleaning.target_moisture }}%</p>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <p class="mb-1"><strong>Start Time:</strong> {{ cleaning.start_time.strftime('%d/%m/%Y %H:%M') }}</p>
+                                                        <p class="mb-1"><strong>End Time:</strong> {{ cleaning.end_time.strftime('%d/%m/%Y %H:%M') }}</p>
+                                                        <p class="mb-1"><strong>Status:</strong> 
+                                                            <span class="badge bg-{{ 'success' if cleaning.status == 'completed' else 'primary' if cleaning.status == 'running' else 'secondary' }}">
+                                                                {{ cleaning.status.title() }}
+                                                            </span>
+                                                        </p>
+                                                        <p class="mb-1"><strong>Operator:</strong> {{ cleaning.operator_name }}</p>
+                                                    </div>
+                                                </div>
+                                                {% if cleaning.water_added_liters %}
+                                                <p class="mb-1"><strong>Water Added:</strong> {{ cleaning.water_added_liters }} liters</p>
+                                                {% endif %}
+                                                {% if cleaning.end_moisture %}
+                                                <p class="mb-1"><strong>Final Moisture:</strong> {{ cleaning.end_moisture }}%</p>
+                                                {% endif %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+
+                                        {% if job.stage == 'grinding' and job_detail.grinding_processes %}
+                                        <div class="mt-3">
+                                            <h6>Grinding Process Details:</h6>
+                                            {% for grinding in job_detail.grinding_processes %}
+                                            <div class="border p-2 mb-2">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <p class="mb-1"><strong>Machine:</strong> {{ grinding.machine_name }}</p>
+                                                        <p class="mb-1"><strong>Input Quantity:</strong> {{ grinding.input_quantity_kg }} kg</p>
+                                                        <p class="mb-1"><strong>Total Output:</strong> {{ grinding.total_output_kg }} kg</p>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <p class="mb-1"><strong>Main Products:</strong> {{ grinding.main_products_kg }} kg ({{ grinding.bran_percentage }}%)</p>
+                                                        <p class="mb-1"><strong>Bran:</strong> {{ grinding.bran_kg }} kg ({{ 100 - grinding.bran_percentage }}%)</p>
+                                                        <p class="mb-1"><strong>Operator:</strong> {{ grinding.operator_name }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-icon {
+    position: absolute;
+    left: -22px;
+    top: 10px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #6c757d;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.timeline-item.active .timeline-icon {
+    background: #007bff;
+}
+
+.timeline-item.completed .timeline-icon {
+    background: #28a745;
+}
+
+.timeline-content {
+    margin-left: 15px;
+}
+
+@media print {
+    .btn, .card-header .d-flex .btn {
+        display: none !important;
+    }
+    
+    .timeline-icon {
+        background: #000 !important;
+        color: white !important;
+        -webkit-print-color-adjust: exact;
+    }
+}
+</style>
+{% endblock %}

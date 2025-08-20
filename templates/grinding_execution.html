@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Grinding Process - Job {{ job.job_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>Grinding Process - {{ job.job_number }}
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Jobs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Information -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Job Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Order:</strong> {{ job.order.order_number }}</p>
+                            <p><strong>Product:</strong> {{ job.order.product }}</p>
+                            <p><strong>Quantity:</strong> {{ job.order.quantity }} tons</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Status:</strong> <span class="badge bg-danger">{{ job.status.title() }}</span></p>
+                            <p><strong>Stage:</strong> Grinding & Processing</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-header">
+                    <h5 class="mb-0">Expected Output Ratio</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <h4 class="text-success">75-77%</h4>
+                            <small class="text-muted">Main Products</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-warning">23-25%</h4>
+                            <small class="text-muted">Bran</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grinding Process Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Complete Grinding Process</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="grindingForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Machine Name *</label>
+                                    <select name="machine_name" class="form-select" required>
+                                        <option value="">Select machine...</option>
+                                        <option value="Grinding Mill 1">Grinding Mill 1</option>
+                                        <option value="Grinding Mill 2">Grinding Mill 2</option>
+                                        <option value="Processing Unit A">Processing Unit A</option>
+                                        <option value="Processing Unit B">Processing Unit B</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Operator Name *</label>
+                                    <input type="text" name="operator_name" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Input/Output Quantities -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h6 class="mb-0">Input/Output Quantities</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Input Quantity (kg) *</label>
+                                            <input type="number" name="input_quantity" id="inputQuantity" class="form-control" step="0.01" min="0.01" required onchange="calculatePercentages()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Main Products (kg) *</label>
+                                            <input type="number" name="main_products" id="mainProducts" class="form-control" step="0.01" min="0" required onchange="calculatePercentages()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Bran (kg) *</label>
+                                            <input type="number" name="bran" id="bran" class="form-control" step="0.01" min="0" required onchange="calculatePercentages()">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Total Output (kg) *</label>
+                                            <input type="number" name="total_output" id="totalOutput" class="form-control" step="0.01" min="0" required readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Bran Percentage</label>
+                                            <input type="text" id="branPercentage" class="form-control" readonly>
+                                            <div id="percentageWarning" class="text-danger small mt-1" style="display: none;">
+                                                Warning: Bran percentage should be between 23-25%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Photo Documentation -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Process Start Photo</label>
+                                    <input type="file" name="start_photo" class="form-control" accept="image/*">
+                                    <small class="form-text text-muted">Photo before starting grinding</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Process End Photo</label>
+                                    <input type="file" name="end_photo" class="form-control" accept="image/*">
+                                    <small class="form-text text-muted">Photo after completing grinding</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Process Information:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Main products should typically represent 75-77% of total output</li>
+                                <li>Bran should represent 23-25% of total output</li>
+                                <li>If bran percentage is higher than 25%, it will be highlighted for review</li>
+                                <li>Ensure machine cleaning logs are up to date before processing</li>
+                            </ul>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-cog me-1"></i>Complete Grinding Process
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function calculatePercentages() {
+    const inputQuantity = parseFloat(document.getElementById('inputQuantity').value) || 0;
+    const mainProducts = parseFloat(document.getElementById('mainProducts').value) || 0;
+    const bran = parseFloat(document.getElementById('bran').value) || 0;
+    
+    const totalOutput = mainProducts + bran;
+    document.getElementById('totalOutput').value = totalOutput.toFixed(2);
+    
+    if (totalOutput > 0) {
+        const branPercentage = (bran / totalOutput) * 100;
+        document.getElementById('branPercentage').value = branPercentage.toFixed(1) + '%';
+        
+        const warningDiv = document.getElementById('percentageWarning');
+        if (branPercentage < 23 || branPercentage > 25) {
+            warningDiv.style.display = 'block';
+            warningDiv.textContent = `Warning: Bran percentage is ${branPercentage.toFixed(1)}% (should be 23-25%)`;
+        } else {
+            warningDiv.style.display = 'none';
+        }
+    }
+}
+
+// Form validation
+document.getElementById('grindingForm').addEventListener('submit', function(e) {
+    const totalOutput = parseFloat(document.getElementById('totalOutput').value) || 0;
+    const inputQuantity = parseFloat(document.getElementById('inputQuantity').value) || 0;
+    
+    if (totalOutput > inputQuantity * 1.1) { // Allow 10% tolerance
+        if (!confirm('Total output is significantly higher than input quantity. Do you want to continue?')) {
+            e.preventDefault();
+            return;
+        }
+    }
+    
+    const branPercentage = parseFloat(document.getElementById('branPercentage').value) || 0;
+    if (branPercentage > 30) {
+        if (!confirm(`Bran percentage is ${branPercentage.toFixed(1)}%, which is very high. Do you want to continue?`)) {
+            e.preventDefault();
+            return;
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+
+{% block title %}Production Execution - Wheat Processing Management{% endblock %}
+
+{% block extra_css %}
+<style>
+.pipeline-stage {
+    padding: 15px;
+    text-align: center;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    margin-bottom: 15px;
+}
+
+.stage-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-size: 24px;
+    color: white;
+}
+
+.job-card {
+    border-left: 4px solid #007bff;
+    transition: all 0.3s ease;
+}
+
+.job-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.stage-transfer { border-left-color: #17a2b8; }
+.stage-cleaning-24h { border-left-color: #ffc107; }
+.stage-cleaning-12h { border-left-color: #007bff; }
+.stage-grinding { border-left-color: #dc3545; }
+.stage-packing { border-left-color: #28a745; }
+
+.countdown-timer {
+    font-size: 24px;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.countdown-expired {
+    color: #dc3545;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+}
+
+.progress-circle {
+    width: 80px;
+    height: 80px;
+}
+
+.reminder-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    max-width: 300px;
+}
+
+.machine-status {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-clean { background-color: #28a745; }
+.status-needs-cleaning { background-color: #ffc107; }
+.status-overdue { background-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>Production Execution & Job Tracking
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary" onclick="location.reload()">
+                                <i class="fas fa-sync me-1"></i>Refresh
+                            </button>
+                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#startJobModal">
+                                <i class="fas fa-play me-1"></i>Start New Job
+                            </button>
+                            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#searchModal">
+                                <i class="fas fa-search me-1"></i>Search Order
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Pipeline Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-sitemap me-2"></i>Production Pipeline Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-info">
+                                    <i class="fas fa-exchange-alt"></i>
+                                </div>
+                                <h6>Transfer to 24h Cleaning</h6>
+                                <span class="badge bg-info fs-6">{{ pipeline_stats.transfer or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-warning">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <h6>24h Cleaning</h6>
+                                <span class="badge bg-warning fs-6">{{ pipeline_stats.cleaning_24h or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-primary">
+                                    <i class="fas fa-hourglass-half"></i>
+                                </div>
+                                <h6>12h Cleaning</h6>
+                                <span class="badge bg-primary fs-6">{{ pipeline_stats.cleaning_12h or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-danger">
+                                    <i class="fas fa-cog"></i>
+                                </div>
+                                <h6>Grinding</h6>
+                                <span class="badge bg-danger fs-6">{{ pipeline_stats.grinding or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-success">
+                                    <i class="fas fa-box"></i>
+                                </div>
+                                <h6>Packing</h6>
+                                <span class="badge bg-success fs-6">{{ pipeline_stats.packing or 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon bg-dark">
+                                    <i class="fas fa-warehouse"></i>
+                                </div>
+                                <h6>Completed</h6>
+                                <span class="badge bg-dark fs-6">{{ pipeline_stats.completed or 0 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Machine Cleaning Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-wrench me-2"></i>Machine Cleaning Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for machine in machines %}
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <span class="machine-status {{ machine.status_class }}"></span>
+                                    <h6>{{ machine.name }}</h6>
+                                    <p class="mb-1">
+                                        <small class="text-muted">Last cleaned: {{ machine.last_cleaned_ago }}</small>
+                                    </p>
+                                    <p class="mb-2">
+                                        <small class="text-muted">Next cleaning: {{ machine.next_cleaning_in }}</small>
+                                    </p>
+                                    {% if machine.needs_cleaning %}
+                                    <button class="btn btn-warning btn-sm" onclick="startCleaning('{{ machine.id }}')">
+                                        <i class="fas fa-broom me-1"></i>Clean Now
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Jobs -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tasks me-2"></i>Active Jobs
+                    </h5>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-secondary btn-sm active" onclick="filterJobs('all')">All</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterJobs('transfer')">Transfer</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterJobs('cleaning_24h')">24h Cleaning</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterJobs('cleaning_12h')">12h Cleaning</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterJobs('grinding')">Grinding</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterJobs('packing')">Packing</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for job in active_jobs %}
+                        <div class="col-md-6 col-lg-4 mb-3 job-item" data-stage="{{ job.stage }}">
+                            <div class="card job-card stage-{{ job.stage }}">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">{{ job.job_number }}</h6>
+                                    <span class="badge bg-{{ job.status_color }}">{{ job.status.title() }}</span>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1">
+                                        <strong>Order:</strong> {{ job.order.order_number }}
+                                    </p>
+                                    <p class="mb-1">
+                                        <strong>Stage:</strong> {{ job.stage_display }}
+                                    </p>
+                                    <p class="mb-1">
+                                        <strong>Started:</strong> {{ job.started_at.strftime('%d/%m %H:%M') if job.started_at else 'Not started' }}
+                                    </p>
+                                    
+                                    {% if job.stage in ['cleaning_24h', 'cleaning_12h'] and job.status == 'in_progress' %}
+                                    <div class="text-center mt-2">
+                                        <div class="countdown-timer" id="countdown-{{ job.id }}">
+                                            Loading...
+                                        </div>
+                                        <small class="text-muted">Time remaining</small>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="mt-2">
+                                        {% if job.status == 'pending' %}
+                                        <button class="btn btn-primary btn-sm w-100" onclick="startJob({{ job.id }})">
+                                            <i class="fas fa-play me-1"></i>Start Job
+                                        </button>
+                                        {% elif job.status == 'in_progress' %}
+                                        <button class="btn btn-success btn-sm w-100" onclick="completeJob({{ job.id }})">
+                                            <i class="fas fa-check me-1"></i>Complete Job
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="viewJobDetails({{ job.id }})">
+                                            <i class="fas fa-eye me-1"></i>View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start New Job Modal -->
+<div class="modal fade" id="startJobModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start New Production Job</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('production_execution') }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Select Production Plan</label>
+                                <select name="plan_id" class="form-select" required>
+                                    <option value="">Choose a plan...</option>
+                                    {% for plan in approved_plans %}
+                                    <option value="{{ plan.id }}">
+                                        {{ plan.order.order_number }} - {{ plan.order.product }} ({{ plan.order.quantity }}T)
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Started By</label>
+                                <input type="text" name="started_by" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (Optional)</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="action" value="start_job" class="btn btn-success">Start Job</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Search Order Modal -->
+<div class="modal fade" id="searchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Search Order Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="GET" action="{{ url_for('order_tracking') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Order Number</label>
+                        <input type="text" name="order_number" class="form-control" placeholder="Enter order number" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reminder notifications will be added here by JavaScript -->
+<div id="notification-container"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/production-execution.js') }}"></script>
+<script>
+// Initialize countdowns for active cleaning processes
+document.addEventListener('DOMContentLoaded', function() {
+    {% for job in active_jobs %}
+    {% if job.stage in ['cleaning_24h', 'cleaning_12h'] and job.status == 'in_progress' and job.end_time %}
+    initializeCountdown('countdown-{{ job.id }}', '{{ job.end_time.isoformat() }}');
+    {% endif %}
+    {% endfor %}
+    
+    // Check for reminders every 30 seconds
+    setInterval(checkReminders, 30000);
+    checkReminders(); // Initial check
+});
+
+function filterJobs(stage) {
+    const items = document.querySelectorAll('.job-item');
+    const buttons = document.querySelectorAll('.btn-group .btn');
+    
+    // Update button states
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Filter job items
+    items.forEach(item => {
+        if (stage === 'all') {
+            item.style.display = '';
+        } else {
+            item.style.display = item.dataset.stage === stage ? '' : 'none';
+        }
+    });
+}
+
+function startJob(jobId) {
+    if (confirm('Are you sure you want to start this job?')) {
+        fetch(`/production_execution/start_job/${jobId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error starting job: ' + data.message);
+            }
+        });
+    }
+}
+
+function completeJob(jobId) {
+    window.location.href = `/production_execution/complete_job/${jobId}`;
+}
+
+function viewJobDetails(jobId) {
+    window.location.href = `/production_execution/job_details/${jobId}`;
+}
+
+function startCleaning(machineId) {
+    window.location.href = `/production_execution/machine_cleaning/${machineId}`;
+}
+
+function initializeCountdown(elementId, endTime) {
+    const countdownElement = document.getElementById(elementId);
+    if (!countdownElement) return;
+    
+    const targetTime = new Date(endTime).getTime();
+    
+    function updateCountdown() {
+        const now = new Date().getTime();
+        const distance = targetTime - now;
+        
+        if (distance < 0) {
+            countdownElement.innerHTML = "COMPLETED";
+            countdownElement.classList.add('countdown-expired');
+            return;
+        }
+        
+        const hours = Math.floor(distance / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+        
+        countdownElement.innerHTML = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Add warning styles when less than 30 minutes remaining
+        if (distance < 30 * 60 * 1000) {
+            countdownElement.style.color = '#dc3545';
+        }
+    }
+    
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+}
+
+function checkReminders() {
+    fetch('/api/check_reminders')
+        .then(response => response.json())
+        .then(data => {
+            if (data.reminders && data.reminders.length > 0) {
+                data.reminders.forEach(reminder => {
+                    showNotification(reminder.message, reminder.type);
+                });
+            }
+        })
+        .catch(error => console.error('Error checking reminders:', error));
+}
+
+function showNotification(message, type = 'info') {
+    const container = document.getElementById('notification-container');
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show reminder-notification`;
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    container.appendChild(notification);
+    
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 10000);
+}
+</script>
+{% endblock %}

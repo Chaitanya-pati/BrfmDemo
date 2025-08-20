@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}12-Hour Cleaning Process - Job {{ job.job_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-hourglass-half me-2"></i>12-Hour Cleaning Process - {{ job.job_number }}
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Jobs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Information -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Job Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Order:</strong> {{ job.order.order_number }}</p>
+                            <p><strong>Product:</strong> {{ job.order.product }}</p>
+                            <p><strong>Quantity:</strong> {{ job.order.quantity }} tons</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Status:</strong> <span class="badge bg-primary">{{ job.status.title() }}</span></p>
+                            <p><strong>Stage:</strong> 12-Hour Cleaning</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-header">
+                    <h5 class="mb-0">Process Duration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <i class="fas fa-hourglass-half fa-3x text-primary"></i>
+                    </div>
+                    <h4 class="text-primary">12 Hours</h4>
+                    <small class="text-muted">With target moisture control</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cleaning Process Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Start 12-Hour Cleaning Process</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Duration (Hours) *</label>
+                                    <select name="duration_hours" class="form-select" required>
+                                        <option value="12" selected>12 Hours (Standard)</option>
+                                        <option value="10">10 Hours (Fast Track)</option>
+                                        <option value="8">8 Hours (Express)</option>
+                                        <option value="6">6 Hours (Testing)</option>
+                                        <option value="1">1 Hour (Demo)</option>
+                                    </select>
+                                    <small class="form-text text-muted">Select duration for testing purposes</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Target Moisture (%) *</label>
+                                    <input type="number" name="target_moisture" class="form-control" step="0.1" min="0" max="100" required>
+                                    <small class="form-text text-muted">Target moisture after cleaning</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Start Moisture (%) *</label>
+                                    <input type="number" name="start_moisture" class="form-control" step="0.1" min="0" max="100" required>
+                                    <small class="form-text text-muted">Current moisture content</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Water Added (Liters)</label>
+                                    <input type="number" name="water_added" class="form-control" step="0.1" min="0" value="0">
+                                    <small class="form-text text-muted">Water added during process</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Operator Name *</label>
+                                    <input type="text" name="operator_name" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Start Photo</label>
+                                    <input type="file" name="start_photo" class="form-control" accept="image/*">
+                                    <small class="form-text text-muted">Photo before starting cleaning process</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Note:</strong> This process will monitor moisture levels and aim to achieve the target moisture. 
+                            You will receive reminders before completion and need to capture final moisture levels.
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-play me-1"></i>Start 12-Hour Cleaning
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

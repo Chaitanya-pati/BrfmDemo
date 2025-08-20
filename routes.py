@@ -1,13 +1,15 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 
 from app import app, db
 from models import (Vehicle, Supplier, Godown, GodownType, QualityTest, Transfer, 
                    PrecleaningBin, ProductionOrder, ProductionPlan, ProductionPlanItem, ProductionJobNew,
-                   Customer, Product, SalesDispatch, CleaningProcess)
-from utils import allowed_file, generate_order_number
+                   Customer, Product, SalesDispatch, CleaningProcess, CleaningMachine,
+                   ProductionTransfer, GrindingProcess, ProductOutput, PackingProcess,
+                   CleaningLog, StorageArea, StorageTransfer)
+from utils import allowed_file, generate_order_number, generate_job_id
 
 @app.route('/')
 def index():
@@ -317,54 +319,599 @@ def production_execution():
             action = request.form.get('action')
             
             if action == 'start_job':
+                plan = ProductionPlan.query.get(int(request.form['plan_id']))
+                if not plan:
+                    flash('Production plan not found!', 'error')
+                    return redirect(url_for('production_execution'))
+                
+                # Create initial transfer job
                 job = ProductionJobNew()
-                job.plan_id = int(request.form['plan_id'])
-                job.job_number = generate_order_number('JOB')
-                job.stage = request.form['stage']
-                job.started_by = request.form['operator_name']
-                job.status = 'in_progress'
-                job.started_at = datetime.now()
+                job.order_id = plan.order_id
+                job.plan_id = plan.id
+                job.job_number = generate_job_id()
+                job.stage = 'transfer'
+                job.status = 'pending'
+                job.started_by = request.form['started_by']
                 job.notes = request.form.get('notes')
                 
                 db.session.add(job)
                 db.session.commit()
-                flash('Production job started successfully!', 'success')
-                
-            elif action == 'execute_transfer':
-                # Handle transfer execution
-                job_id = request.form['job_id']
-                from_bin_id = request.form['from_bin_id']
-                quantity = float(request.form['transfer_quantity'])
-                to_bin = request.form['to_cleaning_bin']
-                
-                # Create transfer record
-                transfer = Transfer()
-                transfer.from_precleaning_bin_id = int(from_bin_id)
-                transfer.quantity = quantity
-                transfer.transfer_type = 'precleaning_to_cleaning'
-                transfer.operator = request.form['operator_name']
-                
-                db.session.add(transfer)
-                db.session.commit()
-                flash('Transfer executed successfully!', 'success')
+                flash('Production job created successfully! Start with the transfer stage.', 'success')
                 
         except Exception as e:
             db.session.rollback()
             flash(f'Error processing request: {str(e)}', 'error')
     
-    # Get data for template
-    active_jobs = ProductionJobNew.query.filter(ProductionJobNew.status.in_(['pending', 'in_progress'])).all()
-    approved_plans = ProductionPlan.query.filter_by(status='approved').all()
-    transfer_jobs = ProductionJobNew.query.filter_by(stage='transfer').all()
-    precleaning_bins = PrecleaningBin.query.filter(PrecleaningBin.current_stock > 0).all()
-    pending_reminders = []  # This would come from a reminders system
+    # Get pipeline statistics
+    pipeline_stats = {
+        'transfer': ProductionJobNew.query.filter_by(stage='transfer', status='in_progress').count(),
+        'cleaning_24h': ProductionJobNew.query.filter_by(stage='cleaning_24h', status='in_progress').count(),
+        'cleaning_12h': ProductionJobNew.query.filter_by(stage='cleaning_12h', status='in_progress').count(),
+        'grinding': ProductionJobNew.query.filter_by(stage='grinding', status='in_progress').count(),
+        'packing': ProductionJobNew.query.filter_by(stage='packing', status='in_progress').count(),
+        'completed': ProductionJobNew.query.filter_by(status='completed').count()
+    }
     
-    return render_template('production_execution.html',
+    # Get active jobs with enhanced data
+    active_jobs = ProductionJobNew.query.filter(
+        ProductionJobNew.status.in_(['pending', 'in_progress'])
+    ).order_by(ProductionJobNew.created_at.desc()).all()
+    
+    # Enhance jobs with additional data
+    for job in active_jobs:
+        job.stage_display = job.stage.replace('_', ' ').title()
+        job.status_color = {
+            'pending': 'secondary',
+            'in_progress': 'primary', 
+            'completed': 'success',
+            'paused': 'warning'
+        }.get(job.status, 'secondary')
+        
+        # Get end time for cleaning processes
+        if job.stage in ['cleaning_24h', 'cleaning_12h'] and job.status == 'in_progress':
+            cleaning_process = CleaningProcess.query.filter_by(job_id=job.id, status='running').first()
+            if cleaning_process:
+                job.end_time = cleaning_process.end_time
+    
+    # Get approved plans for starting new jobs
+    approved_plans = ProductionPlan.query.filter_by(status='approved').join(ProductionOrder).all()
+    
+    # Get machine cleaning status
+    machines = CleaningMachine.query.all()
+    for machine in machines:
+        if machine.last_cleaned:
+            time_since_cleaned = datetime.utcnow() - machine.last_cleaned
+            hours_since_cleaned = time_since_cleaned.total_seconds() / 3600
+            
+            if hours_since_cleaned < machine.cleaning_frequency_hours:
+                machine.status_class = 'status-clean'
+                machine.needs_cleaning = False
+                remaining_hours = machine.cleaning_frequency_hours - hours_since_cleaned
+                machine.next_cleaning_in = f"{int(remaining_hours)}h {int((remaining_hours % 1) * 60)}m"
+            elif hours_since_cleaned < machine.cleaning_frequency_hours * 1.2:
+                machine.status_class = 'status-needs-cleaning'
+                machine.needs_cleaning = True
+                machine.next_cleaning_in = "Due now"
+            else:
+                machine.status_class = 'status-overdue'
+                machine.needs_cleaning = True
+                machine.next_cleaning_in = "Overdue"
+                
+            machine.last_cleaned_ago = f"{int(hours_since_cleaned)}h ago"
+        else:
+            machine.status_class = 'status-overdue'
+            machine.needs_cleaning = True
+            machine.last_cleaned_ago = "Never"
+            machine.next_cleaning_in = "Overdue"
+    
+    return render_template('production_execution_new.html',
                          active_jobs=active_jobs,
                          approved_plans=approved_plans,
-                         transfer_jobs=transfer_jobs,
-                         precleaning_bins=precleaning_bins,
-                         pending_reminders=pending_reminders)
+                         pipeline_stats=pipeline_stats,
+                         machines=machines)
+
+# API Routes for production execution
+@app.route('/production_execution/start_job/<int:job_id>', methods=['POST'])
+def start_production_job(job_id):
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        if job.status != 'pending':
+            return jsonify({'success': False, 'message': 'Job is not in pending state'})
+        
+        job.status = 'in_progress'
+        job.started_at = datetime.utcnow()
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Job started successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/production_execution/complete_job/<int:job_id>')
+def complete_production_job(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if job.stage == 'transfer':
+        return redirect(url_for('transfer_execution', job_id=job_id))
+    elif job.stage == 'cleaning_24h':
+        return redirect(url_for('cleaning_24h_execution', job_id=job_id))
+    elif job.stage == 'cleaning_12h':
+        return redirect(url_for('cleaning_12h_execution', job_id=job_id))
+    elif job.stage == 'grinding':
+        return redirect(url_for('grinding_execution', job_id=job_id))
+    elif job.stage == 'packing':
+        return redirect(url_for('packing_execution', job_id=job_id))
+    
+    return redirect(url_for('production_execution'))
+
+# Transfer Execution
+@app.route('/production_execution/transfer/<int:job_id>', methods=['GET', 'POST'])
+def transfer_execution(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if request.method == 'POST':
+        try:
+            # Create transfer record
+            transfer = ProductionTransfer()
+            transfer.job_id = job_id
+            transfer.from_precleaning_bin_id = int(request.form['from_bin_id'])
+            transfer.quantity_transferred = float(request.form['quantity'])
+            transfer.operator_name = request.form['operator_name']
+            
+            # Handle file uploads
+            if 'start_photo' in request.files:
+                file = request.files['start_photo']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"transfer_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    transfer.start_photo = filename
+            
+            if 'end_photo' in request.files:
+                file = request.files['end_photo']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"transfer_end_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    transfer.end_photo = filename
+            
+            db.session.add(transfer)
+            
+            # Update precleaning bin stock
+            from_bin = PrecleaningBin.query.get(transfer.from_precleaning_bin_id)
+            from_bin.current_stock -= transfer.quantity_transferred
+            
+            # Complete current job and create next job
+            job.status = 'completed'
+            job.completed_at = datetime.utcnow()
+            job.completed_by = transfer.operator_name
+            
+            # Create 24h cleaning job
+            cleaning_job = ProductionJobNew()
+            cleaning_job.order_id = job.order_id
+            cleaning_job.plan_id = job.plan_id
+            cleaning_job.job_number = generate_job_id()
+            cleaning_job.stage = 'cleaning_24h'
+            cleaning_job.status = 'pending'
+            
+            db.session.add(cleaning_job)
+            db.session.commit()
+            
+            flash('Transfer completed successfully! 24-hour cleaning job created.', 'success')
+            return redirect(url_for('production_execution'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing transfer: {str(e)}', 'error')
+    
+    plan_items = ProductionPlanItem.query.filter_by(plan_id=job.plan_id).all()
+    precleaning_bins = PrecleaningBin.query.filter(PrecleaningBin.current_stock > 0).all()
+    
+    return render_template('transfer_execution.html', 
+                         job=job, 
+                         plan_items=plan_items,
+                         precleaning_bins=precleaning_bins)
+
+# 24 Hour Cleaning Process
+@app.route('/production_execution/cleaning_24h/<int:job_id>', methods=['GET', 'POST'])
+def cleaning_24h_execution(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if request.method == 'POST':
+        try:
+            # Create cleaning process record
+            cleaning = CleaningProcess()
+            cleaning.job_id = job_id
+            cleaning.process_type = '24_hour'
+            cleaning.duration_hours = int(request.form.get('duration_hours', 24))
+            cleaning.start_time = datetime.utcnow()
+            cleaning.end_time = datetime.utcnow() + timedelta(hours=cleaning.duration_hours)
+            cleaning.start_moisture = float(request.form['start_moisture'])
+            cleaning.water_added_liters = float(request.form.get('water_added', 0))
+            cleaning.operator_name = request.form['operator_name']
+            cleaning.status = 'running'
+            
+            # Handle file uploads
+            if 'start_photo' in request.files:
+                file = request.files['start_photo']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"cleaning24h_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    cleaning.start_photo = filename
+            
+            db.session.add(cleaning)
+            
+            # Update job status
+            job.status = 'in_progress'
+            job.started_at = datetime.utcnow()
+            
+            db.session.commit()
+            flash(f'{cleaning.duration_hours}-hour cleaning process started successfully!', 'success')
+            return redirect(url_for('production_execution'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting cleaning process: {str(e)}', 'error')
+    
+    return render_template('cleaning_24h_execution.html', job=job)
+
+# 12 Hour Cleaning Process  
+@app.route('/production_execution/cleaning_12h/<int:job_id>', methods=['GET', 'POST'])
+def cleaning_12h_execution(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if request.method == 'POST':
+        try:
+            # Create cleaning process record
+            cleaning = CleaningProcess()
+            cleaning.job_id = job_id
+            cleaning.process_type = '12_hour'
+            cleaning.duration_hours = int(request.form.get('duration_hours', 12))
+            cleaning.target_moisture = float(request.form['target_moisture'])
+            cleaning.start_time = datetime.utcnow()
+            cleaning.end_time = datetime.utcnow() + timedelta(hours=cleaning.duration_hours)
+            cleaning.start_moisture = float(request.form['start_moisture'])
+            cleaning.water_added_liters = float(request.form.get('water_added', 0))
+            cleaning.operator_name = request.form['operator_name']
+            cleaning.status = 'running'
+            
+            # Handle file uploads
+            if 'start_photo' in request.files:
+                file = request.files['start_photo']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"cleaning12h_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    cleaning.start_photo = filename
+            
+            db.session.add(cleaning)
+            
+            # Update job status
+            job.status = 'in_progress'
+            job.started_at = datetime.utcnow()
+            
+            db.session.commit()
+            flash(f'{cleaning.duration_hours}-hour cleaning process with target moisture {cleaning.target_moisture}% started!', 'success')
+            return redirect(url_for('production_execution'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting cleaning process: {str(e)}', 'error')
+    
+    return render_template('cleaning_12h_execution.html', job=job)
+
+# Order Tracking
+@app.route('/order_tracking')
+def order_tracking():
+    order_number = request.args.get('order_number')
+    if not order_number:
+        flash('Please provide an order number to search.', 'error')
+        return redirect(url_for('production_execution'))
+    
+    order = ProductionOrder.query.filter_by(order_number=order_number).first()
+    if not order:
+        flash(f'Order {order_number} not found.', 'error')
+        return redirect(url_for('production_execution'))
+    
+    # Get all jobs for this order
+    jobs = ProductionJobNew.query.filter_by(order_id=order.id).order_by(ProductionJobNew.created_at.asc()).all()
+    
+    # Get detailed process data for each job
+    job_details = []
+    for job in jobs:
+        details = {
+            'job': job,
+            'transfers': ProductionTransfer.query.filter_by(job_id=job.id).all(),
+            'cleaning_processes': CleaningProcess.query.filter_by(job_id=job.id).all(),
+            'grinding_processes': GrindingProcess.query.filter_by(job_id=job.id).all()
+        }
+        job_details.append(details)
+    
+    return render_template('order_tracking.html', 
+                         order=order, 
+                         job_details=job_details)
+
+# API Routes for reminders and status
+@app.route('/api/check_reminders')
+def api_check_reminders():
+    reminders = []
+    
+    # Check machine cleaning reminders
+    machines = CleaningMachine.query.all()
+    for machine in machines:
+        if machine.last_cleaned:
+            time_since_cleaned = datetime.utcnow() - machine.last_cleaned
+            hours_since_cleaned = time_since_cleaned.total_seconds() / 3600
+            
+            # 5 minute warning
+            if (hours_since_cleaned + (5/60)) >= machine.cleaning_frequency_hours:
+                if hours_since_cleaned < machine.cleaning_frequency_hours:
+                    reminders.append({
+                        'message': f'Machine "{machine.name}" needs cleaning in 5 minutes!',
+                        'type': 'warning'
+                    })
+            
+            # 10 minute warning
+            elif (hours_since_cleaned + (10/60)) >= machine.cleaning_frequency_hours:
+                if hours_since_cleaned < machine.cleaning_frequency_hours:
+                    reminders.append({
+                        'message': f'Machine "{machine.name}" needs cleaning in 10 minutes!',
+                        'type': 'info'
+                    })
+            
+            # Overdue
+            elif hours_since_cleaned >= machine.cleaning_frequency_hours:
+                reminders.append({
+                    'message': f'Machine "{machine.name}" cleaning is overdue!',
+                    'type': 'danger'
+                })
+    
+    # Check cleaning process completions
+    ending_processes = CleaningProcess.query.filter(
+        CleaningProcess.status == 'running',
+        CleaningProcess.end_time <= datetime.utcnow() + timedelta(minutes=30)
+    ).all()
+    
+    for process in ending_processes:
+        time_remaining = process.end_time - datetime.utcnow()
+        if time_remaining.total_seconds() > 0:
+            minutes_remaining = int(time_remaining.total_seconds() / 60)
+            if minutes_remaining <= 10:
+                reminders.append({
+                    'message': f'{process.process_type} cleaning process ending in {minutes_remaining} minutes!',
+                    'type': 'warning'
+                })
+        else:
+            reminders.append({
+                'message': f'{process.process_type} cleaning process completed! Ready for next stage.',
+                'type': 'success'
+            })
+    
+    return jsonify({'reminders': reminders})
+
+@app.route('/api/machine_status')
+def api_machine_status():
+    machines = []
+    overdue_machines = []
+    
+    for machine in CleaningMachine.query.all():
+        if machine.last_cleaned:
+            time_since_cleaned = datetime.utcnow() - machine.last_cleaned
+            hours_since_cleaned = time_since_cleaned.total_seconds() / 3600
+            
+            if hours_since_cleaned < machine.cleaning_frequency_hours:
+                status_class = 'status-clean'
+            elif hours_since_cleaned < machine.cleaning_frequency_hours * 1.2:
+                status_class = 'status-needs-cleaning'
+            else:
+                status_class = 'status-overdue'
+                overdue_machines.append(machine)
+        else:
+            status_class = 'status-overdue'
+            overdue_machines.append(machine)
+        
+        machines.append({
+            'id': machine.id,
+            'name': machine.name,
+            'status_class': status_class
+        })
+    
+    return jsonify({
+        'machines': machines,
+        'overdue_machines': [{'id': m.id, 'name': m.name} for m in overdue_machines]
+    })
+
+# Machine Cleaning Management
+@app.route('/production_execution/machine_cleaning/<int:machine_id>', methods=['GET', 'POST'])
+def machine_cleaning_execution(machine_id):
+    machine = CleaningMachine.query.get_or_404(machine_id)
+    
+    if request.method == 'POST':
+        try:
+            # Create cleaning log
+            cleaning_log = CleaningLog()
+            cleaning_log.machine_id = machine_id
+            cleaning_log.cleaned_by = request.form['cleaned_by']
+            cleaning_log.waste_collected = float(request.form.get('waste_collected', 0))
+            cleaning_log.notes = request.form.get('notes', '')
+            
+            # Handle photo uploads
+            if 'photo_before' in request.files:
+                file = request.files['photo_before']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"cleaning_before_{machine.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    cleaning_log.photo_before = filename
+            
+            if 'photo_after' in request.files:
+                file = request.files['photo_after']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"cleaning_after_{machine.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    cleaning_log.photo_after = filename
+            
+            # Update machine last cleaned time
+            machine.last_cleaned = datetime.utcnow()
+            
+            db.session.add(cleaning_log)
+            db.session.commit()
+            
+            flash(f'Machine "{machine.name}" cleaning completed successfully!', 'success')
+            return redirect(url_for('production_execution'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error recording machine cleaning: {str(e)}', 'error')
+    
+    # Get cleaning history for this machine
+    cleaning_logs = CleaningLog.query.filter_by(machine_id=machine_id).order_by(CleaningLog.cleaning_time.desc()).limit(10).all()
+    
+    return render_template('machine_cleaning.html', 
+                         machine=machine, 
+                         cleaning_logs=cleaning_logs)
+
+# Grinding Process
+@app.route('/production_execution/grinding/<int:job_id>', methods=['GET', 'POST'])
+def grinding_execution(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if request.method == 'POST':
+        try:
+            # Create grinding process record
+            grinding = GrindingProcess()
+            grinding.job_id = job_id
+            grinding.machine_name = request.form['machine_name']
+            grinding.input_quantity_kg = float(request.form['input_quantity'])
+            grinding.total_output_kg = float(request.form['total_output'])
+            grinding.main_products_kg = float(request.form['main_products'])
+            grinding.bran_kg = float(request.form['bran'])
+            grinding.bran_percentage = (grinding.bran_kg / grinding.total_output_kg) * 100 if grinding.total_output_kg > 0 else 0
+            grinding.operator_name = request.form['operator_name']
+            grinding.start_time = datetime.utcnow()
+            grinding.status = 'completed'
+            
+            # Handle file uploads
+            if 'start_photo' in request.files:
+                file = request.files['start_photo']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"grinding_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    grinding.start_photo = filename
+            
+            if 'end_photo' in request.files:
+                file = request.files['end_photo']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"grinding_end_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    grinding.end_photo = filename
+            
+            db.session.add(grinding)
+            
+            # Check bran percentage
+            if grinding.bran_percentage > 25:
+                flash(f'Warning: Bran percentage is {grinding.bran_percentage:.1f}% (should be 23-25%)', 'warning')
+            
+            # Complete current job and create packing job
+            job.status = 'completed'
+            job.completed_at = datetime.utcnow()
+            job.completed_by = grinding.operator_name
+            
+            # Create packing job
+            packing_job = ProductionJobNew()
+            packing_job.order_id = job.order_id
+            packing_job.plan_id = job.plan_id
+            packing_job.job_number = generate_job_id()
+            packing_job.stage = 'packing'
+            packing_job.status = 'pending'
+            
+            db.session.add(packing_job)
+            db.session.commit()
+            
+            flash('Grinding process completed successfully! Packing job created.', 'success')
+            return redirect(url_for('production_execution'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing grinding process: {str(e)}', 'error')
+    
+    return render_template('grinding_execution.html', job=job)
+
+# Packing Process
+@app.route('/production_execution/packing/<int:job_id>', methods=['GET', 'POST'])
+def packing_execution(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if request.method == 'POST':
+        try:
+            # Create packing process records
+            products_data = request.form.getlist('product_id')
+            bag_weights = request.form.getlist('bag_weight')
+            bag_counts = request.form.getlist('bag_count')
+            shallow_storage = request.form.getlist('shallow_storage')
+            storage_areas = request.form.getlist('storage_area_id')
+            
+            total_packed = 0
+            
+            for i in range(len(products_data)):
+                if products_data[i] and bag_weights[i] and bag_counts[i]:
+                    packing = PackingProcess()
+                    packing.job_id = job_id
+                    packing.product_id = int(products_data[i])
+                    packing.bag_weight_kg = float(bag_weights[i])
+                    packing.number_of_bags = int(bag_counts[i])
+                    packing.total_packed_kg = packing.bag_weight_kg * packing.number_of_bags
+                    packing.stored_in_shallow_kg = float(shallow_storage[i]) if shallow_storage[i] else 0
+                    packing.storage_area_id = int(storage_areas[i]) if storage_areas[i] else None
+                    packing.operator_name = request.form['operator_name']
+                    
+                    # Update storage area stock
+                    if packing.storage_area_id:
+                        storage_area = StorageArea.query.get(packing.storage_area_id)
+                        if storage_area:
+                            storage_area.current_stock_kg += packing.total_packed_kg + packing.stored_in_shallow_kg
+                    
+                    total_packed += packing.total_packed_kg + packing.stored_in_shallow_kg
+                    db.session.add(packing)
+            
+            # Handle packing photo
+            if 'packing_photo' in request.files:
+                file = request.files['packing_photo']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    filename = f"packing_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    # Update all packing records with the same photo
+                    for packing in PackingProcess.query.filter_by(job_id=job_id).all():
+                        packing.packing_photo = filename
+            
+            # Complete job
+            job.status = 'completed'
+            job.completed_at = datetime.utcnow()
+            job.completed_by = request.form['operator_name']
+            
+            db.session.commit()
+            
+            flash(f'Packing completed successfully! Total packed: {total_packed:.2f} kg', 'success')
+            return redirect(url_for('production_execution'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing packing process: {str(e)}', 'error')
+    
+    products = Product.query.filter_by(category='Main Product').all()
+    storage_areas = StorageArea.query.all()
+    
+    return render_template('packing_execution.html', 
+                         job=job, 
+                         products=products,
+                         storage_areas=storage_areas)
 
 @app.route('/production_planning', methods=['GET', 'POST'])
 @app.route('/production_planning/<int:order_id>', methods=['GET', 'POST'])
@@ -721,14 +1268,7 @@ def api_job_progress():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/check_reminders')
-def api_check_reminders():
-    """API endpoint to check for new reminders"""
-    try:
-        # Placeholder for reminders logic
-        return jsonify({'new_reminders': 0})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Removed duplicate route - using the comprehensive one above
 
 @app.route('/init_data')
 def init_data():

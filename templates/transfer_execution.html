@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Transfer Execution - Job {{ job.job_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-exchange-alt me-2"></i>Transfer Execution - {{ job.job_number }}
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Jobs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Information -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Job Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Order:</strong> {{ job.order.order_number }}</p>
+                    <p><strong>Product:</strong> {{ job.order.product }}</p>
+                    <p><strong>Quantity:</strong> {{ job.order.quantity }} tons</p>
+                    <p><strong>Status:</strong> <span class="badge bg-primary">{{ job.status.title() }}</span></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Plan Items</h5>
+                </div>
+                <div class="card-body">
+                    {% for item in plan_items %}
+                    <div class="mb-2">
+                        <strong>{{ item.precleaning_bin.name }}:</strong> {{ item.percentage }}% ({{ item.quantity }} kg)
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Execute Transfer to 24-Hour Cleaning Bin</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">From Precleaning Bin *</label>
+                                    <select name="from_bin_id" class="form-select" required>
+                                        <option value="">Select bin...</option>
+                                        {% for bin in precleaning_bins %}
+                                        <option value="{{ bin.id }}">
+                                            {{ bin.name }} ({{ bin.current_stock }} kg available)
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Quantity to Transfer (kg) *</label>
+                                    <input type="number" name="quantity" class="form-control" step="0.01" min="0.01" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Operator Name *</label>
+                                    <input type="text" name="operator_name" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Start Photo</label>
+                                    <input type="file" name="start_photo" class="form-control" accept="image/*">
+                                    <small class="form-text text-muted">Photo before starting transfer</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">End Photo</label>
+                                    <input type="file" name="end_photo" class="form-control" accept="image/*">
+                                    <small class="form-text text-muted">Photo after completing transfer</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check me-1"></i>Complete Transfer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

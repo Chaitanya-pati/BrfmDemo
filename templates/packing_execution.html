@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block title %}Packing Process - Job {{ job.job_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-box me-2"></i>Packing Process - {{ job.job_number }}
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Jobs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Information -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Job Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p><strong>Order:</strong> {{ job.order.order_number }}</p>
+                            <p><strong>Product:</strong> {{ job.order.product }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Quantity:</strong> {{ job.order.quantity }} tons</p>
+                            <p><strong>Customer:</strong> {{ job.order.customer }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Status:</strong> <span class="badge bg-success">{{ job.status.title() }}</span></p>
+                            <p><strong>Stage:</strong> Final Packing & Storage</p>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-box fa-2x text-success mb-2"></i>
+                                <h6>Ready for Packing</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packing Process Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Complete Packing Process</h5>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addProductRow()">
+                            <i class="fas fa-plus me-1"></i>Add Product
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="packingForm">
+                        <div class="mb-3">
+                            <label class="form-label">Operator Name *</label>
+                            <input type="text" name="operator_name" class="form-control" required>
+                        </div>
+
+                        <!-- Products Packing Section -->
+                        <div id="productsSection">
+                            <h6 class="mb-3">Product Packing Details</h6>
+                            
+                            <div class="product-row mb-4 p-3 border rounded" data-row="0">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">Product 1</h6>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeProductRow(0)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Product *</label>
+                                            <select name="product_id" class="form-select" required>
+                                                <option value="">Select product...</option>
+                                                {% for product in products %}
+                                                <option value="{{ product.id }}">{{ product.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="mb-3">
+                                            <label class="form-label">Bag Weight (kg) *</label>
+                                            <select name="bag_weight" class="form-select bag-weight" required onchange="calculateTotal(0)">
+                                                <option value="">Select...</option>
+                                                <option value="25">25 kg</option>
+                                                <option value="30">30 kg</option>
+                                                <option value="50">50 kg</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="mb-3">
+                                            <label class="form-label">Number of Bags *</label>
+                                            <input type="number" name="bag_count" class="form-control bag-count" min="1" required onchange="calculateTotal(0)">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="mb-3">
+                                            <label class="form-label">Total Packed (kg)</label>
+                                            <input type="text" class="form-control total-packed" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Storage Area</label>
+                                            <select name="storage_area_id" class="form-select">
+                                                <option value="">Select storage...</option>
+                                                {% for area in storage_areas %}
+                                                <option value="{{ area.id }}">
+                                                    {{ area.name }} ({{ area.current_stock_kg }}/{{ area.capacity_kg }} kg)
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Stored in Shallow (kg)</label>
+                                            <input type="number" name="shallow_storage" class="form-control" step="0.01" min="0" value="0">
+                                            <small class="form-text text-muted">Quantity stored in shallow storage</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Photo Documentation -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Packing Process Photo</label>
+                                    <input type="file" name="packing_photo" class="form-control" accept="image/*">
+                                    <small class="form-text text-muted">Photo of packed products and storage</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary Section -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h6 class="mb-0">Packing Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3 text-center">
+                                        <h4 id="totalBags" class="text-primary">0</h4>
+                                        <small class="text-muted">Total Bags</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 id="totalPacked" class="text-success">0 kg</h4>
+                                        <small class="text-muted">Total Packed</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 id="totalShallow" class="text-info">0 kg</h4>
+                                        <small class="text-muted">Shallow Storage</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 id="grandTotal" class="text-dark">0 kg</h4>
+                                        <small class="text-muted">Grand Total</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Packing Guidelines:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Standard bag weights: 25kg, 30kg, and 50kg</li>
+                                <li>Products can be stored in designated storage areas</li>
+                                <li>Shallow storage is for bulk storage of finished goods</li>
+                                <li>Storage areas have capacity limits - check availability before assigning</li>
+                            </ul>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-box me-1"></i>Complete Packing Process
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let productRowCount = 1;
+
+function addProductRow() {
+    const section = document.getElementById('productsSection');
+    const newRow = document.createElement('div');
+    newRow.className = 'product-row mb-4 p-3 border rounded';
+    newRow.dataset.row = productRowCount;
+    newRow.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Product ${productRowCount + 1}</h6>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeProductRow(${productRowCount})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label class="form-label">Product *</label>
+                    <select name="product_id" class="form-select" required>
+                        <option value="">Select product...</option>
+                        {% for product in products %}
+                        <option value="{{ product.id }}">{{ product.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Bag Weight (kg) *</label>
+                    <select name="bag_weight" class="form-select bag-weight" required onchange="calculateTotal(${productRowCount})">
+                        <option value="">Select...</option>
+                        <option value="25">25 kg</option>
+                        <option value="30">30 kg</option>
+                        <option value="50">50 kg</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Number of Bags *</label>
+                    <input type="number" name="bag_count" class="form-control bag-count" min="1" required onchange="calculateTotal(${productRowCount})">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Total Packed (kg)</label>
+                    <input type="text" class="form-control total-packed" readonly>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label class="form-label">Storage Area</label>
+                    <select name="storage_area_id" class="form-select">
+                        <option value="">Select storage...</option>
+                        {% for area in storage_areas %}
+                        <option value="{{ area.id }}">
+                            {{ area.name }} ({{ area.current_stock_kg }}/{{ area.capacity_kg }} kg)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Stored in Shallow (kg)</label>
+                    <input type="number" name="shallow_storage" class="form-control" step="0.01" min="0" value="0" onchange="updateSummary()">
+                    <small class="form-text text-muted">Quantity stored in shallow storage</small>
+                </div>
+            </div>
+        </div>
+    `;
+    section.appendChild(newRow);
+    productRowCount++;
+}
+
+function removeProductRow(rowIndex) {
+    const row = document.querySelector(`[data-row="${rowIndex}"]`);
+    if (row) {
+        row.remove();
+        updateSummary();
+    }
+}
+
+function calculateTotal(rowIndex) {
+    const row = document.querySelector(`[data-row="${rowIndex}"]`);
+    const bagWeight = parseFloat(row.querySelector('.bag-weight').value) || 0;
+    const bagCount = parseFloat(row.querySelector('.bag-count').value) || 0;
+    const total = bagWeight * bagCount;
+    
+    row.querySelector('.total-packed').value = total.toFixed(2);
+    updateSummary();
+}
+
+function updateSummary() {
+    const rows = document.querySelectorAll('.product-row');
+    let totalBags = 0;
+    let totalPacked = 0;
+    let totalShallow = 0;
+    
+    rows.forEach(row => {
+        const bagCount = parseFloat(row.querySelector('.bag-count').value) || 0;
+        const packed = parseFloat(row.querySelector('.total-packed').value) || 0;
+        const shallow = parseFloat(row.querySelector('input[name="shallow_storage"]').value) || 0;
+        
+        totalBags += bagCount;
+        totalPacked += packed;
+        totalShallow += shallow;
+    });
+    
+    document.getElementById('totalBags').textContent = totalBags;
+    document.getElementById('totalPacked').textContent = totalPacked.toFixed(2) + ' kg';
+    document.getElementById('totalShallow').textContent = totalShallow.toFixed(2) + ' kg';
+    document.getElementById('grandTotal').textContent = (totalPacked + totalShallow).toFixed(2) + ' kg';
+}
+
+// Initialize summary on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateSummary();
+});
+</script>
+{% endblock %}
