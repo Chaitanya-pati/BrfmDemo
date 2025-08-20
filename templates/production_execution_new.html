@@ -491,7 +491,26 @@ function startCleaning(jobId, type) {
     }
 }
 
-function filterJobs(status) {
+
+
+// Make startJob function globally available
+window.startJob = function(jobId, stage) {
+    console.log('Starting job:', jobId, 'stage:', stage);
+    if (stage === 'transfer') {
+        window.location.href = `/production_execution/transfer/${jobId}`;
+    } else if (stage === 'cleaning_24h') {
+        window.location.href = `/production_execution/cleaning_24h/${jobId}`;
+    } else if (stage === 'cleaning_12h') {
+        window.location.href = `/production_execution/cleaning_12h/${jobId}`;
+    } else if (stage === 'grinding') {
+        window.location.href = `/production_execution/grinding/${jobId}`;
+    } else if (stage === 'packing') {
+        window.location.href = `/production_execution/packing/${jobId}`;
+    }
+}
+
+// Also make other functions globally available
+window.filterJobs = function(status) {
     const rows = document.querySelectorAll('.job-row');
     
     rows.forEach(row => {
@@ -507,17 +526,30 @@ function filterJobs(status) {
     });
 }
 
-function startJob(jobId, stage) {
-    if (stage === 'transfer') {
-        window.location.href = `/production_execution/transfer/${jobId}`;
-    } else if (stage === 'cleaning_24h') {
+window.viewJobDetails = function(jobId) {
+    // Use the API to get job details and show in modal
+    fetch(`/api/job_details/${jobId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showJobDetailsModal(data.job);
+            } else {
+                showNotification('Failed to load job details', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading job details:', error);
+            showNotification('Error loading job details', 'error');
+        });
+}
+
+window.startCleaning = function(jobId, type) {
+    if (type === '24h') {
         window.location.href = `/production_execution/cleaning_24h/${jobId}`;
-    } else if (stage === 'cleaning_12h') {
+    } else if (type === '12h') {
         window.location.href = `/production_execution/cleaning_12h/${jobId}`;
-    } else if (stage === 'grinding') {
-        window.location.href = `/production_execution/grinding/${jobId}`;
-    } else if (stage === 'packing') {
-        window.location.href = `/production_execution/packing/${jobId}`;
+    } else {
+        window.location.href = `/production_execution/machine_cleaning/${jobId}`;
     }
 }
 
