@@ -1134,6 +1134,305 @@ def sales_dispatch():
                          sales_orders=sales_orders,
                          vehicles=vehicles)
 
+# Step 3: Grinding Process with Machine Cleaning
+@app.route('/production_execution/grinding/<int:job_id>', methods=['GET', 'POST'])
+def grinding_execution(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    # Check if grinding process already exists
+    existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
+    
+    if request.method == 'POST':
+        try:
+            if existing_grinding:
+                flash('Grinding process already exists for this job!', 'error')
+                return redirect(url_for('grinding_execution', job_id=job_id))
+                
+            # Handle file uploads
+            start_photo = None
+            end_photo = None
+            
+            if 'start_photo' in request.files:
+                file = request.files['start_photo']
+                if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filename = f"grinding_start_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    start_photo = filename
+                    
+            if 'end_photo' in request.files:
+                file = request.files['end_photo']
+                if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filename = f"grinding_end_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    end_photo = filename
+                    
+            # Create grinding process
+            grinding = GrindingProcess()
+            grinding.job_id = job_id
+            grinding.machine_name = request.form['machine_name']
+            grinding.operator_name = request.form['operator_name']
+            grinding.input_quantity_kg = float(request.form['input_quantity'])
+            grinding.main_products_kg = float(request.form['main_products'])
+            grinding.bran_kg = float(request.form['bran'])
+            grinding.total_output_kg = grinding.main_products_kg + grinding.bran_kg
+            grinding.bran_percentage = (grinding.bran_kg / grinding.total_output_kg) * 100 if grinding.total_output_kg > 0 else 0
+            grinding.start_time = datetime.utcnow()
+            grinding.end_time = datetime.utcnow()
+            grinding.start_photo = start_photo
+            grinding.end_photo = end_photo
+            grinding.status = 'completed'
+            
+            # Update job status
+            job.status = 'completed'
+            job.completed_at = datetime.utcnow()
+            job.completed_by = request.form['operator_name']
+            
+            # Check bran percentage and create alert if needed
+            if grinding.bran_percentage > 25:
+                flash(f'Alert: Bran percentage ({grinding.bran_percentage:.1f}%) is higher than expected (23-25%)', 'warning')
+            elif grinding.bran_percentage < 23:
+                flash(f'Alert: Bran percentage ({grinding.bran_percentage:.1f}%) is lower than expected (23-25%)', 'warning')
+                
+            db.session.add(grinding)
+            db.session.commit()
+            
+            flash('Grinding process completed successfully!', 'success')
+            return redirect(url_for('packing_execution', job_id=job_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing grinding process: {str(e)}', 'error')
+    
+    return render_template('grinding_execution.html', job=job, existing_grinding=existing_grinding)
+
+# Machine Cleaning with Hourly Frequency
+@app.route('/machine_cleaning', methods=['GET', 'POST'])
+def machine_cleaning():
+    if request.method == 'POST':
+        try:
+            action = request.form.get('action')
+            
+            if action == 'start_cleaning':
+                machine_id = int(request.form['machine_id'])
+                operator = request.form['operator']
+                
+                # Check if machine needs cleaning
+                machine = CleaningMachine.query.get(machine_id)
+                if not machine:
+                    flash('Machine not found!', 'error')
+                    return redirect(url_for('machine_cleaning'))
+                    
+                # Handle photo upload
+                before_photo = None
+                if 'before_photo' in request.files:
+                    file = request.files['before_photo']
+                    if file and file.filename and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"before_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        before_photo = filename
+                        
+                # Create cleaning log
+                log = CleaningLog()
+                log.machine_id = machine_id
+                log.cleaned_by = operator
+                log.photo_before = before_photo
+                log.waste_collected = float(request.form.get('waste_collected', 0))
+                log.notes = request.form.get('notes', '')
+                
+                # Update machine last cleaned time
+                machine.last_cleaned = datetime.utcnow()
+                
+                db.session.add(log)
+                db.session.commit()
+                
+                flash('Machine cleaning started!', 'success')
+                return redirect(url_for('complete_machine_cleaning', log_id=log.id))
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting machine cleaning: {str(e)}', 'error')
+    
+    # Get machines that need cleaning (every hour)
+    now = datetime.utcnow()
+    machines_needing_cleaning = CleaningMachine.query.filter(
+        db.or_(
+            CleaningMachine.last_cleaned.is_(None),
+            CleaningMachine.last_cleaned <= now - timedelta(hours=1)
+        )
+    ).all()
+    
+    all_machines = CleaningMachine.query.all()
+    recent_logs = CleaningLog.query.order_by(CleaningLog.cleaning_time.desc()).limit(10).all()
+    
+    return render_template('machine_cleaning.html', 
+                         machines_needing_cleaning=machines_needing_cleaning,
+                         all_machines=all_machines,
+                         recent_logs=recent_logs)
+
+@app.route('/complete_machine_cleaning/<int:log_id>', methods=['GET', 'POST'])
+def complete_machine_cleaning(log_id):
+    log = CleaningLog.query.get_or_404(log_id)
+    
+    if request.method == 'POST':
+        try:
+            # Handle after photo upload
+            after_photo = None
+            if 'after_photo' in request.files:
+                file = request.files['after_photo']
+                if file and file.filename and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filename = f"after_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    after_photo = filename
+                    
+            log.photo_after = after_photo
+            log.waste_collected = float(request.form.get('waste_collected', log.waste_collected or 0))
+            log.notes = request.form.get('notes', log.notes or '')
+            
+            db.session.commit()
+            flash('Machine cleaning completed successfully!', 'success')
+            return redirect(url_for('machine_cleaning'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing machine cleaning: {str(e)}', 'error')
+    
+    return render_template('complete_cleaning.html', log=log)
+
+# Step 4: Packing Process
+@app.route('/production_execution/packing/<int:job_id>', methods=['GET', 'POST'])
+def packing_execution(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
+    
+    if not grinding_process:
+        flash('Grinding process must be completed before packing!', 'error')
+        return redirect(url_for('grinding_execution', job_id=job_id))
+    
+    if request.method == 'POST':
+        try:
+            action = request.form.get('action')
+            
+            if action == 'pack_product':
+                product_id = int(request.form['product_id'])
+                bag_weight = float(request.form['bag_weight'])
+                number_of_bags = int(request.form['number_of_bags'])
+                storage_area_id = request.form.get('storage_area_id')
+                stored_in_shallow = float(request.form.get('stored_in_shallow', 0))
+                operator = request.form['operator_name']
+                
+                # Handle photo upload
+                packing_photo = None
+                if 'packing_photo' in request.files:
+                    file = request.files['packing_photo']
+                    if file and file.filename and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"packing_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        packing_photo = filename
+                        
+                # Create packing process
+                packing = PackingProcess()
+                packing.job_id = job_id
+                packing.product_id = product_id
+                packing.bag_weight_kg = bag_weight
+                packing.number_of_bags = number_of_bags
+                packing.total_packed_kg = bag_weight * number_of_bags
+                packing.operator_name = operator
+                packing.storage_area_id = int(storage_area_id) if storage_area_id else None
+                packing.stored_in_shallow_kg = stored_in_shallow
+                packing.packing_photo = packing_photo
+                
+                # Update storage area stock if selected
+                if storage_area_id:
+                    storage_area = StorageArea.query.get(int(storage_area_id))
+                    if storage_area:
+                        storage_area.current_stock_kg += packing.total_packed_kg
+                        
+                db.session.add(packing)
+                db.session.commit()
+                
+                flash(f'Packed {number_of_bags} bags of {bag_weight}kg each successfully!', 'success')
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error in packing process: {str(e)}', 'error')
+    
+    products = Product.query.filter_by(category='Main Product').all()
+    storage_areas = StorageArea.query.all()
+    existing_packing = PackingProcess.query.filter_by(job_id=job_id).all()
+    
+    return render_template('packing_execution.html', 
+                         job=job, 
+                         grinding_process=grinding_process,
+                         products=products,
+                         storage_areas=storage_areas,
+                         existing_packing=existing_packing)
+
+# Storage Management
+@app.route('/storage_management', methods=['GET', 'POST'])
+def storage_management():
+    if request.method == 'POST':
+        try:
+            action = request.form.get('action')
+            
+            if action == 'transfer_storage':
+                from_storage_id = int(request.form['from_storage_id'])
+                to_storage_id = int(request.form['to_storage_id'])
+                product_id = int(request.form['product_id'])
+                quantity = float(request.form['quantity'])
+                operator = request.form['operator_name']
+                reason = request.form.get('reason', '')
+                
+                # Validate transfer
+                from_storage = StorageArea.query.get(from_storage_id)
+                to_storage = StorageArea.query.get(to_storage_id)
+                
+                if not from_storage or not to_storage:
+                    flash('Invalid storage areas selected!', 'error')
+                    return redirect(url_for('storage_management'))
+                    
+                if from_storage.current_stock_kg < quantity:
+                    flash('Insufficient stock in source storage area!', 'error')
+                    return redirect(url_for('storage_management'))
+                    
+                if to_storage.current_stock_kg + quantity > to_storage.capacity_kg:
+                    flash('Destination storage area does not have enough capacity!', 'warning')
+                    
+                # Create transfer record
+                transfer = StorageTransfer()
+                transfer.from_storage_id = from_storage_id
+                transfer.to_storage_id = to_storage_id
+                transfer.product_id = product_id
+                transfer.quantity_kg = quantity
+                transfer.operator_name = operator
+                transfer.reason = reason
+                
+                # Update storage stocks
+                from_storage.current_stock_kg -= quantity
+                to_storage.current_stock_kg += quantity
+                
+                db.session.add(transfer)
+                db.session.commit()
+                
+                flash(f'Transfer of {quantity}kg completed successfully!', 'success')
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error in storage transfer: {str(e)}', 'error')
+    
+    storage_areas = StorageArea.query.all()
+    products = Product.query.all()
+    recent_transfers = StorageTransfer.query.order_by(StorageTransfer.transfer_time.desc()).limit(10).all()
+    
+    return render_template('storage_management.html',
+                         storage_areas=storage_areas,
+                         products=products,
+                         recent_transfers=recent_transfers)
+
 @app.route('/reports')
 def reports():
     # Generate basic reports data
