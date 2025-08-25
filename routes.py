@@ -1124,7 +1124,7 @@ def sales_dispatch():
     # Get sales orders and vehicles for the new functionality
     sales_orders = SalesOrder.query.filter(SalesOrder.status.in_(['pending', 'partial'])).all()
     vehicles = DispatchVehicle.query.filter_by(status='available').all()
-    recent_dispatches = Dispatch.query.order_by(Dispatch.dispatch_date.desc()).limit(10).all()
+    dispatches = Dispatch.query.order_by(Dispatch.dispatch_date.desc()).limit(10).all()
     
     return render_template('sales_dispatch.html', 
                          orders=completed_orders, 
@@ -1132,8 +1132,7 @@ def sales_dispatch():
                          products=products, 
                          dispatches=dispatches,
                          sales_orders=sales_orders,
-                         vehicles=vehicles,
-                         recent_dispatches=recent_dispatches)
+                         vehicles=vehicles)
 
 @app.route('/reports')
 def reports():
