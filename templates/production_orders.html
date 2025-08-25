@@ -18,16 +18,6 @@
             <div class="card-body">
                 <form method="POST">
                     <div class="mb-3">
-                        <label for="customer" class="form-label">Customer (Optional)</label>
-                        <select class="form-select" id="customer" name="customer">
-                            <option value="">Select Customer</option>
-                            {% for customer in customers %}
-                            <option value="{{ customer.company_name }}">{{ customer.company_name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
                         <label for="product" class="form-label">Finished Product</label>
                         <select class="form-select" id="product" name="product" required>
                             <option value="">Select Product</option>
@@ -35,6 +25,12 @@
                             <option value="{{ product.name }}">{{ product.name }}</option>
                             {% endfor %}
                         </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="finished_good_type" class="form-label">Type of Finished Good</label>
+                        <input type="text" class="form-control" id="finished_good_type" name="finished_good_type" 
+                               placeholder="e.g., Premium Quality, Standard Grade, Bulk Order" required>
                     </div>
 
                     <div class="mb-3">
@@ -82,9 +78,9 @@
                                 <tr>
                                     <th>Order No.</th>
                                     <th>Product</th>
+                                    <th>Type</th>
                                     <th>Quantity</th>
                                     <th>Status</th>
-                                    <th>Customer</th>
                                     <th>Deadline</th>
                                     <th>Actions</th>
                                 </tr>
@@ -94,13 +90,13 @@
                                 <tr>
                                     <td><strong>{{ order.order_number }}</strong></td>
                                     <td>{{ order.product }}</td>
+                                    <td>{{ order.finished_good_type or '-' }}</td>
                                     <td>{{ "%.1f"|format(order.quantity) }} kg</td>
                                     <td>
                                         <span class="badge bg-{{ 'warning' if order.status == 'pending' else 'info' if order.status == 'planned' else 'primary' if order.status == 'in_progress' else 'success' }}">
                                             {{ order.status.title() }}
                                         </span>
                                     </td>
-                                    <td>{{ order.customer or '-' }}</td>
                                     <td>{{ order.deadline.strftime('%m/%d/%Y') if order.deadline else '-' }}</td>
                                     <td>
                                         {% if order.status == 'pending' %}

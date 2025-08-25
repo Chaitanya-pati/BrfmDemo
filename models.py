@@ -160,7 +160,7 @@ class ProductionOrder(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
     quantity = db.Column(db.Float, nullable=False)  # in tons
     product = db.Column(db.String(100))  # Change to string field instead of foreign key
-    customer = db.Column(db.String(100))  # Change to string field instead of foreign key
+    finished_good_type = db.Column(db.String(100))  # Type of finished good
     deadline = db.Column(db.DateTime)
     priority = db.Column(db.String(20), default='normal')
     description = db.Column(db.Text)

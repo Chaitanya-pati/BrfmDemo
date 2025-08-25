@@ -290,8 +290,7 @@ def production_orders():
             production_order.order_number = generate_order_number('PO')
             production_order.quantity = float(request.form['quantity'])
             production_order.product = request.form['product']
-            production_order.customer_id = int(request.form['customer_id']) if request.form.get('customer_id') else None
-            production_order.customer = request.form.get('customer')  # Keep the string field too
+            production_order.finished_good_type = request.form['finished_good_type']
             production_order.deadline = datetime.strptime(request.form['deadline'], '%Y-%m-%d')
             production_order.priority = request.form.get('priority', 'normal')
             production_order.description = request.form.get('notes')
