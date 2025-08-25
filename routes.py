@@ -1079,6 +1079,11 @@ def sales_dispatch():
                     else:
                         sales_order.status = 'partial'
                 
+                # Update vehicle status to dispatched
+                vehicle = DispatchVehicle.query.get(request.form['vehicle_id'])
+                if vehicle:
+                    vehicle.status = 'dispatched'
+                
                 db.session.add(dispatch)
                 db.session.commit()
                 flash('Dispatch created successfully!', 'success')
@@ -1389,6 +1394,29 @@ def api_job_progress():
         return jsonify({'error': str(e)}), 500
 
 # Removed duplicate route - using the comprehensive one above
+
+@app.route('/mark_dispatch_delivered/<int:dispatch_id>')
+def mark_dispatch_delivered(dispatch_id):
+    """Mark dispatch as delivered and make vehicle available again"""
+    try:
+        from models import Dispatch, DispatchVehicle
+        
+        dispatch = Dispatch.query.get_or_404(dispatch_id)
+        dispatch.status = 'delivered'
+        dispatch.delivery_date = datetime.utcnow()
+        
+        # Make vehicle available again
+        vehicle = DispatchVehicle.query.get(dispatch.vehicle_id)
+        if vehicle:
+            vehicle.status = 'available'
+        
+        db.session.commit()
+        flash('Dispatch marked as delivered and vehicle is now available!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating dispatch: {str(e)}', 'error')
+    
+    return redirect(url_for('sales_dispatch'))
 
 @app.route('/init_data')
 def init_data():
