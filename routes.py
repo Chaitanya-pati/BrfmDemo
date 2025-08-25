@@ -1012,35 +1012,123 @@ def api_cleaning_timer(process_id):
 @app.route('/sales_dispatch', methods=['GET', 'POST'])
 def sales_dispatch():
     if request.method == 'POST':
-        try:
-            dispatch = SalesDispatch()
-            dispatch.order_id = int(request.form['order_id'])
-            dispatch.customer_id = int(request.form['customer_id'])
-            dispatch.product_id = int(request.form['product_id'])
-            dispatch.quantity = float(request.form['quantity'])
-            dispatch.dispatch_date = datetime.strptime(request.form['dispatch_date'], '%Y-%m-%d')
-            dispatch.vehicle_number = request.form['vehicle_number']
-            dispatch.driver_name = request.form['driver_name']
-            dispatch.notes = request.form.get('notes')
-            
-            db.session.add(dispatch)
-            db.session.commit()
-            flash('Dispatch record created successfully!', 'success')
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error creating dispatch: {str(e)}', 'error')
+        action = request.form.get('action')
+        
+        if action == 'create_order':
+            try:
+                # Import SalesOrder model
+                from models import SalesOrder
+                
+                sales_order = SalesOrder()
+                sales_order.order_number = generate_order_number('SO')
+                sales_order.customer_id = int(request.form['customer_id'])
+                sales_order.salesman = request.form['salesman']
+                sales_order.delivery_date = datetime.strptime(request.form['delivery_date'], '%Y-%m-%d')
+                sales_order.total_quantity = float(request.form['total_quantity'])
+                sales_order.pending_quantity = float(request.form['total_quantity'])
+                
+                db.session.add(sales_order)
+                db.session.commit()
+                flash('Sales order created successfully!', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error creating sales order: {str(e)}', 'error')
+        
+        elif action == 'dispatch':
+            try:
+                # Handle dispatch photos
+                loading_photo = None
+                loaded_photo = None
+                
+                if 'loading_photo' in request.files:
+                    file = request.files['loading_photo']
+                    if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"loading_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        loading_photo = filename
+                
+                if 'loaded_photo' in request.files:
+                    file = request.files['loaded_photo']
+                    if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"loaded_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        loaded_photo = filename
+                
+                # Import required models
+                from models import Dispatch, SalesOrder, DispatchVehicle
+                
+                dispatch = Dispatch()
+                dispatch.dispatch_number = generate_order_number('DP')
+                dispatch.sales_order_id = int(request.form['sales_order_id'])
+                dispatch.vehicle_id = int(request.form['vehicle_id'])
+                dispatch.quantity = float(request.form['quantity'])
+                dispatch.loading_photo = loading_photo
+                dispatch.loaded_photo = loaded_photo
+                
+                # Update sales order quantities
+                sales_order = SalesOrder.query.get(request.form['sales_order_id'])
+                if sales_order:
+                    sales_order.delivered_quantity += float(request.form['quantity'])
+                    sales_order.pending_quantity = sales_order.total_quantity - sales_order.delivered_quantity
+                    
+                    if sales_order.pending_quantity <= 0:
+                        sales_order.status = 'completed'
+                    else:
+                        sales_order.status = 'partial'
+                
+                db.session.add(dispatch)
+                db.session.commit()
+                flash('Dispatch created successfully!', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error creating dispatch: {str(e)}', 'error')
+        
+        else:
+            # Fallback for old dispatch creation without action
+            try:
+                dispatch = SalesDispatch()
+                dispatch.order_id = int(request.form['order_id'])
+                dispatch.customer_id = int(request.form['customer_id'])
+                dispatch.product_id = int(request.form['product_id'])
+                dispatch.quantity = float(request.form['quantity'])
+                dispatch.dispatch_date = datetime.strptime(request.form['dispatch_date'], '%Y-%m-%d')
+                dispatch.vehicle_number = request.form['vehicle_number']
+                dispatch.driver_name = request.form['driver_name']
+                dispatch.notes = request.form.get('notes')
+                
+                db.session.add(dispatch)
+                db.session.commit()
+                flash('Dispatch record created successfully!', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error creating dispatch: {str(e)}', 'error')
+    
+    # Import models for template data
+    from models import SalesOrder, DispatchVehicle, Dispatch
     
     completed_orders = ProductionOrder.query.filter_by(status='completed').all()
     customers = Customer.query.all()
     products = Product.query.all()
     dispatches = SalesDispatch.query.order_by(SalesDispatch.created_at.desc()).limit(20).all()
     
+    # Get sales orders and vehicles for the new functionality
+    sales_orders = SalesOrder.query.filter(SalesOrder.status.in_(['pending', 'partial'])).all()
+    vehicles = DispatchVehicle.query.filter_by(status='available').all()
+    recent_dispatches = Dispatch.query.order_by(Dispatch.dispatch_date.desc()).limit(10).all()
+    
     return render_template('sales_dispatch.html', 
                          orders=completed_orders, 
                          customers=customers, 
                          products=products, 
-                         dispatches=dispatches)
+                         dispatches=dispatches,
+                         sales_orders=sales_orders,
+                         vehicles=vehicles,
+                         recent_dispatches=recent_dispatches)
 
 @app.route('/reports')
 def reports():
