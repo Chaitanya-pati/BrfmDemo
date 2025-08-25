@@ -17,13 +17,13 @@ def index():
     total_vehicles = Vehicle.query.count()
     pending_vehicles = Vehicle.query.filter_by(status='pending').count()
     approved_vehicles = Vehicle.query.filter_by(status='approved').count()
-    
+
     total_stock = db.session.query(db.func.sum(Godown.current_stock)).scalar() or 0
     active_orders = ProductionOrder.query.filter_by(status='pending').count()
-    
+
     recent_vehicles = Vehicle.query.order_by(Vehicle.entry_time.desc()).limit(5).all()
     recent_quality_tests = QualityTest.query.join(Vehicle).order_by(QualityTest.test_time.desc()).limit(5).all()
-    
+
     return render_template('index.html',
                          total_vehicles=total_vehicles,
                          pending_vehicles=pending_vehicles,
@@ -41,7 +41,7 @@ def vehicle_entry():
             # Handle file uploads
             vehicle_photo = None
             supplier_bill = None
-            
+
             if 'vehicle_photo' in request.files:
                 file = request.files['vehicle_photo']
                 if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -49,7 +49,7 @@ def vehicle_entry():
                     filename = f"vehicle_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     vehicle_photo = filename
-            
+
             if 'supplier_bill' in request.files:
                 file = request.files['supplier_bill']
                 if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -57,7 +57,7 @@ def vehicle_entry():
                     filename = f"bill_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     supplier_bill = filename
-            
+
             # Create vehicle record
             vehicle = Vehicle()
             vehicle.supplier_id = int(request.form['supplier_id'])
@@ -70,19 +70,19 @@ def vehicle_entry():
             vehicle.supplier_bill = supplier_bill
             vehicle.notes = request.form.get('notes')
             vehicle.status = 'pending'
-            
+
             db.session.add(vehicle)
             db.session.commit()
             flash('Vehicle entry recorded successfully!', 'success')
             return redirect(url_for('vehicle_entry'))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error recording vehicle entry: {str(e)}', 'error')
-    
+
     suppliers = Supplier.query.all()
     recent_vehicles = Vehicle.query.order_by(Vehicle.entry_time.desc()).limit(10).all()
-    
+
     return render_template('vehicle_entry.html', suppliers=suppliers, recent_vehicles=recent_vehicles)
 
 @app.route('/quality_control', methods=['GET', 'POST'])
@@ -91,11 +91,11 @@ def quality_control():
         try:
             vehicle_id = request.form['vehicle_id']
             vehicle = Vehicle.query.get_or_404(vehicle_id)
-            
+
             # Handle file uploads for sample photos
             sample_photos_before = None
             sample_photos_after = None
-            
+
             if 'sample_photos_before' in request.files:
                 file = request.files['sample_photos_before']
                 if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -103,7 +103,7 @@ def quality_control():
                     filename = f"sample_before_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     sample_photos_before = filename
-            
+
             if 'sample_photos_after' in request.files:
                 file = request.files['sample_photos_after']
                 if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -111,7 +111,7 @@ def quality_control():
                     filename = f"sample_after_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     sample_photos_after = filename
-            
+
             # Create quality test record
             quality_test = QualityTest()
             quality_test.vehicle_id = int(vehicle_id)
@@ -140,30 +140,30 @@ def quality_control():
             quality_test.approved = request.form.get('approved') == 'on'
             quality_test.sample_photos_before = sample_photos_before
             quality_test.sample_photos_after = sample_photos_after
-            
+
             # Set test date if provided, otherwise use current time
             if request.form.get('test_date'):
                 quality_test.test_time = datetime.strptime(request.form['test_date'], '%Y-%m-%dT%H:%M')
-            
+
             # Update vehicle with quality info
             vehicle.quality_category = request.form['category_assigned']
             vehicle.status = 'quality_check'
-            
+
             if quality_test.approved:
                 vehicle.owner_approved = True
                 vehicle.status = 'approved'
-            
+
             db.session.add(quality_test)
             db.session.commit()
             flash('Quality test recorded successfully!', 'success')
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error recording quality test: {str(e)}', 'error')
-    
+
     pending_vehicles = Vehicle.query.filter_by(status='pending').all()
     quality_tests = QualityTest.query.join(Vehicle).order_by(QualityTest.test_time.desc()).all()
-    
+
     return render_template('quality_control.html', vehicles=pending_vehicles, quality_tests=quality_tests)
 
 @app.route('/approve_vehicle/<int:vehicle_id>')
@@ -197,7 +197,7 @@ def weight_entry():
         try:
             vehicle_id = request.form['vehicle_id']
             vehicle = Vehicle.query.get_or_404(vehicle_id)
-            
+
             if 'vehicle_photo_after' in request.files:
                 file = request.files['vehicle_photo_after']
                 if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -205,35 +205,35 @@ def weight_entry():
                     filename = f"after_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     vehicle.vehicle_photo_after = filename
-            
+
             vehicle.net_weight_before = float(request.form['net_weight_before'])
             vehicle.net_weight_after = float(request.form['net_weight_after'])
             vehicle.final_weight = vehicle.net_weight_before - vehicle.net_weight_after
             vehicle.godown_id = request.form['godown_id']
             vehicle.status = 'unloaded'
-            
+
             # Update godown inventory
             godown = Godown.query.get(vehicle.godown_id)
             if godown:
                 godown.current_stock += vehicle.final_weight
-            
+
             db.session.commit()
             flash('Weight entry recorded and inventory updated!', 'success')
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error recording weight entry: {str(e)}', 'error')
-    
+
     approved_vehicles = Vehicle.query.filter_by(status='approved', owner_approved=True).all()
     godowns = Godown.query.all()
-    
+
     return render_template('weight_entry.html', vehicles=approved_vehicles, godowns=godowns)
 
 @app.route('/godown_management')
 def godown_management():
     godowns = Godown.query.join(GodownType).all()
     godown_types = GodownType.query.all()
-    
+
     return render_template('godown_management.html', godowns=godowns, godown_types=godown_types)
 
 @app.route('/precleaning', methods=['GET', 'POST'])
@@ -242,7 +242,7 @@ def precleaning():
         try:
             # Handle transfer photos
             transfer_photo = None
-            
+
             if 'transfer_photo' in request.files:
                 file = request.files['transfer_photo']
                 if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -250,7 +250,7 @@ def precleaning():
                     filename = f"transfer_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     transfer_photo = filename
-            
+
             transfer = Transfer()
             transfer.from_godown_id = int(request.form['from_godown_id'])
             transfer.to_precleaning_bin_id = int(request.form['to_precleaning_bin_id'])
@@ -259,27 +259,27 @@ def precleaning():
             transfer.operator = request.form['operator']
             transfer.notes = request.form.get('notes')
             transfer.evidence_photo = transfer_photo
-            
+
             # Update stocks
             from_godown = Godown.query.get(transfer.from_godown_id)
             to_bin = PrecleaningBin.query.get(transfer.to_precleaning_bin_id)
-            
+
             if from_godown and to_bin:
                 from_godown.current_stock -= transfer.quantity
                 to_bin.current_stock += transfer.quantity
-            
+
             db.session.add(transfer)
             db.session.commit()
             flash('Transfer completed successfully!', 'success')
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error processing transfer: {str(e)}', 'error')
-    
+
     godowns = Godown.query.filter(Godown.current_stock > 0).all()
     precleaning_bins = PrecleaningBin.query.all()
     recent_transfers = Transfer.query.filter_by(transfer_type='godown_to_precleaning').order_by(Transfer.transfer_time.desc()).limit(10).all()
-    
+
     return render_template('precleaning.html', godowns=godowns, precleaning_bins=precleaning_bins, transfers=recent_transfers)
 
 @app.route('/production_orders', methods=['GET', 'POST'])
@@ -295,20 +295,20 @@ def production_orders():
             production_order.priority = request.form.get('priority', 'normal')
             production_order.description = request.form.get('notes')
             production_order.created_by = request.form.get('created_by', 'System')
-            
+
             db.session.add(production_order)
             db.session.commit()
             flash('Production order created successfully!', 'success')
             return redirect(url_for('production_orders'))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error creating production order: {str(e)}', 'error')
-    
+
     orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
     customers = Customer.query.all()
     products = Product.query.filter_by(category='Main Product').all()
-    
+
     return render_template('production_orders.html', orders=orders, customers=customers, products=products)
 
 
@@ -322,14 +322,14 @@ def production_orders():
 @app.route('/api/check_reminders')
 def api_check_reminders():
     reminders = []
-    
+
     # Check machine cleaning reminders
     machines = CleaningMachine.query.all()
     for machine in machines:
         if machine.last_cleaned:
             time_since_cleaned = datetime.utcnow() - machine.last_cleaned
             hours_since_cleaned = time_since_cleaned.total_seconds() / 3600
-            
+
             # 5 minute warning
             if (hours_since_cleaned + (5/60)) >= machine.cleaning_frequency_hours:
                 if hours_since_cleaned < machine.cleaning_frequency_hours:
@@ -337,7 +337,7 @@ def api_check_reminders():
                         'message': f'Machine "{machine.name}" needs cleaning in 5 minutes!',
                         'type': 'warning'
                     })
-            
+
             # 10 minute warning
             elif (hours_since_cleaned + (10/60)) >= machine.cleaning_frequency_hours:
                 if hours_since_cleaned < machine.cleaning_frequency_hours:
@@ -345,20 +345,20 @@ def api_check_reminders():
                         'message': f'Machine "{machine.name}" needs cleaning in 10 minutes!',
                         'type': 'info'
                     })
-            
+
             # Overdue
             elif hours_since_cleaned >= machine.cleaning_frequency_hours:
                 reminders.append({
                     'message': f'Machine "{machine.name}" cleaning is overdue!',
                     'type': 'danger'
                 })
-    
+
     # Check cleaning process completions
     ending_processes = CleaningProcess.query.filter(
         CleaningProcess.status == 'running',
         CleaningProcess.end_time <= datetime.utcnow() + timedelta(minutes=30)
     ).all()
-    
+
     for process in ending_processes:
         time_remaining = process.end_time - datetime.utcnow()
         if time_remaining.total_seconds() > 0:
@@ -373,19 +373,19 @@ def api_check_reminders():
                 'message': f'{process.process_type} cleaning process completed! Ready for next stage.',
                 'type': 'success'
             })
-    
+
     return jsonify({'reminders': reminders})
 
 @app.route('/api/machine_status')
 def api_machine_status():
     machines = []
     overdue_machines = []
-    
+
     for machine in CleaningMachine.query.all():
         if machine.last_cleaned:
             time_since_cleaned = datetime.utcnow() - machine.last_cleaned
             hours_since_cleaned = time_since_cleaned.total_seconds() / 3600
-            
+
             if hours_since_cleaned < machine.cleaning_frequency_hours:
                 status_class = 'status-clean'
             elif hours_since_cleaned < machine.cleaning_frequency_hours * 1.2:
@@ -396,13 +396,13 @@ def api_machine_status():
         else:
             status_class = 'status-overdue'
             overdue_machines.append(machine)
-        
+
         machines.append({
             'id': machine.id,
             'name': machine.name,
             'status_class': status_class
         })
-    
+
     return jsonify({
         'machines': machines,
         'overdue_machines': [{'id': m.id, 'name': m.name} for m in overdue_machines]
@@ -418,12 +418,12 @@ def production_planning(order_id=None):
     order = None
     existing_plan = None
     precleaning_bins = []
-    
+
     if order_id:
         order = ProductionOrder.query.get_or_404(order_id)
         existing_plan = ProductionPlan.query.filter_by(order_id=order_id).first()
         precleaning_bins = PrecleaningBin.query.filter(PrecleaningBin.current_stock > 0).all()
-        
+
         if request.method == 'POST' and not existing_plan:
             try:
                 # Create production plan for specific order
@@ -432,16 +432,16 @@ def production_planning(order_id=None):
                 plan.planned_by = request.form['planned_by']
                 db.session.add(plan)
                 db.session.flush()  # Get the plan ID
-                
+
                 total_percentage = 0
                 precleaning_bin_ids = request.form.getlist('precleaning_bin_id')
                 percentages = request.form.getlist('percentage')
-                
+
                 for i, bin_id in enumerate(precleaning_bin_ids):
                     if bin_id and i < len(percentages) and percentages[i]:
                         percentage = float(percentages[i])
                         quantity = (percentage / 100) * order.quantity
-                        
+
                         plan_item = ProductionPlanItem()
                         plan_item.plan_id = plan.id
                         plan_item.precleaning_bin_id = int(bin_id)
@@ -449,24 +449,24 @@ def production_planning(order_id=None):
                         plan_item.quantity = quantity
                         db.session.add(plan_item)
                         total_percentage += percentage
-                
+
                 if abs(total_percentage - 100) > 0.1:
                     flash('Total percentage must equal 100%!', 'error')
                     db.session.rollback()
                     return redirect(url_for('production_planning', order_id=order_id))
-                
+
                 plan.total_percentage = total_percentage
                 plan.status = 'approved'
                 order.status = 'planned'
-                
+
                 db.session.commit()
                 flash('Production plan created successfully!', 'success')
                 return redirect(url_for('production_orders'))
-                
+
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error creating production plan: {str(e)}', 'error')
-        
+
         return render_template('production_planning.html', 
                              order=order, 
                              precleaning_bins=precleaning_bins, 
@@ -485,19 +485,19 @@ def production_planning(order_id=None):
                 plan.stage_3_percentage = float(request.form.get('stage_3_percentage', 0))
                 plan.priority = request.form.get('priority', 'normal')
                 plan.status = 'draft'
-                
+
                 db.session.add(plan)
                 db.session.commit()
                 flash('Production plan created successfully!', 'success')
-                
+
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error creating plan: {str(e)}', 'error')
-        
+
         orders = ProductionOrder.query.filter_by(status='pending').all()
         bins = PrecleaningBin.query.all()
         plans = ProductionPlan.query.order_by(ProductionPlan.planning_date.desc()).all()
-        
+
         return render_template('production_planning.html', orders=orders, bins=bins, plans=plans)
 
 # Production Execution System with Timer Controls
@@ -506,7 +506,7 @@ def production_execution():
     # Get pending jobs from approved plans
     pending_jobs = ProductionJobNew.query.filter_by(status='pending').all()
     running_processes = CleaningProcess.query.filter_by(status='running').all()
-    
+
     return render_template('production_execution.html', 
                          pending_jobs=pending_jobs,
                          running_processes=running_processes)
@@ -523,17 +523,17 @@ def start_execution(order_id):
     try:
         order = ProductionOrder.query.get_or_404(order_id)
         plan = ProductionPlan.query.filter_by(order_id=order_id, status='approved').first()
-        
+
         if not plan:
             flash('No approved production plan found for this order', 'error')
             return redirect(url_for('production_orders'))
-        
+
         # Check if execution already started
         existing_job = ProductionJobNew.query.filter_by(order_id=order_id).first()
         if existing_job:
             flash('Execution already started for this order', 'warning')
             return redirect(url_for('production_execution'))
-        
+
         # Create first job (transfer stage)
         job = ProductionJobNew()
         job.job_number = generate_job_id()
@@ -541,16 +541,16 @@ def start_execution(order_id):
         job.plan_id = plan.id
         job.stage = 'transfer'
         job.status = 'pending'
-        
+
         # Update order status
         order.status = 'in_progress'
-        
+
         db.session.add(job)
         db.session.commit()
-        
+
         flash(f'Production execution started! Job {job.job_number} created.', 'success')
         return redirect(url_for('production_execution'))
-        
+
     except Exception as e:
         db.session.rollback()
         flash(f'Error starting execution: {str(e)}', 'error')
@@ -560,11 +560,11 @@ def start_execution(order_id):
 def start_transfer(order_id):
     order = ProductionOrder.query.get_or_404(order_id)
     plan = ProductionPlan.query.filter_by(order_id=order_id, status='approved').first()
-    
+
     if not plan:
         flash('No approved production plan found for this order', 'error')
         return redirect(url_for('production_execution'))
-    
+
     # Create transfer job
     job = ProductionJobNew()
     job.job_number = generate_job_id()
@@ -572,24 +572,24 @@ def start_transfer(order_id):
     job.plan_id = plan.id
     job.stage = 'transfer'
     job.status = 'pending'
-    
+
     db.session.add(job)
     db.session.commit()
-    
+
     return redirect(url_for('transfer_execution', job_id=job.id))
 
 @app.route('/production_execution/transfer/<int:job_id>', methods=['GET', 'POST'])
 def transfer_execution(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
     plan_items = ProductionPlanItem.query.filter_by(plan_id=job.plan_id).all()
-    
+
     # Get only the precleaning bins that are in the plan and have sufficient stock
     valid_plan_items = []
     for item in plan_items:
         precleaning_bin = PrecleaningBin.query.get(item.precleaning_bin_id)
         if precleaning_bin and precleaning_bin.current_stock >= item.quantity:
             valid_plan_items.append(item)
-    
+
     if request.method == 'POST':
         try:
             # Check if all plan items have sufficient stock
@@ -598,25 +598,25 @@ def transfer_execution(job_id):
                 if not precleaning_bin or precleaning_bin.current_stock < item.quantity:
                     flash(f'Insufficient stock in {precleaning_bin.name if precleaning_bin else "Unknown bin"}', 'error')
                     return redirect(url_for('transfer_execution', job_id=job_id))
-            
+
             # Mark job as started
             job.status = 'in_progress'
             job.started_at = datetime.utcnow()
             job.started_by = request.form['operator_name']
-            
+
             total_transferred = 0
-            
+
             # Process each precleaning bin transfer automatically
             for plan_item in plan_items:
                 quantity_to_transfer = plan_item.quantity
-                
+
                 # Create transfer record
                 transfer = ProductionTransfer()
                 transfer.job_id = job_id
                 transfer.from_precleaning_bin_id = plan_item.precleaning_bin_id
                 transfer.quantity_transferred = quantity_to_transfer
                 transfer.operator_name = request.form['operator_name']
-                
+
                 # Handle photos
                 if 'start_photo' in request.files:
                     file = request.files['start_photo']
@@ -625,20 +625,20 @@ def transfer_execution(job_id):
                         filename = f"transfer_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         transfer.start_photo = filename
-                
+
                 # Update precleaning bin stock
                 precleaning_bin = PrecleaningBin.query.get(plan_item.precleaning_bin_id)
                 if precleaning_bin:
                     precleaning_bin.current_stock -= quantity_to_transfer
-                
+
                 total_transferred += quantity_to_transfer
                 db.session.add(transfer)
-            
+
             # Complete transfer job
             job.status = 'completed'
             job.completed_at = datetime.utcnow()
             job.completed_by = request.form['operator_name']
-            
+
             # Create cleaning_24h job
             cleaning_job = ProductionJobNew()
             cleaning_job.job_number = generate_job_id()
@@ -646,17 +646,17 @@ def transfer_execution(job_id):
             cleaning_job.plan_id = job.plan_id
             cleaning_job.stage = 'cleaning_24h'
             cleaning_job.status = 'pending'
-            
+
             db.session.add(cleaning_job)
             db.session.commit()
-            
+
             flash(f'Transfer completed successfully! Total transferred: {total_transferred:.2f} kg', 'success')
             return redirect(url_for('cleaning_setup', job_id=cleaning_job.id))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error during transfer: {str(e)}', 'error')
-    
+
     return render_template('transfer_execution.html', 
                          job=job, 
                          plan_items=valid_plan_items)
@@ -665,19 +665,19 @@ def transfer_execution(job_id):
 def cleaning_setup(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
     cleaning_bins = CleaningBin.query.filter_by(status='empty').all()
-    
+
     if request.method == 'POST':
         try:
             duration_option = request.form['duration_option']
             duration_hours = 24  # default
-            
+
             if duration_option == '24':
                 duration_hours = 24
             elif duration_option == '12':
                 duration_hours = 12
             elif duration_option == 'custom':
                 duration_hours = int(request.form['custom_hours'])
-            
+
             # Create cleaning process
             cleaning = CleaningProcess()
             cleaning.job_id = job_id
@@ -690,42 +690,53 @@ def cleaning_setup(job_id):
             cleaning.operator_name = request.form['operator_name']
             cleaning.start_moisture = float(request.form.get('start_moisture', 0))
             cleaning.status = 'running'
-            
-            # Update cleaning bin status
+
+            # Update cleaning bin status (create if doesn't exist for hardcoded option)
             cleaning_bin = CleaningBin.query.get(cleaning.cleaning_bin_id)
-            if cleaning_bin:
+            if not cleaning_bin and cleaning.cleaning_bin_id == 1:
+                # Create default cleaning bin if it doesn't exist
+                cleaning_bin = CleaningBin(
+                    id=1,
+                    name='Cleaning Bin #1',
+                    capacity=100.0,
+                    status='cleaning',
+                    cleaning_type='24_hour'
+                )
+                db.session.add(cleaning_bin)
+            elif cleaning_bin:
                 cleaning_bin.status = 'cleaning'
-            
+
+
             # Update job
             job.status = 'in_progress'
             job.started_at = datetime.utcnow()
             job.started_by = request.form['operator_name']
-            
+
             db.session.add(cleaning)
             db.session.commit()
-            
+
             flash(f'Cleaning process started! Duration: {duration_hours} hours', 'success')
             return redirect(url_for('cleaning_monitor', process_id=cleaning.id))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error starting cleaning process: {str(e)}', 'error')
-    
+
     return render_template('cleaning_setup.html', job=job, cleaning_bins=cleaning_bins)
 
 @app.route('/production_execution/cleaning_monitor/<int:process_id>')
 def cleaning_monitor(process_id):
     process = CleaningProcess.query.get_or_404(process_id)
-    
+
     # Calculate remaining time
     now = datetime.utcnow()
     time_remaining = (process.end_time - now).total_seconds()
-    
+
     # Check if reminder should be shown (1 hour before completion)
     show_reminder = False
     if time_remaining > 0 and time_remaining <= 3600:  # 1 hour = 3600 seconds
         show_reminder = True
-    
+
     if time_remaining <= 0:
         time_remaining = 0
         if process.status == 'running':
@@ -735,7 +746,7 @@ def cleaning_monitor(process_id):
             if cleaning_bin:
                 cleaning_bin.status = 'empty'
             db.session.commit()
-    
+
     return render_template('cleaning_monitor.html', 
                          process=process, 
                          time_remaining=time_remaining,
@@ -744,13 +755,13 @@ def cleaning_monitor(process_id):
 @app.route('/production_execution/complete_cleaning/<int:process_id>', methods=['GET', 'POST'])
 def complete_cleaning(process_id):
     process = CleaningProcess.query.get_or_404(process_id)
-    
+
     # Check if timer is completed
     now = datetime.utcnow()
     if now < process.end_time:
         flash('Cannot complete cleaning process until timer finishes!', 'error')
         return redirect(url_for('cleaning_monitor', process_id=process_id))
-    
+
     if request.method == 'POST':
         try:
             # Update cleaning process with completion data
@@ -761,7 +772,7 @@ def complete_cleaning(process_id):
             process.completed_by = request.form['completed_by']
             process.notes = request.form.get('notes', '')
             process.status = 'completed'
-            
+
             # Handle end photo
             if 'end_photo' in request.files:
                 file = request.files['end_photo']
@@ -770,18 +781,18 @@ def complete_cleaning(process_id):
                     filename = f"cleaning_end_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     process.end_photo = filename
-            
+
             # Update cleaning bin status
             cleaning_bin = CleaningBin.query.get(process.cleaning_bin_id)
             if cleaning_bin:
                 cleaning_bin.status = 'empty'
-            
+
             # Complete the job
             job = ProductionJobNew.query.get(process.job_id)
             job.status = 'completed'
             job.completed_at = datetime.utcnow()
             job.completed_by = request.form['completed_by']
-            
+
             # If this was 24-hour cleaning, create 12-hour cleaning job
             if job.stage == 'cleaning_24h':
                 cleaning_12h_job = ProductionJobNew()
@@ -791,7 +802,7 @@ def complete_cleaning(process_id):
                 cleaning_12h_job.stage = 'cleaning_12h'
                 cleaning_12h_job.status = 'pending'
                 db.session.add(cleaning_12h_job)
-                
+
                 db.session.commit()
                 flash('24-hour cleaning completed! Ready for 12-hour cleaning process.', 'success')
                 return redirect(url_for('cleaning_12h_setup', job_id=cleaning_12h_job.id))
@@ -799,11 +810,11 @@ def complete_cleaning(process_id):
                 db.session.commit()
                 flash('Cleaning process completed successfully!', 'success')
                 return redirect(url_for('production_execution'))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error completing cleaning process: {str(e)}', 'error')
-    
+
     return render_template('complete_cleaning.html', process=process)
 
 # 12-Hour Cleaning Setup Route
@@ -811,19 +822,19 @@ def complete_cleaning(process_id):
 def cleaning_12h_setup(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
     cleaning_bins_12h = CleaningBin.query.filter_by(status='empty', cleaning_type='12_hour').all()
-    
+
     if request.method == 'POST':
         try:
             duration_option = request.form['duration_option']
             duration_hours = 12  # default
-            
+
             if duration_option == '24':
                 duration_hours = 24
             elif duration_option == '12':
                 duration_hours = 12
             elif duration_option == 'custom':
                 duration_hours = int(request.form['custom_hours'])
-            
+
             # Create 12-hour cleaning process
             cleaning = CleaningProcess()
             cleaning.job_id = job_id
@@ -837,40 +848,40 @@ def cleaning_12h_setup(job_id):
             cleaning.start_moisture = float(request.form.get('start_moisture', 0))
             cleaning.target_moisture = float(request.form.get('target_moisture', 0))
             cleaning.status = 'running'
-            
+
             # Update cleaning bin status
             cleaning_bin = CleaningBin.query.get(cleaning.cleaning_bin_id)
             if cleaning_bin:
                 cleaning_bin.status = 'cleaning'
-            
+
             # Update job
             job.status = 'in_progress'
             job.started_at = datetime.utcnow()
             job.started_by = request.form['operator_name']
-            
+
             db.session.add(cleaning)
             db.session.commit()
-            
+
             flash(f'12-hour cleaning process started! Duration: {duration_hours} hours', 'success')
             return redirect(url_for('cleaning_monitor', process_id=cleaning.id))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error starting 12-hour cleaning process: {str(e)}', 'error')
-    
+
     return render_template('cleaning_12h_setup.html', job=job, cleaning_bins=cleaning_bins_12h)
 
 @app.route('/production_tracking')
 def production_tracking():
     # Get all orders with their plans and jobs
     orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
-    
+
     # Get orders with plans
     planned_orders = []
     for order in orders:
         plan = ProductionPlan.query.filter_by(order_id=order.id).first()
         jobs = ProductionJobNew.query.filter_by(order_id=order.id).all()
-        
+
         order_data = {
             'order': order,
             'plan': plan,
@@ -880,7 +891,7 @@ def production_tracking():
             'progress_percentage': (len([j for j in jobs if j.status == 'completed']) / len(jobs) * 100) if jobs else 0
         }
         planned_orders.append(order_data)
-    
+
     return render_template('production_tracking.html', planned_orders=planned_orders)
 
 @app.route('/order_tracking/<order_number>')
@@ -889,7 +900,7 @@ def order_tracking_detail(order_number):
     order = ProductionOrder.query.filter_by(order_number=order_number).first_or_404()
     plan = ProductionPlan.query.filter_by(order_id=order.id).first()
     jobs = ProductionJobNew.query.filter_by(order_id=order.id).order_by(ProductionJobNew.created_at).all()
-    
+
     # Build job details with associated processes
     job_details = []
     for job in jobs:
@@ -900,7 +911,7 @@ def order_tracking_detail(order_number):
             'grinding_processes': GrindingProcess.query.filter_by(job_id=job.id).all() if hasattr(job, 'grinding_processes') else []
         }
         job_details.append(job_detail)
-    
+
     return render_template('order_tracking.html', 
                          order=order, 
                          plan=plan, 
@@ -910,28 +921,28 @@ def order_tracking_detail(order_number):
 def api_order_tracking(order_number):
     """API endpoint to get complete order lifecycle data"""
     order = ProductionOrder.query.filter_by(order_number=order_number).first()
-    
+
     if not order:
         return jsonify({'error': 'Order not found'}), 404
-    
+
     # Get production plan
     plan = ProductionPlan.query.filter_by(order_id=order.id).first()
-    
+
     # Get all jobs
     jobs = ProductionJobNew.query.filter_by(order_id=order.id).order_by(ProductionJobNew.created_at).all()
-    
+
     # Get all transfers
     transfers = []
     for job in jobs:
         job_transfers = ProductionTransfer.query.filter_by(job_id=job.id).all()
         transfers.extend(job_transfers)
-    
+
     # Get all cleaning processes
     cleaning_processes = []
     for job in jobs:
         job_cleanings = CleaningProcess.query.filter_by(job_id=job.id).all()
         cleaning_processes.extend(job_cleanings)
-    
+
     # Build response
     tracking_data = {
         'order': {
@@ -985,22 +996,22 @@ def api_order_tracking(order_number):
             'completed_by': cleaning.completed_by
         } for cleaning in cleaning_processes]
     }
-    
+
     return jsonify(tracking_data)
 
 @app.route('/api/cleaning_timer/<int:process_id>')
 def api_cleaning_timer(process_id):
     """API endpoint for real-time timer updates"""
     process = CleaningProcess.query.get_or_404(process_id)
-    
+
     now = datetime.utcnow()
     time_remaining = (process.end_time - now).total_seconds()
-    
+
     # Check if reminder should be shown (1 hour before completion for 12h process)
     show_reminder = False
     if '12h' in process.process_type and time_remaining > 0 and time_remaining <= 3600:
         show_reminder = True
-    
+
     return jsonify({
         'time_remaining': max(0, time_remaining),
         'status': process.status,
@@ -1013,12 +1024,12 @@ def api_cleaning_timer(process_id):
 def sales_dispatch():
     if request.method == 'POST':
         action = request.form.get('action')
-        
+
         if action == 'create_order':
             try:
                 # Import SalesOrder model
                 from models import SalesOrder
-                
+
                 sales_order = SalesOrder()
                 sales_order.order_number = generate_order_number('SO')
                 sales_order.customer_id = int(request.form['customer_id'])
@@ -1026,21 +1037,21 @@ def sales_dispatch():
                 sales_order.delivery_date = datetime.strptime(request.form['delivery_date'], '%Y-%m-%d')
                 sales_order.total_quantity = float(request.form['total_quantity'])
                 sales_order.pending_quantity = float(request.form['total_quantity'])
-                
+
                 db.session.add(sales_order)
                 db.session.commit()
                 flash('Sales order created successfully!', 'success')
-                
+
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error creating sales order: {str(e)}', 'error')
-        
+
         elif action == 'dispatch':
             try:
                 # Handle dispatch photos
                 loading_photo = None
                 loaded_photo = None
-                
+
                 if 'loading_photo' in request.files:
                     file = request.files['loading_photo']
                     if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -1048,7 +1059,7 @@ def sales_dispatch():
                         filename = f"loading_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         loading_photo = filename
-                
+
                 if 'loaded_photo' in request.files:
                     file = request.files['loaded_photo']
                     if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -1056,10 +1067,10 @@ def sales_dispatch():
                         filename = f"loaded_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         loaded_photo = filename
-                
+
                 # Import required models
                 from models import Dispatch, SalesOrder, DispatchVehicle
-                
+
                 dispatch = Dispatch()
                 dispatch.dispatch_number = generate_order_number('DP')
                 dispatch.sales_order_id = int(request.form['sales_order_id'])
@@ -1067,31 +1078,31 @@ def sales_dispatch():
                 dispatch.quantity = float(request.form['quantity'])
                 dispatch.loading_photo = loading_photo
                 dispatch.loaded_photo = loaded_photo
-                
+
                 # Update sales order quantities
                 sales_order = SalesOrder.query.get(request.form['sales_order_id'])
                 if sales_order:
                     sales_order.delivered_quantity += float(request.form['quantity'])
                     sales_order.pending_quantity = sales_order.total_quantity - sales_order.delivered_quantity
-                    
+
                     if sales_order.pending_quantity <= 0:
                         sales_order.status = 'completed'
                     else:
                         sales_order.status = 'partial'
-                
+
                 # Update vehicle status to dispatched
                 vehicle = DispatchVehicle.query.get(request.form['vehicle_id'])
                 if vehicle:
                     vehicle.status = 'dispatched'
-                
+
                 db.session.add(dispatch)
                 db.session.commit()
                 flash('Dispatch created successfully!', 'success')
-                
+
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error creating dispatch: {str(e)}', 'error')
-        
+
         else:
             # Fallback for old dispatch creation without action
             try:
@@ -1104,28 +1115,28 @@ def sales_dispatch():
                 dispatch.vehicle_number = request.form['vehicle_number']
                 dispatch.driver_name = request.form['driver_name']
                 dispatch.notes = request.form.get('notes')
-                
+
                 db.session.add(dispatch)
                 db.session.commit()
                 flash('Dispatch record created successfully!', 'success')
-                
+
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error creating dispatch: {str(e)}', 'error')
-    
+
     # Import models for template data
     from models import SalesOrder, DispatchVehicle, Dispatch
-    
+
     completed_orders = ProductionOrder.query.filter_by(status='completed').all()
     customers = Customer.query.all()
     products = Product.query.all()
     dispatches = SalesDispatch.query.order_by(SalesDispatch.created_at.desc()).limit(20).all()
-    
+
     # Get sales orders and vehicles for the new functionality
     sales_orders = SalesOrder.query.filter(SalesOrder.status.in_(['pending', 'partial'])).all()
     vehicles = DispatchVehicle.query.filter_by(status='available').all()
     dispatches = Dispatch.query.order_by(Dispatch.dispatch_date.desc()).limit(10).all()
-    
+
     return render_template('sales_dispatch.html', 
                          orders=completed_orders, 
                          customers=customers, 
@@ -1138,20 +1149,20 @@ def sales_dispatch():
 @app.route('/production_execution/grinding/<int:job_id>', methods=['GET', 'POST'])
 def grinding_execution(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
-    
+
     # Check if grinding process already exists
     existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
-    
+
     if request.method == 'POST':
         try:
             if existing_grinding:
                 flash('Grinding process already exists for this job!', 'error')
                 return redirect(url_for('grinding_execution', job_id=job_id))
-                
+
             # Handle file uploads
             start_photo = None
             end_photo = None
-            
+
             if 'start_photo' in request.files:
                 file = request.files['start_photo']
                 if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -1159,7 +1170,7 @@ def grinding_execution(job_id):
                     filename = f"grinding_start_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     start_photo = filename
-                    
+
             if 'end_photo' in request.files:
                 file = request.files['end_photo']
                 if file and file.filename and file.filename != '' and allowed_file(file.filename):
@@ -1167,7 +1178,7 @@ def grinding_execution(job_id):
                     filename = f"grinding_end_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     end_photo = filename
-                    
+
             # Create grinding process
             grinding = GrindingProcess()
             grinding.job_id = job_id
@@ -1183,28 +1194,28 @@ def grinding_execution(job_id):
             grinding.start_photo = start_photo
             grinding.end_photo = end_photo
             grinding.status = 'completed'
-            
+
             # Update job status
             job.status = 'completed'
             job.completed_at = datetime.utcnow()
             job.completed_by = request.form['operator_name']
-            
+
             # Check bran percentage and create alert if needed
             if grinding.bran_percentage > 25:
                 flash(f'Alert: Bran percentage ({grinding.bran_percentage:.1f}%) is higher than expected (23-25%)', 'warning')
             elif grinding.bran_percentage < 23:
                 flash(f'Alert: Bran percentage ({grinding.bran_percentage:.1f}%) is lower than expected (23-25%)', 'warning')
-                
+
             db.session.add(grinding)
             db.session.commit()
-            
+
             flash('Grinding process completed successfully!', 'success')
             return redirect(url_for('packing_execution', job_id=job_id))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error completing grinding process: {str(e)}', 'error')
-    
+
     return render_template('grinding_execution.html', job=job, existing_grinding=existing_grinding)
 
 # Machine Cleaning with Hourly Frequency
@@ -1213,17 +1224,17 @@ def machine_cleaning():
     if request.method == 'POST':
         try:
             action = request.form.get('action')
-            
+
             if action == 'start_cleaning':
                 machine_id = int(request.form['machine_id'])
                 operator = request.form['operator']
-                
+
                 # Check if machine needs cleaning
                 machine = CleaningMachine.query.get(machine_id)
                 if not machine:
                     flash('Machine not found!', 'error')
                     return redirect(url_for('machine_cleaning'))
-                    
+
                 # Handle photo upload
                 before_photo = None
                 if 'before_photo' in request.files:
@@ -1233,7 +1244,7 @@ def machine_cleaning():
                         filename = f"before_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         before_photo = filename
-                        
+
                 # Create cleaning log
                 log = CleaningLog()
                 log.machine_id = machine_id
@@ -1241,20 +1252,20 @@ def machine_cleaning():
                 log.photo_before = before_photo
                 log.waste_collected = float(request.form.get('waste_collected', 0))
                 log.notes = request.form.get('notes', '')
-                
+
                 # Update machine last cleaned time
                 machine.last_cleaned = datetime.utcnow()
-                
+
                 db.session.add(log)
                 db.session.commit()
-                
+
                 flash('Machine cleaning started!', 'success')
                 return redirect(url_for('complete_machine_cleaning', log_id=log.id))
-                
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error starting machine cleaning: {str(e)}', 'error')
-    
+
     # Get machines that need cleaning (every hour)
     now = datetime.utcnow()
     machines_needing_cleaning = CleaningMachine.query.filter(
@@ -1263,10 +1274,10 @@ def machine_cleaning():
             CleaningMachine.last_cleaned <= now - timedelta(hours=1)
         )
     ).all()
-    
+
     all_machines = CleaningMachine.query.all()
     recent_logs = CleaningLog.query.order_by(CleaningLog.cleaning_time.desc()).limit(10).all()
-    
+
     return render_template('machine_cleaning.html', 
                          machines_needing_cleaning=machines_needing_cleaning,
                          all_machines=all_machines,
@@ -1275,7 +1286,7 @@ def machine_cleaning():
 @app.route('/complete_machine_cleaning/<int:log_id>', methods=['GET', 'POST'])
 def complete_machine_cleaning(log_id):
     log = CleaningLog.query.get_or_404(log_id)
-    
+
     if request.method == 'POST':
         try:
             # Handle after photo upload
@@ -1287,19 +1298,19 @@ def complete_machine_cleaning(log_id):
                     filename = f"after_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     after_photo = filename
-                    
+
             log.photo_after = after_photo
             log.waste_collected = float(request.form.get('waste_collected', log.waste_collected or 0))
             log.notes = request.form.get('notes', log.notes or '')
-            
+
             db.session.commit()
             flash('Machine cleaning completed successfully!', 'success')
             return redirect(url_for('machine_cleaning'))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error completing machine cleaning: {str(e)}', 'error')
-    
+
     return render_template('complete_cleaning.html', log=log)
 
 # Step 4: Packing Process
@@ -1307,15 +1318,15 @@ def complete_machine_cleaning(log_id):
 def packing_execution(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
     grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
-    
+
     if not grinding_process:
         flash('Grinding process must be completed before packing!', 'error')
         return redirect(url_for('grinding_execution', job_id=job_id))
-    
+
     if request.method == 'POST':
         try:
             action = request.form.get('action')
-            
+
             if action == 'pack_product':
                 product_id = int(request.form['product_id'])
                 bag_weight = float(request.form['bag_weight'])
@@ -1323,7 +1334,7 @@ def packing_execution(job_id):
                 storage_area_id = request.form.get('storage_area_id')
                 stored_in_shallow = float(request.form.get('stored_in_shallow', 0))
                 operator = request.form['operator_name']
-                
+
                 # Handle photo upload
                 packing_photo = None
                 if 'packing_photo' in request.files:
@@ -1333,7 +1344,7 @@ def packing_execution(job_id):
                         filename = f"packing_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         packing_photo = filename
-                        
+
                 # Create packing process
                 packing = PackingProcess()
                 packing.job_id = job_id
@@ -1345,26 +1356,26 @@ def packing_execution(job_id):
                 packing.storage_area_id = int(storage_area_id) if storage_area_id else None
                 packing.stored_in_shallow_kg = stored_in_shallow
                 packing.packing_photo = packing_photo
-                
+
                 # Update storage area stock if selected
                 if storage_area_id:
                     storage_area = StorageArea.query.get(int(storage_area_id))
                     if storage_area:
                         storage_area.current_stock_kg += packing.total_packed_kg
-                        
+
                 db.session.add(packing)
                 db.session.commit()
-                
+
                 flash(f'Packed {number_of_bags} bags of {bag_weight}kg each successfully!', 'success')
-                
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error in packing process: {str(e)}', 'error')
-    
+
     products = Product.query.filter_by(category='Main Product').all()
     storage_areas = StorageArea.query.all()
     existing_packing = PackingProcess.query.filter_by(job_id=job_id).all()
-    
+
     return render_template('packing_execution.html', 
                          job=job, 
                          grinding_process=grinding_process,
@@ -1378,7 +1389,7 @@ def storage_management():
     if request.method == 'POST':
         try:
             action = request.form.get('action')
-            
+
             if action == 'transfer_storage':
                 from_storage_id = int(request.form['from_storage_id'])
                 to_storage_id = int(request.form['to_storage_id'])
@@ -1386,22 +1397,22 @@ def storage_management():
                 quantity = float(request.form['quantity'])
                 operator = request.form['operator_name']
                 reason = request.form.get('reason', '')
-                
+
                 # Validate transfer
                 from_storage = StorageArea.query.get(from_storage_id)
                 to_storage = StorageArea.query.get(to_storage_id)
-                
+
                 if not from_storage or not to_storage:
                     flash('Invalid storage areas selected!', 'error')
                     return redirect(url_for('storage_management'))
-                    
+
                 if from_storage.current_stock_kg < quantity:
                     flash('Insufficient stock in source storage area!', 'error')
                     return redirect(url_for('storage_management'))
-                    
+
                 if to_storage.current_stock_kg + quantity > to_storage.capacity_kg:
                     flash('Destination storage area does not have enough capacity!', 'warning')
-                    
+
                 # Create transfer record
                 transfer = StorageTransfer()
                 transfer.from_storage_id = from_storage_id
@@ -1410,24 +1421,24 @@ def storage_management():
                 transfer.quantity_kg = quantity
                 transfer.operator_name = operator
                 transfer.reason = reason
-                
+
                 # Update storage stocks
                 from_storage.current_stock_kg -= quantity
                 to_storage.current_stock_kg += quantity
-                
+
                 db.session.add(transfer)
                 db.session.commit()
-                
+
                 flash(f'Transfer of {quantity}kg completed successfully!', 'success')
-                
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error in storage transfer: {str(e)}', 'error')
-    
+
     storage_areas = StorageArea.query.all()
     products = Product.query.all()
     recent_transfers = StorageTransfer.query.order_by(StorageTransfer.transfer_time.desc()).limit(10).all()
-    
+
     return render_template('storage_management.html',
                          storage_areas=storage_areas,
                          products=products,
@@ -1440,7 +1451,7 @@ def reports():
     total_stock = db.session.query(db.func.sum(Godown.current_stock)).scalar() or 0
     active_jobs = ProductionJobNew.query.filter_by(status='in_progress').count()
     completed_orders = ProductionOrder.query.filter_by(status='completed').count()
-    
+
     return render_template('reports.html',
                          total_vehicles=total_vehicles,
                          total_stock=total_stock,
@@ -1458,18 +1469,18 @@ def cleaning_management():
             cleaning.start_time = datetime.now()
             cleaning.status = 'in_progress'
             cleaning.notes = request.form.get('notes')
-            
+
             db.session.add(cleaning)
             db.session.commit()
             flash('Cleaning process started!', 'success')
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error starting cleaning: {str(e)}', 'error')
-    
+
     active_cleanings = CleaningProcess.query.filter_by(status='in_progress').all()
     recent_cleanings = CleaningProcess.query.order_by(CleaningProcess.created_at.desc()).limit(10).all()
-    
+
     return render_template('cleaning_management.html',
                          active_cleanings=active_cleanings,
                          recent_cleanings=recent_cleanings)
@@ -1479,7 +1490,7 @@ def masters():
     if request.method == 'POST':
         try:
             form_type = request.form.get('form_type')
-            
+
             if form_type == 'supplier':
                 supplier = Supplier()
                 supplier.company_name = request.form['company_name']
@@ -1489,11 +1500,11 @@ def masters():
                 supplier.city = request.form.get('city')
                 supplier.state = request.form.get('state')
                 supplier.postal_code = request.form.get('postal_code')
-                
+
                 db.session.add(supplier)
                 db.session.commit()
                 flash('Supplier added successfully!', 'success')
-                
+
             elif form_type == 'customer':
                 customer = Customer()
                 customer.company_name = request.form['company_name']
@@ -1504,53 +1515,53 @@ def masters():
                 customer.city = request.form.get('city')
                 customer.state = request.form.get('state')
                 customer.postal_code = request.form.get('postal_code')
-                
+
                 db.session.add(customer)
                 db.session.commit()
                 flash('Customer added successfully!', 'success')
-                
+
             elif form_type == 'product':
                 product = Product()
                 product.name = request.form['name']
                 product.category = request.form['category']
                 product.description = request.form.get('description')
-                
+
                 db.session.add(product)
                 db.session.commit()
                 flash('Product added successfully!', 'success')
-                
+
             elif form_type == 'godown':
                 godown = Godown()
                 godown.name = request.form['name']
                 godown.type_id = int(request.form['type_id'])
                 godown.capacity = float(request.form['capacity'])
-                
+
                 db.session.add(godown)
                 db.session.commit()
                 flash('Godown added successfully!', 'success')
-                
+
             elif form_type == 'precleaning_bin':
                 bin_obj = PrecleaningBin()
                 bin_obj.name = request.form['name']
                 bin_obj.capacity = float(request.form['capacity'])
-                
+
                 db.session.add(bin_obj)
                 db.session.commit()
                 flash('Pre-cleaning bin added successfully!', 'success')
-                
+
             return redirect(url_for('masters'))
-            
+
         except Exception as e:
             db.session.rollback()
             flash(f'Error adding record: {str(e)}', 'error')
-    
+
     suppliers = Supplier.query.all()
     customers = Customer.query.all()
     products = Product.query.all()
     godown_types = GodownType.query.all()
     godowns = Godown.query.join(GodownType).all()
     precleaning_bins = PrecleaningBin.query.all()
-    
+
     return render_template('masters.html',
                          suppliers=suppliers,
                          customers=customers,
@@ -1613,11 +1624,11 @@ def api_start_job():
     try:
         data = request.get_json()
         job_id = data.get('job_id')
-        
+
         job = ProductionJobNew.query.get_or_404(job_id)
         job.status = 'in_progress'
         job.started_at = datetime.now()
-        
+
         db.session.commit()
         return jsonify({'success': True, 'message': 'Job started successfully'})
     except Exception as e:
@@ -1629,10 +1640,10 @@ def api_pause_job():
     try:
         data = request.get_json()
         job_id = data.get('job_id')
-        
+
         job = ProductionJobNew.query.get_or_404(job_id)
         job.status = 'paused'
-        
+
         db.session.commit()
         return jsonify({'success': True, 'message': 'Job paused successfully'})
     except Exception as e:
@@ -1661,7 +1672,7 @@ def api_job_details(job_id):
     try:
         job = ProductionJobNew.query.get_or_404(job_id)
         order = ProductionOrder.query.get(job.order_id) if job.order_id else None
-        
+
         job_data = {
             'id': job.id,
             'job_number': job.job_number,
@@ -1674,7 +1685,7 @@ def api_job_details(job_id):
             'completed_by': job.completed_by,
             'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else None
         }
-        
+
         return jsonify({'success': True, 'job': job_data})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1698,22 +1709,22 @@ def mark_dispatch_delivered(dispatch_id):
     """Mark dispatch as delivered and make vehicle available again"""
     try:
         from models import Dispatch, DispatchVehicle
-        
+
         dispatch = Dispatch.query.get_or_404(dispatch_id)
         dispatch.status = 'delivered'
         dispatch.delivery_date = datetime.utcnow()
-        
+
         # Make vehicle available again
         vehicle = DispatchVehicle.query.get(dispatch.vehicle_id)
         if vehicle:
             vehicle.status = 'available'
-        
+
         db.session.commit()
         flash('Dispatch marked as delivered and vehicle is now available!', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Error updating dispatch: {str(e)}', 'error')
-    
+
     return redirect(url_for('sales_dispatch'))
 
 @app.route('/uploads/<filename>')
