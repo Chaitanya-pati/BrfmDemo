@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from flask import render_template, request, redirect, url_for, flash, jsonify
+from flask import render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 
 from app import app, db
@@ -1416,6 +1416,15 @@ def mark_dispatch_delivered(dispatch_id):
         flash(f'Error updating dispatch: {str(e)}', 'error')
     
     return redirect(url_for('sales_dispatch'))
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    try:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    except Exception as e:
+        flash(f'File not found: {str(e)}', 'error')
+        return redirect(url_for('sales_dispatch'))
 
 @app.route('/init_data')
 def init_data():
