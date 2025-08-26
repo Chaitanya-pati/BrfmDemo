@@ -815,7 +815,7 @@ def complete_cleaning(process_id):
             db.session.rollback()
             flash(f'Error completing cleaning process: {str(e)}', 'error')
 
-    return render_template('complete_cleaning.html', process=process)
+    return render_template('complete_cleaning.html', log=process)
 
 # 12-Hour Cleaning Setup Route
 @app.route('/production_execution/cleaning_12h_setup/<int:job_id>', methods=['GET', 'POST'])
