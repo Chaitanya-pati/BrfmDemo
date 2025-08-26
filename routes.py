@@ -849,9 +849,19 @@ def cleaning_12h_setup(job_id):
             cleaning.target_moisture = float(request.form.get('target_moisture', 0))
             cleaning.status = 'running'
 
-            # Update cleaning bin status
+            # Update cleaning bin status (create if doesn't exist for hardcoded option)
             cleaning_bin = CleaningBin.query.get(cleaning.cleaning_bin_id)
-            if cleaning_bin:
+            if not cleaning_bin and cleaning.cleaning_bin_id == 2:
+                # Create default 12-hour cleaning bin if it doesn't exist
+                cleaning_bin = CleaningBin(
+                    id=2,
+                    name='12-Hour Cleaning Bin #1',
+                    capacity=100.0,
+                    status='cleaning',
+                    cleaning_type='12_hour'
+                )
+                db.session.add(cleaning_bin)
+            elif cleaning_bin:
                 cleaning_bin.status = 'cleaning'
 
             # Update job

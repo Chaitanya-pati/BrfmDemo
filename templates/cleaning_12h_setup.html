@@ -73,10 +73,9 @@
                                 </label>
                                 <select class="form-select" id="cleaning_bin_id" name="cleaning_bin_id" required>
                                     <option value="">Select 12-Hour Cleaning Bin</option>
-                                    {% for bin in cleaning_bins %}
-                                    <option value="{{ bin.id }}">
-                                        {{ bin.name }} ({{ bin.capacity }} tons - {{ bin.status }})
-                                    </option>
+                                    <option value="2">12-Hour Cleaning Bin #1 (Default)</option>
+                                    {% for bin in cleaning_bins_12h %}
+                                    <option value="{{ bin.id }}">{{ bin.name }} (Capacity: {{ bin.capacity }}kg)</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -196,7 +195,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const customRadio = document.getElementById('duration_custom');
     const customHoursDiv = document.getElementById('custom_hours_div');
     const customHoursInput = document.getElementById('custom_hours');
-    
+
     document.querySelectorAll('input[name="duration_option"]').forEach(radio => {
         radio.addEventListener('change', function() {
             if (this.value === 'custom') {
