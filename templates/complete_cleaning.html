@@ -34,11 +34,21 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
+                            {% if log.machine %}
+                            <!-- Machine Cleaning Log -->
                             <p><strong>Machine:</strong> {{ log.machine.name }}</p>
                             <p><strong>Operator:</strong> {{ log.cleaned_by }}</p>
                             <p><strong>Started:</strong> {{ log.cleaning_time.strftime('%d/%m/%Y %H:%M') }}</p>
+                            {% else %}
+                            <!-- Production Cleaning Process -->
+                            <p><strong>Machine:</strong> {{ log.machine_name }}</p>
+                            <p><strong>Operator:</strong> {{ log.operator_name }}</p>
+                            <p><strong>Started:</strong> {{ log.start_time.strftime('%d/%m/%Y %H:%M') }}</p>
+                            {% endif %}
                         </div>
                         <div class="col-md-6">
+                            {% if log.machine %}
+                            <!-- Machine Cleaning Log -->
                             {% if log.photo_before %}
                             <p><strong>Before Photo:</strong> 
                                 <a href="{{ url_for('static', filename='uploads/' + log.photo_before) }}" target="_blank" class="btn btn-sm btn-outline-primary">
@@ -47,6 +57,17 @@
                             </p>
                             {% endif %}
                             <p><strong>Initial Waste:</strong> {{ log.waste_collected or 0 }}kg</p>
+                            {% else %}
+                            <!-- Production Cleaning Process -->
+                            {% if log.start_photo %}
+                            <p><strong>Start Photo:</strong> 
+                                <a href="{{ url_for('static', filename='uploads/' + log.start_photo) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i>View
+                                </a>
+                            </p>
+                            {% endif %}
+                            <p><strong>Process Type:</strong> {{ log.process_type }}</p>
+                            {% endif %}
                         </div>
                     </div>
                     {% if log.notes %}
@@ -66,6 +87,8 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data">
+                        {% if log.machine %}
+                        <!-- Machine Cleaning Completion Form -->
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -98,11 +121,78 @@
                                 <li>Once completed, this cleaning record cannot be modified</li>
                             </ul>
                         </div>
+                        {% else %}
+                        <!-- Production Cleaning Process Completion Form -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="end_moisture" class="form-label">
+                                    <i class="fas fa-tint me-2"></i>Final Moisture Level (%) *
+                                </label>
+                                <input type="number" class="form-control" id="end_moisture" 
+                                       name="end_moisture" step="0.1" min="0" max="100" required>
+                                <div class="form-text">Enter the moisture level after cleaning</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="waste_collected" class="form-label">
+                                    <i class="fas fa-trash me-2"></i>Waste Collected (kg) *
+                                </label>
+                                <input type="number" class="form-control" id="waste_collected" 
+                                       name="waste_collected" step="0.1" min="0" required>
+                                <div class="form-text">Total waste collected during cleaning</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="water_added" class="form-label">
+                                    <i class="fas fa-water me-2"></i>Water Added (liters) *
+                                </label>
+                                <input type="number" class="form-control" id="water_added" 
+                                       name="water_added" step="0.1" min="0" required>
+                                <div class="form-text">Total water added during the process</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="completed_by" class="form-label">
+                                    <i class="fas fa-user-check me-2"></i>Completed By *
+                                </label>
+                                <input type="text" class="form-control" id="completed_by" 
+                                       name="completed_by" required>
+                                <div class="form-text">Name of person completing the process</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="end_photo" class="form-label">
+                                    <i class="fas fa-camera me-2"></i>Completion Photo
+                                </label>
+                                <input type="file" class="form-control" id="end_photo" 
+                                       name="end_photo" accept="image/*">
+                                <div class="form-text">Photo of completed cleaning process</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label for="notes" class="form-label">
+                                    <i class="fas fa-sticky-note me-2"></i>Notes
+                                </label>
+                                <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                          placeholder="Any observations or comments about the cleaning process"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Ready to Complete:</strong> 
+                            The cleaning timer has finished. You can now complete this process and move to the next stage.
+                        </div>
+                        {% endif %}
 
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
                             <button type="submit" class="btn btn-success">
-                                <i class="fas fa-check me-1"></i>Complete Cleaning
+                                <i class="fas fa-check me-1"></i>Complete {% if log.machine %}Cleaning{% else %}Process{% endif %}
                             </button>
                         </div>
                     </form>
