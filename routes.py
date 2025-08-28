@@ -793,19 +793,35 @@ def complete_cleaning(process_id):
             job.completed_at = datetime.utcnow()
             job.completed_by = request.form['completed_by']
 
-            # If this was 24-hour cleaning, create 12-hour cleaning job
-            if job.stage == 'cleaning_24h':
-                cleaning_12h_job = ProductionJobNew()
-                cleaning_12h_job.job_number = generate_job_id()
-                cleaning_12h_job.order_id = job.order_id
-                cleaning_12h_job.plan_id = job.plan_id
-                cleaning_12h_job.stage = 'cleaning_12h'
-                cleaning_12h_job.status = 'pending'
-                db.session.add(cleaning_12h_job)
+            # Enhanced workflow transition logic
+            if job.stage == 'cleaning_24h' or 'hour_cleaning' in process.process_type:
+                # Check if this is the first cleaning (24h) - create 12h job
+                if '24' in process.process_type or job.stage == 'cleaning_24h':
+                    cleaning_12h_job = ProductionJobNew()
+                    cleaning_12h_job.job_number = generate_job_id()
+                    cleaning_12h_job.order_id = job.order_id
+                    cleaning_12h_job.plan_id = job.plan_id
+                    cleaning_12h_job.stage = 'cleaning_12h'
+                    cleaning_12h_job.status = 'pending'
+                    process.next_process_job_id = cleaning_12h_job.id
+                    db.session.add(cleaning_12h_job)
 
-                db.session.commit()
-                flash('24-hour cleaning completed! Ready for 12-hour cleaning process.', 'success')
-                return redirect(url_for('cleaning_12h_setup', job_id=cleaning_12h_job.id))
+                    db.session.commit()
+                    flash('24-hour cleaning completed! Ready for 12-hour cleaning process.', 'success')
+                    return redirect(url_for('cleaning_12h_setup', job_id=cleaning_12h_job.id))
+                elif job.stage == 'cleaning_12h' or '12h' in process.process_type:
+                    # 12h cleaning completed - move to grinding with B1 scale
+                    grinding_job = ProductionJobNew()
+                    grinding_job.job_number = generate_job_id()
+                    grinding_job.order_id = job.order_id
+                    grinding_job.plan_id = job.plan_id
+                    grinding_job.stage = 'grinding'
+                    grinding_job.status = 'pending'
+                    db.session.add(grinding_job)
+
+                    db.session.commit()
+                    flash('12-hour cleaning completed! Ready for B1 scale and grinding process.', 'success')
+                    return redirect(url_for('b1_scale_process', job_id=grinding_job.id))
             else:
                 db.session.commit()
                 flash('Cleaning process completed successfully!', 'success')
@@ -1155,6 +1171,105 @@ def sales_dispatch():
                          sales_orders=sales_orders,
                          vehicles=vehicles)
 
+# B1 Scale Process - Step between 12h cleaning and grinding
+@app.route('/production_execution/b1_scale/<int:job_id>', methods=['GET', 'POST'])
+def b1_scale_process(job_id):
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    # Check if B1 scale machine needs cleaning (every hour)
+    from models import B1ScaleCleaning
+    b1_machine = B1ScaleCleaning.query.first()
+    if not b1_machine:
+        # Create B1 scale machine if it doesn't exist
+        b1_machine = B1ScaleCleaning(
+            machine_name='B1 Scale',
+            cleaning_frequency_minutes=60,
+            last_cleaned=datetime.utcnow(),
+            next_cleaning_due=datetime.utcnow() + timedelta(minutes=60),
+            status='due'
+        )
+        db.session.add(b1_machine)
+        db.session.commit()
+    
+    # Check if cleaning is due (within 10 minutes)
+    time_until_cleaning = (b1_machine.next_cleaning_due - datetime.utcnow()).total_seconds() / 60
+    cleaning_required = time_until_cleaning <= 10
+    cleaning_urgent = time_until_cleaning <= 5
+    
+    if request.method == 'POST':
+        if request.form.get('action') == 'proceed_to_grinding':
+            # Proceed to grinding if no cleaning required or cleaning completed
+            if cleaning_required and b1_machine.status != 'completed':
+                flash('B1 Scale cleaning is required before proceeding to grinding!', 'error')
+                return redirect(url_for('b1_scale_process', job_id=job_id))
+            
+            return redirect(url_for('grinding_execution', job_id=job_id))
+    
+    return render_template('b1_scale_process.html', 
+                         job=job, 
+                         b1_machine=b1_machine,
+                         cleaning_required=cleaning_required,
+                         cleaning_urgent=cleaning_urgent,
+                         time_until_cleaning=time_until_cleaning)
+
+@app.route('/production_execution/b1_scale_cleaning/<int:job_id>', methods=['GET', 'POST'])
+def b1_scale_cleaning(job_id):
+    from models import B1ScaleCleaning, B1ScaleCleaningLog
+    job = ProductionJobNew.query.get_or_404(job_id)
+    b1_machine = B1ScaleCleaning.query.first()
+    
+    if request.method == 'POST':
+        try:
+            # Handle file uploads
+            before_photo = None
+            after_photo = None
+
+            if 'before_cleaning_photo' in request.files:
+                file = request.files['before_cleaning_photo']
+                if file and file.filename and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filename = f"b1_before_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    before_photo = filename
+
+            if 'after_cleaning_photo' in request.files:
+                file = request.files['after_cleaning_photo']
+                if file and file.filename and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filename = f"b1_after_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    after_photo = filename
+
+            # Create cleaning log
+            cleaning_log = B1ScaleCleaningLog(
+                machine_id=b1_machine.id,
+                cleaned_by=request.form['cleaned_by'],
+                cleaning_start_time=datetime.utcnow(),
+                cleaning_end_time=datetime.utcnow(),
+                before_cleaning_photo=before_photo,
+                after_cleaning_photo=after_photo,
+                waste_collected_kg=float(request.form.get('waste_collected', 0)),
+                notes=request.form.get('notes', ''),
+                status='completed'
+            )
+
+            # Update machine status
+            b1_machine.last_cleaned = datetime.utcnow()
+            b1_machine.next_cleaning_due = datetime.utcnow() + timedelta(minutes=b1_machine.cleaning_frequency_minutes)
+            b1_machine.status = 'completed'
+
+            db.session.add(cleaning_log)
+            db.session.commit()
+
+            flash('B1 Scale cleaning completed successfully!', 'success')
+            return redirect(url_for('b1_scale_process', job_id=job_id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing B1 scale cleaning: {str(e)}', 'error')
+
+    return render_template('b1_scale_cleaning.html', job=job, b1_machine=b1_machine)
+
 # Step 3: Grinding Process with Machine Cleaning
 @app.route('/production_execution/grinding/<int:job_id>', methods=['GET', 'POST'])
 def grinding_execution(job_id):
@@ -1210,17 +1325,39 @@ def grinding_execution(job_id):
             job.completed_at = datetime.utcnow()
             job.completed_by = request.form['operator_name']
 
+            # Enhanced bran percentage validation and alerts
+            grinding.main_products_percentage = (grinding.main_products_kg / grinding.total_output_kg) * 100 if grinding.total_output_kg > 0 else 0
+            grinding.bran_percentage_alert = grinding.bran_percentage > 25
+            
+            # B1 Scale integration
+            grinding.b1_scale_operator = request.form.get('b1_scale_operator', '')
+            grinding.b1_scale_start_time = datetime.utcnow()
+            grinding.b1_scale_weight_kg = float(request.form.get('b1_scale_weight', grinding.input_quantity_kg))
+            
             # Check bran percentage and create alert if needed
             if grinding.bran_percentage > 25:
-                flash(f'Alert: Bran percentage ({grinding.bran_percentage:.1f}%) is higher than expected (23-25%)', 'warning')
+                grinding.bran_percentage_alert = True
+                flash(f'⚠️ ALERT: Bran percentage ({grinding.bran_percentage:.1f}%) is higher than expected range (23-25%)', 'warning')
             elif grinding.bran_percentage < 23:
-                flash(f'Alert: Bran percentage ({grinding.bran_percentage:.1f}%) is lower than expected (23-25%)', 'warning')
+                grinding.bran_percentage_alert = True
+                flash(f'⚠️ ALERT: Bran percentage ({grinding.bran_percentage:.1f}%) is lower than expected range (23-25%)', 'warning')
+            else:
+                flash(f'✅ Bran percentage ({grinding.bran_percentage:.1f}%) is within expected range (23-25%)', 'success')
 
             db.session.add(grinding)
             db.session.commit()
 
+            # Create packing job for next stage
+            packing_job = ProductionJobNew()
+            packing_job.job_number = generate_job_id()
+            packing_job.order_id = job.order_id
+            packing_job.plan_id = job.plan_id
+            packing_job.stage = 'packing'
+            packing_job.status = 'pending'
+            db.session.add(packing_job)
+            
             flash('Grinding process completed successfully!', 'success')
-            return redirect(url_for('packing_execution', job_id=job_id))
+            return redirect(url_for('packing_execution', job_id=packing_job.id))
 
         except Exception as e:
             db.session.rollback()

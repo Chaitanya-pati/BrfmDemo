@@ -45,6 +45,7 @@ def init_sample_data():
     try:
         # Import models here to avoid circular imports
         from models import GodownType, Godown, PrecleaningBin, Supplier, Product, Customer
+        from datetime import timedelta, datetime
         
         # Create godown types
         if not db.session.query(GodownType).first():
@@ -118,10 +119,49 @@ def init_sample_data():
             
             db.session.add_all([customer1, customer2])
             db.session.commit()
+        
+        # Create cleaning bins for 24h and 12h processes
+        from models import CleaningBin
+        if not db.session.query(CleaningBin).first():
+            cleaning_bins = [
+                CleaningBin(name='24-Hour Cleaning Bin #1', capacity=100.0, status='empty', cleaning_type='24_hour'),
+                CleaningBin(name='24-Hour Cleaning Bin #2', capacity=100.0, status='empty', cleaning_type='24_hour'),
+                CleaningBin(name='12-Hour Cleaning Bin #1', capacity=75.0, status='empty', cleaning_type='12_hour'),
+                CleaningBin(name='12-Hour Cleaning Bin #2', capacity=75.0, status='empty', cleaning_type='12_hour')
+            ]
+            db.session.add_all(cleaning_bins)
+            db.session.commit()
+        
+        # Create 4 storage areas as requested
+        from models import StorageArea
+        if not db.session.query(StorageArea).first():
+            storage_areas = [
+                StorageArea(name='Storage Area A', capacity_kg=5000.0, location='Main Warehouse Section A'),
+                StorageArea(name='Storage Area B', capacity_kg=4000.0, location='Main Warehouse Section B'),
+                StorageArea(name='Storage Area C', capacity_kg=3500.0, location='Secondary Warehouse Section A'),
+                StorageArea(name='Storage Area D', capacity_kg=4500.0, location='Secondary Warehouse Section B')
+            ]
+            db.session.add_all(storage_areas)
+            db.session.commit()
+        
+        # Create B1 scale machine
+        from models import B1ScaleCleaning
+        if not db.session.query(B1ScaleCleaning).first():
+            b1_machine = B1ScaleCleaning(
+                machine_name='B1 Scale',
+                cleaning_frequency_minutes=60,
+                last_cleaned=datetime.utcnow(),
+                next_cleaning_due=datetime.utcnow() + timedelta(minutes=60),
+                status='completed'
+            )
+            db.session.add(b1_machine)
+            db.session.commit()
             
     except Exception as e:
         db.session.rollback()
         print(f"Error initializing sample data: {e}")
+        # Continue with basic setup even if sample data fails
+        pass
 
 # Initialize the app context and create tables
 with app.app_context():

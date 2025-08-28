@@ -380,7 +380,15 @@ class CleaningProcess(db.Model):
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    job = db.relationship('ProductionJobNew', backref=db.backref('cleaning_processes', lazy=True))
+    # Enhanced tracking fields for step requirements
+    is_locked = db.Column(db.Boolean, default=True)  # Locks access during cleaning
+    reminder_sent_5min = db.Column(db.Boolean, default=False)
+    reminder_sent_10min = db.Column(db.Boolean, default=False)
+    reminder_sent_30min = db.Column(db.Boolean, default=False)
+    next_process_job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'))  # For 12h process after 24h
+    
+    job = db.relationship('ProductionJobNew', foreign_keys=[job_id], backref=db.backref('cleaning_processes', lazy=True))
+    next_process_job = db.relationship('ProductionJobNew', foreign_keys=[next_process_job_id], backref=db.backref('previous_cleaning_processes', lazy=True))
 
 class GrindingProcess(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -398,6 +406,15 @@ class GrindingProcess(db.Model):
     start_photo = db.Column(db.String(255))
     end_photo = db.Column(db.String(255))
     notes = db.Column(db.Text)
+    
+    # Enhanced fields for B1 scale tracking
+    b1_scale_operator = db.Column(db.String(100))  # B1 scale operator
+    b1_scale_start_time = db.Column(db.DateTime)  # When wheat moved from B1 scale
+    b1_scale_weight_kg = db.Column(db.Float)  # Weight from B1 scale
+    
+    # Bran percentage validation
+    bran_percentage_alert = db.Column(db.Boolean, default=False)  # True if bran > 25%
+    main_products_percentage = db.Column(db.Float)  # Calculated main products %
     
     job = db.relationship('ProductionJobNew', backref=db.backref('grinding_processes', lazy=True))
 
@@ -460,4 +477,49 @@ class ProcessReminder(db.Model):
     
     job = db.relationship('ProductionJobNew', backref=db.backref('reminders', lazy=True))
 
-# Enhanced models already exist above - removing duplicates
+# Enhanced Machine Cleaning Model for Hourly Cleaning with B1 Scale
+class B1ScaleCleaning(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    machine_name = db.Column(db.String(100), default='B1 Scale', nullable=False)
+    cleaning_frequency_minutes = db.Column(db.Integer, default=60)  # Every hour
+    last_cleaned = db.Column(db.DateTime)
+    next_cleaning_due = db.Column(db.DateTime)
+    status = db.Column(db.String(20), default='due')  # due, cleaning, completed
+    
+    # Cleaning log relationship
+    cleaning_logs = db.relationship('B1ScaleCleaningLog', backref='machine', lazy=True)
+    
+class B1ScaleCleaningLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    machine_id = db.Column(db.Integer, db.ForeignKey('b1_scale_cleaning.id'), nullable=False)
+    grinding_process_id = db.Column(db.Integer, db.ForeignKey('grinding_process.id'))
+    cleaned_by = db.Column(db.String(100), nullable=False)
+    cleaning_start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    cleaning_end_time = db.Column(db.DateTime)
+    before_cleaning_photo = db.Column(db.String(255))
+    after_cleaning_photo = db.Column(db.String(255))
+    waste_collected_kg = db.Column(db.Float)
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='completed')
+    
+    # Relationship with grinding process
+    grinding_process = db.relationship('GrindingProcess', backref='b1_cleaning_logs')
+
+# Enhanced Storage with 4 storage areas as requested
+class ProductStorageTransfer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    from_storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=False)
+    to_storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    quantity_kg = db.Column(db.Float, nullable=False)
+    bag_count = db.Column(db.Integer)
+    bag_weight_kg = db.Column(db.Float)
+    transfer_date = db.Column(db.DateTime, default=datetime.utcnow)
+    operator_name = db.Column(db.String(100), nullable=False)
+    reason = db.Column(db.String(200))
+    notes = db.Column(db.Text)
+    
+    # Relationships
+    from_storage = db.relationship('StorageArea', foreign_keys=[from_storage_area_id], backref='outbound_transfers')
+    to_storage = db.relationship('StorageArea', foreign_keys=[to_storage_area_id], backref='inbound_transfers')
+    product = db.relationship('Product', backref='storage_transfer_records')

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}B1 Scale Process - Job {{ job.job_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-weight"></i> B1 Scale Process</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('production_execution') }}">Production Execution</a></li>
+                        <li class="breadcrumb-item active">B1 Scale Process</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5><i class="fas fa-info-circle"></i> Job Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Job Number:</strong> {{ job.job_number }}</p>
+                            <p><strong>Stage:</strong> <span class="badge bg-info">{{ job.stage.replace('_', ' ').title() }}</span></p>
+                            <p><strong>Status:</strong> <span class="badge bg-warning">{{ job.status.title() }}</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Order ID:</strong> {{ job.order_id }}</p>
+                            <p><strong>Started By:</strong> {{ job.started_by or 'Not Started' }}</p>
+                            <p><strong>Started At:</strong> {{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else 'Not Started' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5><i class="fas fa-weight"></i> B1 Scale Status</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Machine:</strong> {{ b1_machine.machine_name }}</p>
+                    <p><strong>Last Cleaned:</strong> {{ b1_machine.last_cleaned.strftime('%Y-%m-%d %H:%M') if b1_machine.last_cleaned else 'Never' }}</p>
+                    <p><strong>Next Cleaning Due:</strong> {{ b1_machine.next_cleaning_due.strftime('%Y-%m-%d %H:%M') if b1_machine.next_cleaning_due else 'Not Set' }}</p>
+                    <p><strong>Time Until Cleaning:</strong> 
+                        {% if time_until_cleaning > 0 %}
+                            {{ "%.0f"|format(time_until_cleaning) }} minutes
+                        {% else %}
+                            <span class="text-danger">Overdue</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            {% if cleaning_urgent %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> <strong>URGENT:</strong> B1 Scale cleaning is due within 5 minutes! Clean immediately before proceeding.
+            </div>
+            {% elif cleaning_required %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> <strong>WARNING:</strong> B1 Scale cleaning is due within 10 minutes. Please clean before proceeding.
+            </div>
+            {% else %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> B1 Scale is clean and ready for operation.
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-cogs"></i> B1 Scale Operation</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Process Flow:</strong></p>
+                    <ol>
+                        <li>Transfer wheat from 12-hour cleaning bin to B1 scale</li>
+                        <li>Weigh and record the quantity</li>
+                        <li>If cleaning is required, complete B1 scale cleaning with before/after photos</li>
+                        <li>Transfer wheat from B1 scale to grinding process</li>
+                    </ol>
+
+                    <div class="row mt-4">
+                        {% if cleaning_required and b1_machine.status != 'completed' %}
+                        <div class="col-md-6">
+                            <a href="{{ url_for('b1_scale_cleaning', job_id=job.id) }}" class="btn btn-warning btn-lg w-100">
+                                <i class="fas fa-broom"></i> Clean B1 Scale First
+                            </a>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-6">
+                            <form method="POST">
+                                <input type="hidden" name="action" value="proceed_to_grinding">
+                                <button type="submit" class="btn btn-success btn-lg w-100" 
+                                        {% if cleaning_required and b1_machine.status != 'completed' %}disabled{% endif %}>
+                                    <i class="fas fa-arrow-right"></i> Proceed to Grinding
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-refresh page every 30 seconds to check cleaning status
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

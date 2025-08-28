@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}B1 Scale Cleaning{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-broom"></i> B1 Scale Cleaning</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('production_execution') }}">Production Execution</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('b1_scale_process', job_id=job.id) }}">B1 Scale Process</a></li>
+                        <li class="breadcrumb-item active">B1 Scale Cleaning</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5><i class="fas fa-broom"></i> Complete B1 Scale Cleaning</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="cleaned_by" class="form-label">Cleaned By *</label>
+                                    <input type="text" class="form-control" id="cleaned_by" name="cleaned_by" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="waste_collected" class="form-label">Waste Collected (kg)</label>
+                                    <input type="number" class="form-control" id="waste_collected" name="waste_collected" step="0.1" min="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="before_cleaning_photo" class="form-label">Before Cleaning Photo *</label>
+                                    <input type="file" class="form-control" id="before_cleaning_photo" name="before_cleaning_photo" accept="image/*" required>
+                                    <small class="text-muted">Upload photo showing condition before cleaning</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="after_cleaning_photo" class="form-label">After Cleaning Photo *</label>
+                                    <input type="file" class="form-control" id="after_cleaning_photo" name="after_cleaning_photo" accept="image/*" required>
+                                    <small class="text-muted">Upload photo showing condition after cleaning</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Cleaning Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Any observations or issues during cleaning..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('b1_scale_process', job_id=job.id) }}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check"></i> Complete Cleaning
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-info-circle"></i> Cleaning Guidelines</h5>
+                </div>
+                <div class="card-body">
+                    <h6>B1 Scale Cleaning Checklist:</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check-square text-success"></i> Take before cleaning photo</li>
+                        <li><i class="fas fa-check-square text-success"></i> Clean weighing platform thoroughly</li>
+                        <li><i class="fas fa-check-square text-success"></i> Remove all debris and dust</li>
+                        <li><i class="fas fa-check-square text-success"></i> Clean load cells area</li>
+                        <li><i class="fas fa-check-square text-success"></i> Wipe down control panel</li>
+                        <li><i class="fas fa-check-square text-success"></i> Take after cleaning photo</li>
+                        <li><i class="fas fa-check-square text-success"></i> Collect and weigh waste</li>
+                    </ul>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <small><i class="fas fa-exclamation-triangle"></i> <strong>Important:</strong> B1 Scale must be cleaned every hour to ensure accurate weighing and prevent contamination.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-secondary text-white">
+                    <h5><i class="fas fa-clock"></i> Machine Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Machine:</strong> {{ b1_machine.machine_name }}</p>
+                    <p><strong>Frequency:</strong> Every {{ b1_machine.cleaning_frequency_minutes }} minutes</p>
+                    <p><strong>Last Cleaned:</strong> {{ b1_machine.last_cleaned.strftime('%Y-%m-%d %H:%M') if b1_machine.last_cleaned else 'Never' }}</p>
+                    <p><strong>Status:</strong> <span class="badge bg-warning">Cleaning Required</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

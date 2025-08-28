@@ -1,0 +1,15 @@
+step 1 : 
+after the planning is done the other user will start executing the transfer from different precleaning bins to 24 hours cleaning bin we want to keep track of job ids here like what jobs are done at what timing then how much time it has taken for completion we have to keep track of everything and all this should be linked to one order id the admin may search the order number they he should be able to see all the details from  order id creation to finished goods inventory once he start this transfer the timer should start this cleaning process generally takes 24 hours and but before starting this process give user a option for how much time duration the wheat will stay in this bins give 3 options 1)24, 2)12, 3)custom and based on this duration start the countdown and before this timer completed user should not access or enter further process details and after this process is completed capture the moisture the wheat and waste collected after 24 hours of cleaning with machine name here also keep the track water added to the bins 
+
+step 2: after this cleaning process the wheat will transfer to 12 hours cleaning process capture moisture once again here and then start the countdown for 12 hours for now give option to select the time duration for this also for testing purpose and also before starting this process they will mention the target moisture of wheat and after completion of this process again capture the outgoing moisture here also give reminders before process ending
+
+
+step 3 : after 12 hours cleaning process the wheat will move from the b1 scale to grinding and here we have to capture the machine cleaning logs
+here the frequency is more it should be cleaned every hour and the reminders should sent before 5  10 mins and here also they should upload before and after cleaning pics 
+ through this b1 scale the wheat will  move to the grinding process where they how much percentage of each products are required there are mainly 2 products 
+1) Main Products :Includes - Maida,Suji,Chakki Ata, Tandoori Ata,Dp Maida,Loto Maida , Nestle Maida etc which is configured 
+2) Bran : which comes automatically after the process this is basically the outer shield of the wheat
+the ratio of main products is 75-77 % for each production and rest 23 to 25 is bran if the bran is more than this then it should be highlighted
+
+Once this process is completed we have they will packed in bags or stored in the shallow so we need to capture how much of bags are packed of which weight i.e 30kg,50kg 25 kg etc, of which product and how much of finished good is stored in shallows for storing the finished goods also they have storage areas consider 4 storage for now so we need to capture in which storage area how much amount of products are there and they also shift the products from one area to another keep the track of that also shifting products between godown 
+
