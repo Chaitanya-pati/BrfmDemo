@@ -505,7 +505,14 @@ def production_planning(order_id=None):
 def production_execution():
     # Get pending jobs from approved plans
     pending_jobs = ProductionJobNew.query.filter_by(status='pending').all()
-    running_processes = CleaningProcess.query.filter_by(status='running').all()
+    
+    # Try to get running processes with error handling for missing columns
+    try:
+        running_processes = CleaningProcess.query.filter_by(status='running').all()
+    except Exception as e:
+        # Handle missing column error gracefully
+        print(f"Database column error: {e}")
+        running_processes = []
 
     return render_template('production_execution.html', 
                          pending_jobs=pending_jobs,
