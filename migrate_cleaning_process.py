@@ -1,106 +1,90 @@
-
 import os
-import sqlite3
-from sqlalchemy import create_engine, text
+import psycopg2
+from urllib.parse import urlparse
+
+def get_db_connection():
+    """Get database connection from environment variable"""
+    db_url = os.environ.get('DATABASE_URL') or os.environ.get('REPLIT_DB_URL')
+
+    if not db_url:
+        print("No database URL found in environment variables")
+        return None
+
+    try:
+        # Parse the database URL
+        parsed = urlparse(db_url)
+
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            port=parsed.port,
+            database=parsed.path[1:],  # Remove leading slash
+            user=parsed.username,
+            password=parsed.password,
+            sslmode='require'
+        )
+        return conn
+    except Exception as e:
+        print(f"Error connecting to database: {e}")
+        return None
 
 def migrate_cleaning_process():
-    """Add missing fields to cleaning_process table"""
-    
-    # Try to get database URL from environment or use SQLite
-    database_url = os.environ.get('DATABASE_URL')
-    if not database_url:
-        # Use SQLite
-        db_path = os.path.join('instance', 'wheat_processing.db')
-        if not os.path.exists(db_path):
-            print("Database file not found!")
-            return
-        database_url = f'sqlite:///{db_path}'
-    
-    print(f"Using database: {database_url}")
-    
-    # Create engine
-    engine = create_engine(database_url)
-    
-    # List of new columns to add
-    new_columns = [
-        ('is_locked', 'BOOLEAN', 'DEFAULT TRUE'),
-        ('reminder_sent_5min', 'BOOLEAN', 'DEFAULT FALSE'),
-        ('reminder_sent_10min', 'BOOLEAN', 'DEFAULT FALSE'),
-        ('reminder_sent_30min', 'BOOLEAN', 'DEFAULT FALSE'),
-        ('next_process_job_id', 'INTEGER')
-    ]
-    
+    conn = get_db_connection()
+    if not conn:
+        return
+
     try:
-        with engine.connect() as conn:
-            # Check if table exists and get column info
-            try:
-                if 'postgresql' in str(engine.url):
-                    # PostgreSQL syntax
-                    result = conn.execute(text("""
-                        SELECT column_name 
-                        FROM information_schema.columns 
-                        WHERE table_name = 'cleaning_process'
-                    """))
-                    existing_columns = [row[0] for row in result]
-                else:
-                    # SQLite syntax
-                    result = conn.execute(text("PRAGMA table_info(cleaning_process)"))
-                    existing_columns = [row[1] for row in result]
-                
-                print(f"Existing columns in cleaning_process: {existing_columns}")
-                
-                # Add missing columns
-                for column_name, column_type, default_value in new_columns:
-                    if column_name not in existing_columns:
-                        try:
-                            if 'postgresql' in str(engine.url):
-                                # PostgreSQL syntax
-                                if column_type == 'BOOLEAN':
-                                    sql = f"ALTER TABLE cleaning_process ADD COLUMN {column_name} BOOLEAN {default_value}"
-                                elif column_type == 'INTEGER':
-                                    sql = f"ALTER TABLE cleaning_process ADD COLUMN {column_name} INTEGER"
-                                else:
-                                    sql = f"ALTER TABLE cleaning_process ADD COLUMN {column_name} {column_type}"
-                            else:
-                                # SQLite syntax
-                                if default_value:
-                                    sql = f"ALTER TABLE cleaning_process ADD COLUMN {column_name} {column_type} {default_value}"
-                                else:
-                                    sql = f"ALTER TABLE cleaning_process ADD COLUMN {column_name} {column_type}"
-                            
-                            conn.execute(text(sql))
-                            conn.commit()
-                            print(f"Added {column_name} column")
-                        except Exception as e:
-                            if "already exists" in str(e) or "duplicate column" in str(e):
-                                print(f"Column {column_name} already exists")
-                            else:
-                                print(f"Error adding {column_name}: {e}")
-                    else:
-                        print(f"Column {column_name} already exists")
-                
-                # Add foreign key constraint for next_process_job_id if it doesn't exist
-                if 'next_process_job_id' not in existing_columns:
-                    try:
-                        if 'postgresql' in str(engine.url):
-                            conn.execute(text("""
-                                ALTER TABLE cleaning_process 
-                                ADD CONSTRAINT fk_cleaning_process_next_job 
-                                FOREIGN KEY (next_process_job_id) 
-                                REFERENCES production_job_new(id)
-                            """))
-                            conn.commit()
-                            print("Added foreign key constraint for next_process_job_id")
-                    except Exception as e:
-                        print(f"Note: Could not add foreign key constraint: {e}")
-                
-                print("Cleaning process table migration completed successfully!")
-                
-            except Exception as e:
-                print(f"Error checking table structure: {e}")
-                
+        cur = conn.cursor()
+
+        print("Using database:", os.environ.get('DATABASE_URL') or os.environ.get('REPLIT_DB_URL'))
+
+        # Get existing columns
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'cleaning_process' AND table_schema = 'public'
+        """)
+        existing_columns = [row[0] for row in cur.fetchall()]
+        print("Existing columns in cleaning_process:", existing_columns)
+
+        # Add missing columns one by one
+        columns_to_add = [
+            ('next_process_job_id', 'INTEGER REFERENCES production_job_new(id)'),
+            ('is_locked', 'BOOLEAN DEFAULT TRUE'),
+            ('reminder_sent_5min', 'BOOLEAN DEFAULT FALSE'),
+            ('reminder_sent_10min', 'BOOLEAN DEFAULT FALSE'),
+            ('reminder_sent_30min', 'BOOLEAN DEFAULT FALSE')
+        ]
+
+        for column_name, column_def in columns_to_add:
+            if column_name not in existing_columns:
+                try:
+                    cur.execute(f"ALTER TABLE cleaning_process ADD COLUMN {column_name} {column_def}")
+                    conn.commit()
+                    print(f"Added column {column_name}")
+                except Exception as e:
+                    print(f"Error adding column {column_name}: {e}")
+                    conn.rollback()
+            else:
+                print(f"Column {column_name} already exists")
+
+        # Verify all columns were added
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'cleaning_process' AND table_schema = 'public'
+            ORDER BY column_name
+        """)
+        final_columns = [row[0] for row in cur.fetchall()]
+        print("Final columns in cleaning_process:", final_columns)
+
+        conn.close()
+        print("Migration completed successfully!")
+
     except Exception as e:
         print(f"Migration failed: {e}")
+        if conn:
+            conn.rollback()
+            conn.close()
 
 if __name__ == "__main__":
     migrate_cleaning_process()

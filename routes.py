@@ -512,6 +512,8 @@ def production_execution():
     except Exception as e:
         # Handle missing column error gracefully
         print(f"Database column error: {e}")
+        # Reset any database transaction issues
+        db.session.rollback()
         running_processes = []
 
     return render_template('production_execution.html', 

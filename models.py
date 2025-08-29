@@ -381,11 +381,11 @@ class CleaningProcess(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Enhanced tracking fields for step requirements
-    is_locked = db.Column(db.Boolean, default=True)  # Locks access during cleaning
-    reminder_sent_5min = db.Column(db.Boolean, default=False)
-    reminder_sent_10min = db.Column(db.Boolean, default=False)
-    reminder_sent_30min = db.Column(db.Boolean, default=False)
-    next_process_job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'))  # For 12h process after 24h
+    is_locked = db.Column(db.Boolean, default=True, nullable=True)  # Locks access during cleaning
+    reminder_sent_5min = db.Column(db.Boolean, default=False, nullable=True)
+    reminder_sent_10min = db.Column(db.Boolean, default=False, nullable=True)
+    reminder_sent_30min = db.Column(db.Boolean, default=False, nullable=True)
+    next_process_job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=True)  # For 12h process after 24h
     
     job = db.relationship('ProductionJobNew', foreign_keys=[job_id], backref=db.backref('cleaning_processes', lazy=True))
     next_process_job = db.relationship('ProductionJobNew', foreign_keys=[next_process_job_id], backref=db.backref('previous_cleaning_processes', lazy=True))
