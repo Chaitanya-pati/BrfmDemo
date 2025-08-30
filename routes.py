@@ -522,9 +522,9 @@ def generate_job_id():
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     return f"{prefix}{timestamp}"
 
-@app.route('/start_execution/<int:order_id>')
-def start_execution(order_id):
-    """Start production execution for a planned order"""
+@app.route('/start_production_process/<int:order_id>')
+def start_production_process(order_id):
+    """Prepare to start production - doesn't create jobs until actual execution begins"""
     try:
         order = ProductionOrder.query.get_or_404(order_id)
         plan = ProductionPlan.query.filter_by(order_id=order_id, status='approved').first()
@@ -536,52 +536,123 @@ def start_execution(order_id):
         # Check if execution already started
         existing_job = ProductionJobNew.query.filter_by(order_id=order_id).first()
         if existing_job:
-            flash('Execution already started for this order', 'warning')
+            flash('Production already started for this order', 'warning')
             return redirect(url_for('production_execution'))
 
-        # Create first job (transfer stage)
-        job = ProductionJobNew()
-        job.job_number = generate_job_id()
-        job.order_id = order_id
-        job.plan_id = plan.id
-        job.stage = 'transfer'
-        job.status = 'pending'
-
-        # Update order status
-        order.status = 'in_progress'
-
-        db.session.add(job)
-        db.session.commit()
-
-        flash(f'Production execution started! Job {job.job_number} created.', 'success')
-        return redirect(url_for('production_execution'))
+        # Don't create jobs yet - just redirect to transfer execution setup
+        return redirect(url_for('transfer_execution_setup', order_id=order_id))
 
     except Exception as e:
-        db.session.rollback()
-        flash(f'Error starting execution: {str(e)}', 'error')
+        flash(f'Error preparing production: {str(e)}', 'error')
         return redirect(url_for('production_orders'))
 
-@app.route('/production_execution/start_transfer/<int:order_id>')
-def start_transfer(order_id):
+@app.route('/production_execution/transfer_setup/<int:order_id>', methods=['GET', 'POST'])
+def transfer_execution_setup(order_id):
+    """Setup and begin transfer execution - creates job only when actually started"""
     order = ProductionOrder.query.get_or_404(order_id)
     plan = ProductionPlan.query.filter_by(order_id=order_id, status='approved').first()
 
     if not plan:
         flash('No approved production plan found for this order', 'error')
+        return redirect(url_for('production_orders'))
+
+    # Check if execution already started
+    existing_job = ProductionJobNew.query.filter_by(order_id=order_id).first()
+    if existing_job:
+        flash('Production already started for this order', 'warning')
         return redirect(url_for('production_execution'))
 
-    # Create transfer job
-    job = ProductionJobNew()
-    job.job_number = generate_job_id()
-    job.order_id = order_id
-    job.plan_id = plan.id
-    job.stage = 'transfer'
-    job.status = 'pending'
+    plan_items = ProductionPlanItem.query.filter_by(plan_id=plan.id).all()
+    
+    # Get only the precleaning bins that are in the plan and have sufficient stock
+    valid_plan_items = []
+    for item in plan_items:
+        precleaning_bin = PrecleaningBin.query.get(item.precleaning_bin_id)
+        if precleaning_bin and precleaning_bin.current_stock >= item.quantity:
+            valid_plan_items.append(item)
 
-    db.session.add(job)
-    db.session.commit()
+    if request.method == 'POST':
+        try:
+            # Check if all plan items have sufficient stock
+            for item in plan_items:
+                precleaning_bin = PrecleaningBin.query.get(item.precleaning_bin_id)
+                if not precleaning_bin or precleaning_bin.current_stock < item.quantity:
+                    flash(f'Insufficient stock in {precleaning_bin.name if precleaning_bin else "Unknown bin"}', 'error')
+                    return redirect(url_for('transfer_execution_setup', order_id=order_id))
 
-    return redirect(url_for('transfer_execution', job_id=job.id))
+            # NOW create the job since user is actually starting execution
+            job = ProductionJobNew()
+            job.job_number = generate_job_id()
+            job.order_id = order_id
+            job.plan_id = plan.id
+            job.stage = 'transfer'
+            job.status = 'in_progress'
+            job.started_at = datetime.utcnow()
+            job.started_by = request.form['operator_name']
+
+            # Update order status to in_progress
+            order.status = 'in_progress'
+
+            db.session.add(job)
+            db.session.flush()  # Get job ID
+
+            total_transferred = 0
+
+            # Process each precleaning bin transfer automatically
+            for plan_item in plan_items:
+                quantity_to_transfer = plan_item.quantity
+
+                # Create transfer record
+                transfer = ProductionTransfer()
+                transfer.job_id = job.id
+                transfer.from_precleaning_bin_id = plan_item.precleaning_bin_id
+                transfer.quantity_transferred = quantity_to_transfer
+                transfer.operator_name = request.form['operator_name']
+
+                # Handle photos
+                if 'start_photo' in request.files:
+                    file = request.files['start_photo']
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        filename = f"transfer_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        transfer.start_photo = filename
+
+                # Update precleaning bin stock
+                precleaning_bin = PrecleaningBin.query.get(plan_item.precleaning_bin_id)
+                if precleaning_bin:
+                    precleaning_bin.current_stock -= quantity_to_transfer
+
+                total_transferred += quantity_to_transfer
+                db.session.add(transfer)
+
+            # Complete transfer job
+            job.status = 'completed'
+            job.completed_at = datetime.utcnow()
+            job.completed_by = request.form['operator_name']
+
+            # Create cleaning_24h job
+            cleaning_job = ProductionJobNew()
+            cleaning_job.job_number = generate_job_id()
+            cleaning_job.order_id = job.order_id
+            cleaning_job.plan_id = job.plan_id
+            cleaning_job.stage = 'cleaning_24h'
+            cleaning_job.status = 'pending'
+
+            db.session.add(cleaning_job)
+            db.session.commit()
+
+            flash(f'Production started! Transfer completed: {total_transferred:.2f} kg', 'success')
+            return redirect(url_for('cleaning_setup', job_id=cleaning_job.id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting production: {str(e)}', 'error')
+
+    return render_template('transfer_execution_setup.html', 
+                         order=order,
+                         plan=plan,
+                         plan_items=valid_plan_items)
 
 @app.route('/production_execution/transfer/<int:job_id>', methods=['GET', 'POST'])
 def transfer_execution(job_id):

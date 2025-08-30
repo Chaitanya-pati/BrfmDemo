@@ -107,16 +107,16 @@
                                             <a href="{{ url_for('production_planning', order_id=order.id) }}" class="btn btn-sm btn-info me-1">
                                                 <i class="fas fa-eye me-1"></i>View Plan
                                             </a>
-                                            <a href="{{ url_for('start_execution', order_id=order.id) }}" class="btn btn-sm btn-success" 
-                                               onclick="return confirm('Start production execution for this order?')">
-                                                <i class="fas fa-play me-1"></i>Start Execution
+                                            <a href="{{ url_for('start_production_process', order_id=order.id) }}" class="btn btn-sm btn-success">
+                                                <i class="fas fa-play me-1"></i>Start Production
                                             </a>
                                         {% elif order.status == 'in_progress' %}
+                                            <span class="badge bg-primary me-2">Production Running</span>
                                             <a href="{{ url_for('production_execution') }}" class="btn btn-sm btn-warning me-1">
-                                                <i class="fas fa-cogs me-1"></i>Monitor Execution
+                                                <i class="fas fa-cogs me-1"></i>Monitor Progress
                                             </a>
                                             <a href="{{ url_for('order_tracking_detail', order_number=order.order_number) }}" class="btn btn-sm btn-info">
-                                                <i class="fas fa-eye me-1"></i>Track Progress
+                                                <i class="fas fa-chart-line me-1"></i>View Details
                                             </a>
                                         {% elif order.status == 'completed' %}
                                             <span class="badge bg-success me-1">Completed</span>
