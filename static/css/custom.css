@@ -37,6 +37,27 @@ body {
     overflow-y: auto;
 }
 
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed-width);
+}
+
+.sidebar.collapsed .sidebar-brand > div {
+    display: none;
+}
+
+.sidebar.collapsed .nav-link {
+    padding: 12px 20px;
+    justify-content: center;
+}
+
+.sidebar.collapsed .nav-link span {
+    display: none;
+}
+
+.sidebar.collapsed .collapse {
+    display: none !important;
+}
+
 .sidebar-toggle {
     position: fixed;
     top: 15px;
@@ -48,7 +69,14 @@ body {
     border-radius: 50%;
     width: 40px;
     height: 40px;
-    display: none;
+    display: block;
+}
+
+@media (min-width: 769px) {
+    .sidebar-toggle {
+        top: 20px;
+        left: 20px;
+    }
 }
 
 .sidebar-header {
@@ -93,11 +121,21 @@ body {
 }
 
 /* Main Content */
-.main-content {
+.main-wrapper {
     margin-left: var(--sidebar-width);
     min-height: 100vh;
-    padding: 20px;
     transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+}
+
+.main-wrapper.expanded {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+.main-content {
+    flex: 1;
+    padding: 0;
 }
 
 /* Cards */
@@ -289,22 +327,57 @@ body {
 }
 
 /* Responsive Design */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
     .sidebar {
         transform: translateX(-100%);
+        width: var(--sidebar-width);
     }
     
     .sidebar.show {
         transform: translateX(0);
     }
     
-    .sidebar-toggle {
-        display: block;
+    .sidebar.collapsed {
+        width: var(--sidebar-width);
+        transform: translateX(-100%);
+    }
+    
+    .sidebar.collapsed.show {
+        transform: translateX(0);
+    }
+    
+    .main-wrapper {
+        margin-left: 0;
+    }
+    
+    .main-wrapper.expanded {
+        margin-left: 0;
     }
     
     .main-content {
-        margin-left: 0;
-        padding: 70px 15px 15px;
+        padding-top: 70px;
+    }
+    
+    /* Overlay for mobile when sidebar is open */
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        display: none;
+    }
+    
+    .sidebar-overlay.show {
+        display: block;
+    }
+}
+
+@media (min-width: 769px) {
+    .sidebar-overlay {
+        display: none !important;
     }
 }
 

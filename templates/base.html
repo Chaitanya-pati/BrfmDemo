@@ -12,9 +12,12 @@
 </head>
 <body>
     <!-- Sidebar Toggle Button -->
-    <button class="sidebar-toggle d-md-none" id="sidebarToggle">
+    <button class="sidebar-toggle" id="sidebarToggle">
         <i class="fas fa-bars"></i>
     </button>
+
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <!-- Sidebar Navigation -->
     <div class="sidebar" id="sidebar">
@@ -33,14 +36,14 @@
                 <!-- Dashboard -->
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('index') }}">
-                        <i class="fas fa-tachometer-alt"></i>Dashboard
+                        <i class="fas fa-tachometer-alt"></i><span>Dashboard</span>
                     </a>
                 </li>
 
                 <!-- Vehicle Operations -->
                 <li class="nav-item">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="collapse" data-bs-target="#vehicleOperations" aria-expanded="false">
-                        <i class="fas fa-truck"></i>Vehicle Operations
+                        <i class="fas fa-truck"></i><span>Vehicle Operations</span>
                     </a>
                     <div class="collapse" id="vehicleOperations">
                         <ul class="nav flex-column ms-3">
@@ -66,7 +69,7 @@
                 <!-- Inventory Control -->
                 <li class="nav-item">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="collapse" data-bs-target="#inventoryControl" aria-expanded="false">
-                        <i class="fas fa-warehouse"></i>Inventory Control
+                        <i class="fas fa-warehouse"></i><span>Inventory Control</span>
                     </a>
                     <div class="collapse" id="inventoryControl">
                         <ul class="nav flex-column ms-3">
@@ -87,7 +90,7 @@
                 <!-- Production -->
                 <li class="nav-item">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="collapse" data-bs-target="#production" aria-expanded="false">
-                        <i class="fas fa-industry"></i>Production
+                        <i class="fas fa-industry"></i><span>Production</span>
                     </a>
                     <div class="collapse" id="production">
                         <ul class="nav flex-column ms-3">
@@ -128,14 +131,14 @@
                 <!-- Sales & Dispatch -->
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('sales_dispatch') }}">
-                        <i class="fas fa-shipping-fast"></i>Sales & Dispatch
+                        <i class="fas fa-shipping-fast"></i><span>Sales & Dispatch</span>
                     </a>
                 </li>
 
                 <!-- Analytics -->
                 <li class="nav-item">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="collapse" data-bs-target="#analytics" aria-expanded="false">
-                        <i class="fas fa-chart-line"></i>Analytics
+                        <i class="fas fa-chart-line"></i><span>Analytics</span>
                     </a>
                     <div class="collapse" id="analytics">
                         <ul class="nav flex-column ms-3">
@@ -161,7 +164,7 @@
                 <!-- System -->
                 <li class="nav-item">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="collapse" data-bs-target="#system" aria-expanded="false">
-                        <i class="fas fa-cog"></i>System
+                        <i class="fas fa-cog"></i><span>System</span>
                     </a>
                     <div class="collapse" id="system">
                         <ul class="nav flex-column ms-3">
@@ -187,13 +190,13 @@
                 <!-- User Account -->
                 <li class="nav-item mt-3">
                     <a class="nav-link text-warning" href="#" data-bs-toggle="modal" data-bs-target="#notificationModal">
-                        <i class="fas fa-bell"></i>Notifications
+                        <i class="fas fa-bell"></i><span>Notifications</span>
                         <span class="badge bg-warning rounded-pill ms-auto">3</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link text-danger" href="#">
-                        <i class="fas fa-sign-out-alt"></i>Logout
+                        <i class="fas fa-sign-out-alt"></i><span>Logout</span>
                     </a>
                 </li>
             </ul>
@@ -346,17 +349,29 @@
             const sidebar = document.getElementById('sidebar');
             const mainWrapper = document.getElementById('mainWrapper');
             const sidebarToggle = document.getElementById('sidebarToggle');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
             const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
 
             function toggleSidebar() {
                 if (window.innerWidth <= 768) {
+                    // Mobile behavior
                     sidebar.classList.toggle('show');
+                    sidebarOverlay.classList.toggle('show');
                 } else {
+                    // Desktop behavior
                     sidebar.classList.toggle('collapsed');
                     mainWrapper.classList.toggle('expanded');
                 }
             }
 
+            function closeSidebar() {
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('show');
+                    sidebarOverlay.classList.remove('show');
+                }
+            }
+
+            // Toggle button click
             if (sidebarToggle) {
                 sidebarToggle.addEventListener('click', toggleSidebar);
             }
@@ -364,6 +379,22 @@
             if (mobileSidebarToggle) {
                 mobileSidebarToggle.addEventListener('click', toggleSidebar);
             }
+
+            // Overlay click to close sidebar on mobile
+            if (sidebarOverlay) {
+                sidebarOverlay.addEventListener('click', closeSidebar);
+            }
+
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('show');
+                    sidebarOverlay.classList.remove('show');
+                } else {
+                    sidebar.classList.remove('collapsed');
+                    mainWrapper.classList.remove('expanded');
+                }
+            });
 
             // Set active navigation
             const currentPath = window.location.pathname;
