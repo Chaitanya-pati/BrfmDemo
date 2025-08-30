@@ -1357,19 +1357,8 @@ def grinding_execution(job_id):
             db.session.add(grinding)
             db.session.commit()
 
-            # Create packing job for next stage
-            packing_job = ProductionJobNew()
-            packing_job.job_number = generate_job_id()
-            packing_job.order_id = job.order_id
-            packing_job.plan_id = job.plan_id
-            packing_job.stage = 'packing'
-            packing_job.status = 'pending'
-            
-            db.session.add(packing_job)
-            db.session.commit()  # Commit to get the packing_job.id
-            
             flash('Grinding process completed successfully!', 'success')
-            return redirect(url_for('packing_execution', job_id=packing_job.id))
+            return redirect(url_for('packing_execution', job_id=job_id))
 
         except Exception as e:
             db.session.rollback()
@@ -1476,11 +1465,20 @@ def complete_machine_cleaning(log_id):
 @app.route('/production_execution/packing/<int:job_id>', methods=['GET', 'POST'])
 def packing_execution(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
+    
+    # Check for grinding process in this job or related grinding jobs
     grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
-
+    if not grinding_process:
+        # Look for grinding process in other jobs with the same order_id
+        related_jobs = ProductionJobNew.query.filter_by(order_id=job.order_id, stage='grinding').all()
+        for related_job in related_jobs:
+            grinding_process = GrindingProcess.query.filter_by(job_id=related_job.id).first()
+            if grinding_process:
+                break
+    
     if not grinding_process:
         flash('Grinding process must be completed before packing!', 'error')
-        return redirect(url_for('grinding_execution', job_id=job_id))
+        return redirect(url_for('production_execution'))
 
     if request.method == 'POST':
         try:
