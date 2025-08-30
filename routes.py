@@ -1642,6 +1642,348 @@ def cleaning_management():
                          active_cleanings=active_cleanings,
                          recent_cleanings=recent_cleanings)
 
+# Production Machine Management - Master Data
+@app.route('/production_machines', methods=['GET', 'POST'])
+def production_machines():
+    if request.method == 'POST':
+        try:
+            from models import ProductionMachine
+            
+            action = request.form.get('action')
+            
+            if action == 'add_machine':
+                machine = ProductionMachine(
+                    name=request.form['name'],
+                    machine_type=request.form['machine_type'],
+                    process_step=request.form['process_step'],
+                    location=request.form.get('location', ''),
+                    cleaning_frequency_hours=int(request.form.get('cleaning_frequency_hours', 3))
+                )
+                db.session.add(machine)
+                db.session.commit()
+                flash('Production machine added successfully!', 'success')
+                
+            elif action == 'toggle_machine':
+                machine_id = int(request.form['machine_id'])
+                machine = ProductionMachine.query.get(machine_id)
+                if machine:
+                    machine.is_active = not machine.is_active
+                    machine.status = 'active' if machine.is_active else 'operational'
+                    db.session.commit()
+                    status_text = 'activated' if machine.is_active else 'deactivated'
+                    flash(f'Machine {machine.name} {status_text}!', 'success')
+                    
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error: {str(e)}', 'error')
+    
+    from models import ProductionMachine
+    machines = ProductionMachine.query.all()
+    
+    # Group machines by process step
+    machines_by_process = {}
+    for machine in machines:
+        if machine.process_step not in machines_by_process:
+            machines_by_process[machine.process_step] = []
+        machines_by_process[machine.process_step].append(machine)
+    
+    return render_template('production_machines.html', 
+                         machines=machines,
+                         machines_by_process=machines_by_process)
+
+# Start Process with Machine Activation
+@app.route('/start_process/<int:job_id>', methods=['POST'])
+def start_process(job_id):
+    try:
+        from models import ProductionMachine, CleaningSchedule, ProductionOrderTracking
+        
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Update job status
+        job.status = 'in_progress'
+        job.started_at = datetime.utcnow()
+        job.process_start_time = datetime.utcnow()
+        job.started_by = request.form.get('operator_name', 'Unknown')
+        job.machines_active = True
+        
+        # Find machines for this process step
+        machines = ProductionMachine.query.filter_by(process_step=job.stage).all()
+        
+        # Activate machines and create cleaning schedules
+        for machine in machines:
+            machine.is_active = True
+            machine.status = 'active'
+            
+            # Create cleaning schedules every 3 hours (or machine frequency)
+            current_time = datetime.utcnow()
+            frequency_hours = machine.cleaning_frequency_hours
+            
+            # Create initial cleaning schedule
+            first_cleaning = CleaningSchedule(
+                machine_id=machine.id,
+                job_id=job_id,
+                production_order_id=job.order_id,
+                process_step=job.stage,
+                scheduled_time=current_time + timedelta(hours=frequency_hours)
+            )
+            db.session.add(first_cleaning)
+        
+        # Create or update production order tracking
+        tracking = ProductionOrderTracking.query.filter_by(production_order_id=job.order_id).first()
+        if not tracking:
+            tracking = ProductionOrderTracking(
+                production_order_id=job.order_id,
+                current_stage=job.stage,
+                overall_status='in_progress',
+                start_time=datetime.utcnow()
+            )
+            db.session.add(tracking)
+        else:
+            tracking.current_stage = job.stage
+            tracking.overall_status = 'in_progress'
+        
+        db.session.commit()
+        
+        flash(f'Process {job.stage} started successfully! Machine cleaning schedules activated.', 'success')
+        return redirect(url_for('production_execution'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error starting process: {str(e)}', 'error')
+        return redirect(url_for('production_execution'))
+
+# Stop Process with Machine Deactivation
+@app.route('/stop_process/<int:job_id>', methods=['POST'])
+def stop_process(job_id):
+    try:
+        from models import ProductionMachine, CleaningSchedule, ProductionOrderTracking
+        
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Update job status
+        job.status = 'completed'
+        job.completed_at = datetime.utcnow()
+        job.process_end_time = datetime.utcnow()
+        job.completed_by = request.form.get('operator_name', 'Unknown')
+        job.machines_active = False
+        
+        # Calculate process duration
+        if job.process_start_time:
+            duration = job.process_end_time - job.process_start_time
+            hours = duration.total_seconds() / 3600
+        
+        # Deactivate machines for this process step
+        machines = ProductionMachine.query.filter_by(process_step=job.stage).all()
+        for machine in machines:
+            machine.is_active = False
+            machine.status = 'operational'
+        
+        # Cancel pending cleaning schedules for this job
+        pending_schedules = CleaningSchedule.query.filter_by(
+            job_id=job_id, 
+            status='scheduled'
+        ).all()
+        for schedule in pending_schedules:
+            schedule.status = 'cancelled'
+        
+        # Update production order tracking
+        tracking = ProductionOrderTracking.query.filter_by(production_order_id=job.order_id).first()
+        if tracking:
+            # Check if this is the final stage
+            if job.stage == 'packing':
+                tracking.overall_status = 'completed'
+                tracking.end_time = datetime.utcnow()
+                if tracking.start_time:
+                    total_duration = tracking.end_time - tracking.start_time
+                    tracking.total_duration_hours = total_duration.total_seconds() / 3600
+        
+        db.session.commit()
+        
+        flash(f'Process {job.stage} stopped successfully! Machine cleaning schedules deactivated.', 'success')
+        return redirect(url_for('production_execution'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error stopping process: {str(e)}', 'error')
+        return redirect(url_for('production_execution'))
+
+# Machine Cleaning for Active Processes
+@app.route('/process_machine_cleaning/<int:job_id>', methods=['GET', 'POST'])
+def process_machine_cleaning(job_id):
+    from models import ProductionMachine, MachineCleaningLog, CleaningSchedule
+    
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    # Get machines for this process step
+    machines = ProductionMachine.query.filter_by(process_step=job.stage, is_active=True).all()
+    
+    # Get pending cleaning schedules
+    pending_cleanings = CleaningSchedule.query.filter_by(
+        job_id=job_id,
+        status='scheduled'
+    ).filter(CleaningSchedule.scheduled_time <= datetime.utcnow()).all()
+    
+    # Get recent cleaning logs for this job
+    recent_logs = MachineCleaningLog.query.filter_by(job_id=job_id).order_by(
+        MachineCleaningLog.cleaning_start_time.desc()
+    ).limit(10).all()
+    
+    if request.method == 'POST':
+        try:
+            action = request.form.get('action')
+            
+            if action == 'start_cleaning':
+                machine_id = int(request.form['machine_id'])
+                machine = ProductionMachine.query.get(machine_id)
+                
+                # Handle photo upload
+                before_photo = None
+                if 'before_photo' in request.files:
+                    file = request.files['before_photo']
+                    if file and file.filename and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"machine_before_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        before_photo = filename
+                
+                # Create cleaning log
+                cleaning_log = MachineCleaningLog(
+                    machine_id=machine_id,
+                    production_order_id=job.order_id,
+                    job_id=job_id,
+                    process_step=job.stage,
+                    cleaned_by=request.form['cleaned_by'],
+                    photo_before=before_photo,
+                    status='in_progress'
+                )
+                
+                db.session.add(cleaning_log)
+                db.session.commit()
+                
+                flash('Machine cleaning started!', 'success')
+                return redirect(url_for('complete_process_machine_cleaning', log_id=cleaning_log.id))
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting machine cleaning: {str(e)}', 'error')
+    
+    return render_template('process_machine_cleaning.html',
+                         job=job,
+                         machines=machines,
+                         pending_cleanings=pending_cleanings,
+                         recent_logs=recent_logs)
+
+@app.route('/complete_process_machine_cleaning/<int:log_id>', methods=['GET', 'POST'])
+def complete_process_machine_cleaning(log_id):
+    from models import MachineCleaningLog, CleaningSchedule, ProductionOrderTracking
+    
+    log = MachineCleaningLog.query.get_or_404(log_id)
+    
+    if request.method == 'POST':
+        try:
+            # Handle after photo upload
+            after_photo = None
+            if 'after_photo' in request.files:
+                file = request.files['after_photo']
+                if file and file.filename and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filename = f"machine_after_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    after_photo = filename
+            
+            # Complete the cleaning log
+            log.cleaning_end_time = datetime.utcnow()
+            log.photo_after = after_photo
+            log.waste_collected_kg = float(request.form.get('waste_collected', 0))
+            log.notes = request.form.get('notes', '')
+            log.status = 'completed'
+            
+            # Calculate cleaning duration
+            if log.cleaning_start_time:
+                duration = log.cleaning_end_time - log.cleaning_start_time
+                log.cleaning_duration_minutes = int(duration.total_seconds() / 60)
+            
+            # Update machine last cleaned time
+            log.machine.last_cleaned = log.cleaning_end_time
+            
+            # Mark related cleaning schedule as completed
+            schedule = CleaningSchedule.query.filter_by(
+                machine_id=log.machine_id,
+                job_id=log.job_id,
+                status='scheduled'
+            ).first()
+            if schedule:
+                schedule.status = 'completed'
+            
+            # Create next cleaning schedule
+            next_cleaning_time = log.cleaning_end_time + timedelta(hours=log.machine.cleaning_frequency_hours)
+            next_schedule = CleaningSchedule(
+                machine_id=log.machine_id,
+                job_id=log.job_id,
+                production_order_id=log.production_order_id,
+                process_step=log.process_step,
+                scheduled_time=next_cleaning_time
+            )
+            db.session.add(next_schedule)
+            
+            # Update production order tracking
+            tracking = ProductionOrderTracking.query.filter_by(production_order_id=log.production_order_id).first()
+            if tracking:
+                tracking.total_cleanings_performed += 1
+            
+            db.session.commit()
+            
+            flash('Machine cleaning completed successfully!', 'success')
+            return redirect(url_for('process_machine_cleaning', job_id=log.job_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing machine cleaning: {str(e)}', 'error')
+    
+    return render_template('complete_process_machine_cleaning.html', log=log)
+
+# Production Order Comprehensive Tracking
+@app.route('/production_order_tracking/<production_order_id>')
+def production_order_tracking(production_order_id):
+    from models import ProductionOrderTracking, MachineCleaningLog
+    
+    # Get all jobs for this production order
+    jobs = ProductionJobNew.query.filter_by(order_id=production_order_id).order_by(ProductionJobNew.created_at).all()
+    
+    # Get tracking information
+    tracking = ProductionOrderTracking.query.filter_by(production_order_id=production_order_id).first()
+    
+    # Get all cleaning logs for this production order
+    cleaning_logs = MachineCleaningLog.query.filter_by(
+        production_order_id=production_order_id
+    ).order_by(MachineCleaningLog.cleaning_start_time).all()
+    
+    # Get process parameters from various stages
+    process_data = {}
+    for job in jobs:
+        if job.stage == 'transfer':
+            transfers = ProductionTransfer.query.filter_by(job_id=job.id).all()
+            process_data['transfers'] = transfers
+        elif job.stage == 'cleaning_24h':
+            cleaning_24h = CleaningProcess.query.filter_by(job_id=job.id).all()
+            process_data['cleaning_24h'] = cleaning_24h
+        elif job.stage == 'cleaning_12h':
+            cleaning_12h = CleaningProcess.query.filter_by(job_id=job.id).all()
+            process_data['cleaning_12h'] = cleaning_12h
+        elif job.stage == 'grinding':
+            grinding = GrindingProcess.query.filter_by(job_id=job.id).all()
+            process_data['grinding'] = grinding
+        elif job.stage == 'packing':
+            packing = PackingProcess.query.filter_by(job_id=job.id).all()
+            process_data['packing'] = packing
+    
+    return render_template('production_order_tracking.html',
+                         production_order_id=production_order_id,
+                         jobs=jobs,
+                         tracking=tracking,
+                         cleaning_logs=cleaning_logs,
+                         process_data=process_data)
+
 @app.route('/masters', methods=['GET', 'POST'])
 def masters():
     if request.method == 'POST':

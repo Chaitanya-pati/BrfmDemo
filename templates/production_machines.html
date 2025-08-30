@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Production Machines Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-cogs"></i> Production Machines Management</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Production Machines</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5><i class="fas fa-plus"></i> Add New Machine</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="action" value="add_machine">
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Machine Name *</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="machine_type" class="form-label">Machine Type *</label>
+                            <select class="form-select" id="machine_type" name="machine_type" required>
+                                <option value="">Select Type</option>
+                                <option value="drum_shield">Drum Shield</option>
+                                <option value="magnet">Magnet</option>
+                                <option value="separator">Separator</option>
+                                <option value="conveyor">Conveyor</option>
+                                <option value="cleaner">Cleaner</option>
+                                <option value="grinder">Grinder</option>
+                                <option value="packer">Packer</option>
+                                <option value="scale">Scale</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="process_step" class="form-label">Process Step *</label>
+                            <select class="form-select" id="process_step" name="process_step" required>
+                                <option value="">Select Process</option>
+                                <option value="precleaning">Precleaning</option>
+                                <option value="cleaning_24h">24-Hour Cleaning</option>
+                                <option value="cleaning_12h">12-Hour Cleaning</option>
+                                <option value="grinding">Grinding</option>
+                                <option value="packing">Packing</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Location</label>
+                            <input type="text" class="form-control" id="location" name="location">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="cleaning_frequency_hours" class="form-label">Cleaning Frequency (Hours)</label>
+                            <input type="number" class="form-control" id="cleaning_frequency_hours" name="cleaning_frequency_hours" value="3" min="1" max="24">
+                            <small class="text-muted">Default: 3 hours</small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-plus"></i> Add Machine
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-list"></i> Machines by Process Step</h5>
+                </div>
+                <div class="card-body">
+                    {% for process_step, machines in machines_by_process.items() %}
+                    <div class="mb-4">
+                        <h6 class="text-primary">{{ process_step.replace('_', ' ').title() }}</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Location</th>
+                                        <th>Frequency</th>
+                                        <th>Status</th>
+                                        <th>Last Cleaned</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for machine in machines %}
+                                    <tr>
+                                        <td>{{ machine.name }}</td>
+                                        <td>{{ machine.machine_type.replace('_', ' ').title() }}</td>
+                                        <td>{{ machine.location or 'Not Set' }}</td>
+                                        <td>{{ machine.cleaning_frequency_hours }}h</td>
+                                        <td>
+                                            {% if machine.is_active %}
+                                                <span class="badge bg-success">Active</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if machine.last_cleaned %}
+                                                {{ machine.last_cleaned.strftime('%Y-%m-%d %H:%M') }}
+                                            {% else %}
+                                                Never
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <form method="POST" style="display: inline;">
+                                                <input type="hidden" name="action" value="toggle_machine">
+                                                <input type="hidden" name="machine_id" value="{{ machine.id }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                    {% if machine.is_active %}
+                                                        <i class="fas fa-pause"></i> Deactivate
+                                                    {% else %}
+                                                        <i class="fas fa-play"></i> Activate
+                                                    {% endif %}
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not machines_by_process %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No machines configured yet. Add your first machine!</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5><i class="fas fa-info-circle"></i> Process Integration Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Cleaning Schedule Logic:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-clock text-primary"></i> Machines are activated when process starts</li>
+                                <li><i class="fas fa-calendar text-success"></i> Cleaning schedules created every 3 hours (default)</li>
+                                <li><i class="fas fa-bell text-warning"></i> Automatic reminders when cleaning is due</li>
+                                <li><i class="fas fa-stop text-danger"></i> Schedules cancelled when process stops</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Process Steps:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-arrow-right text-info"></i> <strong>Precleaning:</strong> Transfer from godown to bins</li>
+                                <li><i class="fas fa-arrow-right text-info"></i> <strong>24h Cleaning:</strong> Long cleaning process</li>
+                                <li><i class="fas fa-arrow-right text-info"></i> <strong>12h Cleaning:</strong> Final cleaning stage</li>
+                                <li><i class="fas fa-arrow-right text-info"></i> <strong>Grinding:</strong> Processing and ratio control</li>
+                                <li><i class="fas fa-arrow-right text-info"></i> <strong>Packing:</strong> Final packaging and storage</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

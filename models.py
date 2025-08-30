@@ -523,3 +523,75 @@ class ProductStorageTransfer(db.Model):
     from_storage = db.relationship('StorageArea', foreign_keys=[from_storage_area_id], backref='outbound_transfers')
     to_storage = db.relationship('StorageArea', foreign_keys=[to_storage_area_id], backref='inbound_transfers')
     product = db.relationship('Product', backref='storage_transfer_records')
+
+# Enhanced Machine Cleaning System - Process Linked
+class ProductionMachine(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    machine_type = db.Column(db.String(50), nullable=False)
+    process_step = db.Column(db.String(50), nullable=False)  # 'precleaning', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing'
+    location = db.Column(db.String(100))
+    cleaning_frequency_hours = db.Column(db.Integer, default=3)  # Default 3 hours
+    last_cleaned = db.Column(db.DateTime)
+    status = db.Column(db.String(20), default='operational')
+    is_active = db.Column(db.Boolean, default=False)  # Active during process
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    cleaning_logs = db.relationship('MachineCleaningLog', backref='machine', lazy=True)
+    cleaning_schedules = db.relationship('CleaningSchedule', backref='machine', lazy=True)
+
+# Enhanced cleaning log linked to production processes
+class MachineCleaningLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    machine_id = db.Column(db.Integer, db.ForeignKey('production_machine.id'), nullable=False)
+    production_order_id = db.Column(db.String(50))  # Link to production order
+    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'))  # Link to specific job
+    process_step = db.Column(db.String(50), nullable=False)
+    cleaned_by = db.Column(db.String(100), nullable=False)
+    cleaning_start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    cleaning_end_time = db.Column(db.DateTime)
+    photo_before = db.Column(db.String(255))
+    photo_after = db.Column(db.String(255))
+    waste_collected_kg = db.Column(db.Float)
+    cleaning_duration_minutes = db.Column(db.Integer)
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Cleaning schedules and reminders for active processes
+class CleaningSchedule(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    machine_id = db.Column(db.Integer, db.ForeignKey('production_machine.id'), nullable=False)
+    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
+    production_order_id = db.Column(db.String(50), nullable=False)
+    process_step = db.Column(db.String(50), nullable=False)
+    scheduled_time = db.Column(db.DateTime, nullable=False)
+    status = db.Column(db.String(20), default='scheduled')  # scheduled, overdue, completed, cancelled
+    reminder_sent = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Production Order comprehensive tracking
+class ProductionOrderTracking(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    production_order_id = db.Column(db.String(50), unique=True, nullable=False)
+    total_stages = db.Column(db.Integer, default=5)  # precleaning, 24h, 12h, grinding, packing
+    current_stage = db.Column(db.String(50))
+    overall_status = db.Column(db.String(20), default='pending')
+    start_time = db.Column(db.DateTime)
+    end_time = db.Column(db.DateTime)
+    total_duration_hours = db.Column(db.Float)
+    total_cleanings_performed = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Process parameters tracking
+    precleaning_moisture = db.Column(db.Float)
+    cleaning_24h_start_moisture = db.Column(db.Float)
+    cleaning_24h_end_moisture = db.Column(db.Float)
+    cleaning_12h_start_moisture = db.Column(db.Float)
+    cleaning_12h_end_moisture = db.Column(db.Float)
+    grinding_input_kg = db.Column(db.Float)
+    grinding_output_kg = db.Column(db.Float)
+    grinding_bran_percentage = db.Column(db.Float)
+    packing_total_bags = db.Column(db.Integer)
+    packing_total_weight_kg = db.Column(db.Float)
