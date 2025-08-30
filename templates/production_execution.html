@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 
 {% block title %}Production Execution{% endblock %}
@@ -15,111 +16,436 @@
         </div>
     </div>
 
-    <!-- Active Running Processes -->
+    <!-- Active Running Processes Alert -->
     {% if running_processes %}
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-warning">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Running Cleaning Processes</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        {% for process in running_processes %}
-                        <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="card border-info">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        {{ process.job.job_number }}
-                                        <span class="badge bg-info">{{ process.process_type }}</span>
-                                    </h6>
-                                    <p class="card-text">
-                                        <strong>Machine:</strong> {{ process.machine_name }}<br>
-                                        <strong>Started:</strong> {{ process.start_time.strftime('%Y-%m-%d %H:%M') }}<br>
-                                        <strong>Ends:</strong> {{ process.end_time.strftime('%Y-%m-%d %H:%M') }}<br>
-                                        <strong>Operator:</strong> {{ process.operator_name }}
-                                    </p>
-                                    <a href="{{ url_for('cleaning_monitor', process_id=process.id) }}" 
-                                       class="btn btn-info btn-sm">
-                                        <i class="fas fa-eye me-1"></i>Monitor
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="fas fa-clock me-2"></i>
+                <strong>{{ running_processes|length }} cleaning processes are currently running!</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         </div>
     </div>
     {% endif %}
 
-    <!-- Pending Jobs -->
+    <!-- Production Steps Tabs -->
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Pending Production Jobs</h5>
+                    <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Production Process Steps</h5>
                 </div>
                 <div class="card-body">
-                    {% if pending_jobs %}
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Job Number</th>
-                                    <th>Order Number</th>
-                                    <th>Customer</th>
-                                    <th>Stage</th>
-                                    <th>Status</th>
-                                    <th>Created</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for job in pending_jobs %}
-                                <tr>
-                                    <td>{{ job.job_number }}</td>
-                                    <td>{{ job.order.order_number }}</td>
-                                    <td>{{ job.order.customer }}</td>
-                                    <td>
-                                        <span class="badge bg-secondary">{{ job.stage }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-warning">{{ job.status }}</span>
-                                    </td>
-                                    <td>{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td>
-                                        {% if job.stage == 'transfer' %}
-                                        <a href="{{ url_for('transfer_execution', job_id=job.id) }}" 
-                                           class="btn btn-primary btn-sm">
-                                            <i class="fas fa-play me-1"></i>Start Transfer
-                                        </a>
-                                        {% elif job.stage == 'cleaning' %}
-                                        <a href="{{ url_for('cleaning_setup', job_id=job.id) }}" 
-                                           class="btn btn-success btn-sm">
-                                            <i class="fas fa-play me-1"></i>Setup Cleaning
-                                        </a>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <!-- Tab Navigation -->
+                    <ul class="nav nav-tabs" id="productionTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="cleaning-24h-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#cleaning-24h" type="button" role="tab">
+                                <i class="fas fa-hourglass-half me-2"></i>24-Hour Cleaning
+                                <span class="badge bg-primary ms-2" id="cleaning-24h-count">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="cleaning-12h-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#cleaning-12h" type="button" role="tab">
+                                <i class="fas fa-clock me-2"></i>12-Hour Cleaning
+                                <span class="badge bg-info ms-2" id="cleaning-12h-count">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="grinding-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#grinding" type="button" role="tab">
+                                <i class="fas fa-cog me-2"></i>Grinding Process
+                                <span class="badge bg-warning ms-2" id="grinding-count">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="packing-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#packing" type="button" role="tab">
+                                <i class="fas fa-box me-2"></i>Final Packaging
+                                <span class="badge bg-success ms-2" id="packing-count">0</span>
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content mt-4" id="productionTabContent">
+                        <!-- 24-Hour Cleaning Tab -->
+                        <div class="tab-pane fade show active" id="cleaning-24h" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="text-primary mb-3">
+                                        <i class="fas fa-hourglass-half me-2"></i>24-Hour Cleaning Process
+                                    </h6>
+                                    <div id="cleaning-24h-jobs">
+                                        <!-- Jobs will be loaded here -->
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-primary">
+                                        <div class="card-header bg-primary text-white">
+                                            <h6 class="mb-0">Process Information</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-unstyled mb-0">
+                                                <li><i class="fas fa-check text-success me-2"></i>Duration: 24 hours</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Initial moisture control</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Cleaning machine preparation</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Timer-based monitoring</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 12-Hour Cleaning Tab -->
+                        <div class="tab-pane fade" id="cleaning-12h" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="text-info mb-3">
+                                        <i class="fas fa-clock me-2"></i>12-Hour Cleaning Process
+                                    </h6>
+                                    <div id="cleaning-12h-jobs">
+                                        <!-- Jobs will be loaded here -->
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-info">
+                                        <div class="card-header bg-info text-white">
+                                            <h6 class="mb-0">Process Information</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-unstyled mb-0">
+                                                <li><i class="fas fa-check text-success me-2"></i>Duration: 12 hours</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Target moisture control</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Water addition if needed</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Final preparation for grinding</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Grinding Process Tab -->
+                        <div class="tab-pane fade" id="grinding" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="text-warning mb-3">
+                                        <i class="fas fa-cog me-2"></i>Grinding Process
+                                    </h6>
+                                    <div id="grinding-jobs">
+                                        <!-- Jobs will be loaded here -->
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-warning">
+                                        <div class="card-header bg-warning text-dark">
+                                            <h6 class="mb-0">Process Information</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-unstyled mb-0">
+                                                <li><i class="fas fa-check text-success me-2"></i>B1 Scale process</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Machine cleaning (hourly)</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Main products: 75-77%</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Bran output: 23-25%</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Final Packaging Tab -->
+                        <div class="tab-pane fade" id="packing" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="text-success mb-3">
+                                        <i class="fas fa-box me-2"></i>Final Packaging Process
+                                    </h6>
+                                    <div id="packing-jobs">
+                                        <!-- Jobs will be loaded here -->
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-success">
+                                        <div class="card-header bg-success text-white">
+                                            <h6 class="mb-0">Process Information</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-unstyled mb-0">
+                                                <li><i class="fas fa-check text-success me-2"></i>Bag packaging (25kg, 30kg, 50kg)</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Storage area allocation</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Quality documentation</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Inventory updates</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">No pending production jobs</h5>
-                        <p class="text-muted">All production jobs are completed or none have been created yet.</p>
-                        <a href="{{ url_for('production_orders') }}" class="btn btn-primary">
-                            <i class="fas fa-plus me-2"></i>Create New Job
-                        </a>
-                    </div>
-                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start New Production Button -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5>Start New Production</h5>
+                    <p class="text-muted">Select an approved production plan to begin execution</p>
+                    <a href="{{ url_for('production_orders') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus me-2"></i>View Production Orders
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Job Detail Modal -->
+<div class="modal fade" id="jobDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Job Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="jobDetailContent">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadProductionJobs();
+    
+    // Refresh jobs every 30 seconds
+    setInterval(loadProductionJobs, 30000);
+});
+
+function loadProductionJobs() {
+    fetch('/api/production_jobs_by_stage')
+        .then(response => response.json())
+        .then(data => {
+            updateJobsInTabs(data);
+            updateTabStates(data);
+        })
+        .catch(error => console.error('Error loading jobs:', error));
+}
+
+function updateJobsInTabs(jobsByStage) {
+    // Update 24-hour cleaning jobs
+    updateTabContent('cleaning-24h-jobs', jobsByStage['cleaning_24h'] || [], 'cleaning_24h');
+    document.getElementById('cleaning-24h-count').textContent = (jobsByStage['cleaning_24h'] || []).length;
+    
+    // Update 12-hour cleaning jobs
+    updateTabContent('cleaning-12h-jobs', jobsByStage['cleaning_12h'] || [], 'cleaning_12h');
+    document.getElementById('cleaning-12h-count').textContent = (jobsByStage['cleaning_12h'] || []).length;
+    
+    // Update grinding jobs
+    updateTabContent('grinding-jobs', jobsByStage['grinding'] || [], 'grinding');
+    document.getElementById('grinding-count').textContent = (jobsByStage['grinding'] || []).length;
+    
+    // Update packing jobs
+    updateTabContent('packing-jobs', jobsByStage['packing'] || [], 'packing');
+    document.getElementById('packing-count').textContent = (jobsByStage['packing'] || []).length;
+}
+
+function updateTabContent(containerId, jobs, stage) {
+    const container = document.getElementById(containerId);
+    
+    if (jobs.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                <h6 class="text-muted">No ${stage.replace('_', '-')} jobs available</h6>
+                <p class="text-muted small">Jobs will appear here when ready for this stage</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-striped">';
+    html += `
+        <thead>
+            <tr>
+                <th>Job Number</th>
+                <th>Order</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    jobs.forEach(job => {
+        const isCurrentStep = job.can_proceed;
+        const isPreviousStep = job.is_previous_step;
+        const canStart = isCurrentStep || isPreviousStep;
+        
+        html += `
+            <tr class="${canStart ? '' : 'table-secondary'}">
+                <td>
+                    <strong>${job.job_number}</strong>
+                    ${job.is_running ? '<span class="badge bg-warning ms-2">Running</span>' : ''}
+                </td>
+                <td>${job.order_number}</td>
+                <td>
+                    <span class="badge bg-${getStatusColor(job.status)}">${job.status}</span>
+                </td>
+                <td>
+                    <div class="progress" style="width: 100px;">
+                        <div class="progress-bar" style="width: ${job.progress}%"></div>
+                    </div>
+                    <small>${job.progress}%</small>
+                </td>
+                <td>
+                    ${canStart ? getActionButtons(job, stage) : '<span class="text-muted">Waiting</span>'}
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function getStatusColor(status) {
+    switch(status) {
+        case 'pending': return 'warning';
+        case 'in_progress': return 'primary';
+        case 'completed': return 'success';
+        case 'paused': return 'secondary';
+        default: return 'light';
+    }
+}
+
+function getActionButtons(job, stage) {
+    if (job.status === 'completed') {
+        return '<span class="badge bg-success">Completed</span>';
+    }
+    
+    if (job.status === 'in_progress') {
+        return `
+            <button class="btn btn-info btn-sm" onclick="viewJob(${job.id})">
+                <i class="fas fa-eye me-1"></i>Monitor
+            </button>
+        `;
+    }
+    
+    // Pending jobs
+    let actionUrl = '';
+    let actionText = '';
+    let actionIcon = '';
+    
+    switch(stage) {
+        case 'cleaning_24h':
+            actionUrl = `/production_execution/cleaning_setup/${job.id}`;
+            actionText = 'Start 24h Cleaning';
+            actionIcon = 'fas fa-play';
+            break;
+        case 'cleaning_12h':
+            actionUrl = `/production_execution/cleaning_12h_setup/${job.id}`;
+            actionText = 'Start 12h Cleaning';
+            actionIcon = 'fas fa-play';
+            break;
+        case 'grinding':
+            actionUrl = `/production_execution/b1_scale/${job.id}`;
+            actionText = 'Start Grinding';
+            actionIcon = 'fas fa-cog';
+            break;
+        case 'packing':
+            actionUrl = `/production_execution/packing/${job.id}`;
+            actionText = 'Start Packing';
+            actionIcon = 'fas fa-box';
+            break;
+    }
+    
+    return `
+        <a href="${actionUrl}" class="btn btn-primary btn-sm">
+            <i class="${actionIcon} me-1"></i>${actionText}
+        </a>
+        <button class="btn btn-outline-secondary btn-sm ms-1" onclick="viewJob(${job.id})">
+            <i class="fas fa-info me-1"></i>Details
+        </button>
+    `;
+}
+
+function updateTabStates(jobsByStage) {
+    // Enable/disable tabs based on job availability and workflow
+    const tabs = ['cleaning-24h-tab', 'cleaning-12h-tab', 'grinding-tab', 'packing-tab'];
+    
+    tabs.forEach(tabId => {
+        const tab = document.getElementById(tabId);
+        const stage = tabId.replace('-tab', '').replace('-', '_');
+        const jobs = jobsByStage[stage] || [];
+        
+        // Check if this stage has any available jobs
+        const hasAvailableJobs = jobs.some(job => job.can_proceed || job.is_previous_step);
+        
+        if (hasAvailableJobs || jobs.length > 0) {
+            tab.classList.remove('disabled');
+            tab.removeAttribute('disabled');
+        } else {
+            // Keep tab enabled but show empty state in content
+            tab.classList.remove('disabled');
+            tab.removeAttribute('disabled');
+        }
+    });
+}
+
+function viewJob(jobId) {
+    fetch(`/api/job_details/${jobId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showJobDetails(data.job);
+            } else {
+                alert('Error loading job details: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading job details');
+        });
+}
+
+function showJobDetails(job) {
+    const content = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Job Information</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Job Number:</strong></td><td>${job.job_number}</td></tr>
+                    <tr><td><strong>Order Number:</strong></td><td>${job.order_number}</td></tr>
+                    <tr><td><strong>Stage:</strong></td><td>${job.stage}</td></tr>
+                    <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getStatusColor(job.status)}">${job.status}</span></td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Timeline</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Created:</strong></td><td>${job.created_at || 'N/A'}</td></tr>
+                    <tr><td><strong>Started:</strong></td><td>${job.started_at || 'Not started'}</td></tr>
+                    <tr><td><strong>Started By:</strong></td><td>${job.started_by || 'N/A'}</td></tr>
+                    <tr><td><strong>Completed:</strong></td><td>${job.completed_at || 'Not completed'}</td></tr>
+                    <tr><td><strong>Completed By:</strong></td><td>${job.completed_by || 'N/A'}</td></tr>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('jobDetailContent').innerHTML = content;
+    new bootstrap.Modal(document.getElementById('jobDetailModal')).show();
+}
+</script>
 {% endblock %}

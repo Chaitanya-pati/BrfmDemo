@@ -503,10 +503,7 @@ def production_planning(order_id=None):
 # Production Execution System with Timer Controls
 @app.route('/production_execution')
 def production_execution():
-    # Get pending jobs from approved plans
-    pending_jobs = ProductionJobNew.query.filter_by(status='pending').all()
-    
-    # Try to get running processes with error handling for missing columns
+    # Get running processes for alerts
     try:
         running_processes = CleaningProcess.query.filter_by(status='running').all()
     except Exception as e:
@@ -517,7 +514,6 @@ def production_execution():
         running_processes = []
 
     return render_template('production_execution.html', 
-                         pending_jobs=pending_jobs,
                          running_processes=running_processes)
 
 def generate_job_id():
@@ -1864,6 +1860,139 @@ def api_job_progress():
         } for job in jobs])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/production_jobs_by_stage')
+def api_production_jobs_by_stage():
+    """API endpoint to get production jobs organized by stage with workflow logic"""
+    try:
+        # Get all active jobs
+        jobs = ProductionJobNew.query.filter(
+            ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+        ).order_by(ProductionJobNew.created_at.desc()).all()
+        
+        # Organize jobs by stage
+        jobs_by_stage = {
+            'cleaning_24h': [],
+            'cleaning_12h': [],
+            'grinding': [],
+            'packing': []
+        }
+        
+        # Get running processes for status
+        running_processes = []
+        try:
+            running_processes = CleaningProcess.query.filter_by(status='running').all()
+        except:
+            pass
+        
+        running_job_ids = [p.job_id for p in running_processes]
+        
+        for job in jobs:
+            # Determine if this job can proceed based on workflow logic
+            can_proceed = False
+            is_previous_step = False
+            is_running = job.id in running_job_ids
+            
+            # Get order to check overall workflow state
+            order = ProductionOrder.query.get(job.order_id) if job.order_id else None
+            
+            if job.stage == 'cleaning_24h':
+                # 24h cleaning can always start if pending, or restart if there's capacity
+                can_proceed = job.status == 'pending' or (job.status == 'completed' and has_available_24h_capacity())
+                is_previous_step = False  # This is the first step
+                
+            elif job.stage == 'cleaning_12h':
+                # 12h cleaning can start if 24h is completed for this job
+                previous_24h_job = ProductionJobNew.query.filter_by(
+                    order_id=job.order_id, stage='cleaning_24h', status='completed'
+                ).first()
+                can_proceed = job.status == 'pending' and previous_24h_job is not None
+                
+                # Can restart 24h if 12h bin is available
+                is_previous_step = job.status == 'completed' and has_available_24h_capacity()
+                
+            elif job.stage == 'grinding':
+                # Grinding can start if 12h cleaning is completed
+                previous_12h_job = ProductionJobNew.query.filter_by(
+                    order_id=job.order_id, stage='cleaning_12h', status='completed'
+                ).first()
+                can_proceed = job.status == 'pending' and previous_12h_job is not None
+                
+                # Can restart 12h if grinding is not yet started
+                is_previous_step = job.status in ['pending', 'completed'] and has_available_12h_capacity()
+                
+            elif job.stage == 'packing':
+                # Packing can start if grinding is completed
+                previous_grinding_job = ProductionJobNew.query.filter_by(
+                    order_id=job.order_id, stage='grinding', status='completed'
+                ).first()
+                can_proceed = job.status == 'pending' and previous_grinding_job is not None
+                
+                # Can restart grinding if packing is not yet started
+                is_previous_step = job.status in ['pending', 'completed']
+            
+            # Calculate progress
+            progress = 0
+            if job.status == 'completed':
+                progress = 100
+            elif job.status == 'in_progress' or is_running:
+                progress = 50
+            elif job.status == 'pending' and can_proceed:
+                progress = 10
+            
+            job_data = {
+                'id': job.id,
+                'job_number': job.job_number,
+                'order_number': order.order_number if order else 'N/A',
+                'status': job.status,
+                'stage': job.stage,
+                'can_proceed': can_proceed,
+                'is_previous_step': is_previous_step,
+                'is_running': is_running,
+                'progress': progress,
+                'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else None,
+                'completed_at': job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else None,
+                'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else None
+            }
+            
+            # Add to appropriate stage
+            if job.stage in ['cleaning_24h', 'cleaning']:
+                jobs_by_stage['cleaning_24h'].append(job_data)
+            elif job.stage == 'cleaning_12h':
+                jobs_by_stage['cleaning_12h'].append(job_data)
+            elif job.stage == 'grinding':
+                jobs_by_stage['grinding'].append(job_data)
+            elif job.stage == 'packing':
+                jobs_by_stage['packing'].append(job_data)
+        
+        return jsonify(jobs_by_stage)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def has_available_24h_capacity():
+    """Check if there's available capacity for 24h cleaning"""
+    try:
+        # Check if there are available 24h cleaning bins
+        available_bins = CleaningBin.query.filter_by(
+            status='empty', 
+            cleaning_type='24_hour'
+        ).count()
+        return available_bins > 0
+    except:
+        return True  # Default to true if can't check
+
+def has_available_12h_capacity():
+    """Check if there's available capacity for 12h cleaning"""
+    try:
+        # Check if there are available 12h cleaning bins
+        available_bins = CleaningBin.query.filter_by(
+            status='empty', 
+            cleaning_type='12_hour'
+        ).count()
+        return available_bins > 0
+    except:
+        return True  # Default to true if can't check
 
 # Removed duplicate route - using the comprehensive one above
 
