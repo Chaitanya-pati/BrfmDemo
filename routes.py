@@ -1284,8 +1284,13 @@ def b1_scale_cleaning(job_id):
 def grinding_execution(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
 
-    # Check if grinding process already exists
-    existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
+    # Check if grinding process already exists with error handling
+    existing_grinding = None
+    try:
+        existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
+    except Exception as e:
+        print(f"Error querying grinding process: {e}")
+        db.session.rollback()
 
     if request.method == 'POST':
         try:
