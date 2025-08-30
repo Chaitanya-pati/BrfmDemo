@@ -1368,7 +1368,9 @@ def grinding_execution(job_id):
             packing_job.plan_id = job.plan_id
             packing_job.stage = 'packing'
             packing_job.status = 'pending'
+            
             db.session.add(packing_job)
+            db.session.commit()  # Commit to get the packing_job.id
             
             flash('Grinding process completed successfully!', 'success')
             return redirect(url_for('packing_execution', job_id=packing_job.id))
