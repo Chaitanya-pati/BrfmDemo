@@ -9,7 +9,9 @@ from models import (Vehicle, Supplier, Godown, GodownType, QualityTest, Transfer
                    Customer, Product, SalesDispatch, CleaningProcess, CleaningMachine, CleaningBin,
                    ProductionTransfer, GrindingProcess, ProductOutput, PackingProcess,
                    CleaningLog, StorageArea, StorageTransfer)
-from utils import allowed_file, generate_order_number, generate_job_id
+from utils import allowed_file, generate_order_number
+import random
+import string
 
 @app.route('/')
 def index():
@@ -518,9 +520,11 @@ def production_execution():
 
 def generate_job_id():
     """Generate unique job ID"""
-    prefix = "JOB"
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    return f"{prefix}{timestamp}"
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    import random
+    import string
+    random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    return f"JOB{timestamp}{random_suffix}"
 
 @app.route('/start_production_process/<int:order_id>')
 def start_production_process(order_id):
