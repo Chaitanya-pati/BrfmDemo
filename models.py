@@ -372,7 +372,7 @@ class CleaningProcess(db.Model):
     water_added_liters = db.Column(db.Float)
     waste_collected_kg = db.Column(db.Float)
     machine_name = db.Column(db.String(100))
-    status = db.Column(db.String(20), default='pending')  # pending, running, completed
+    status = db.Column(db.String(50), default='pending')  # pending, running, completed
     start_photo = db.Column(db.String(255))
     end_photo = db.Column(db.String(255))
     operator_name = db.Column(db.String(100))
