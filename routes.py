@@ -806,6 +806,8 @@ def cleaning_setup(job_id):
 
 @app.route('/production_execution/cleaning_monitor/<int:process_id>')
 def cleaning_monitor(process_id):
+    from models import CleaningSchedule, ProductionMachine, MachineCleaningLog
+    
     process = CleaningProcess.query.get_or_404(process_id)
 
     # Calculate remaining time
@@ -827,10 +829,41 @@ def cleaning_monitor(process_id):
                 cleaning_bin.status = 'empty'
             db.session.commit()
 
+    # Get machine cleaning schedules for this process
+    job_id = process.job_id
+    active_machines = ProductionMachine.query.filter_by(process_step=process.process_type, is_active=True).all()
+    
+    # Get scheduled machine cleanings that are due
+    scheduled_cleanings = CleaningSchedule.query.filter(
+        CleaningSchedule.job_id == job_id,
+        CleaningSchedule.status == 'scheduled',
+        CleaningSchedule.scheduled_time <= now + timedelta(minutes=1)  # Due within 1 minute
+    ).all()
+    
+    # Get in-progress machine cleanings
+    in_progress_cleanings = MachineCleaningLog.query.filter_by(
+        job_id=job_id,
+        status='in_progress'
+    ).all()
+    
+    # Calculate machine cleaning timers
+    machine_cleaning_timers = []
+    for cleaning in in_progress_cleanings:
+        if cleaning.cleaning_start_time:
+            elapsed_time = (now - cleaning.cleaning_start_time).total_seconds()
+            machine_cleaning_timers.append({
+                'log': cleaning,
+                'elapsed_time': elapsed_time
+            })
+
     return render_template('cleaning_monitor.html', 
                          process=process, 
                          time_remaining=time_remaining,
-                         show_reminder=show_reminder)
+                         show_reminder=show_reminder,
+                         scheduled_cleanings=scheduled_cleanings,
+                         in_progress_cleanings=in_progress_cleanings,
+                         machine_cleaning_timers=machine_cleaning_timers,
+                         active_machines=active_machines)
 
 @app.route('/production_execution/complete_cleaning/<int:process_id>', methods=['GET', 'POST'])
 def complete_cleaning(process_id):
@@ -1890,13 +1923,23 @@ def start_process(job_id):
             current_time = datetime.utcnow()
             frequency_hours = machine.cleaning_frequency_hours
             
-            # Create initial cleaning schedule
+            # Create initial cleaning schedule with adjusted frequency for testing
+            if job.stage == 'cleaning_24h':
+                # 5 minutes for 24h cleaning (testing)
+                scheduled_time = current_time + timedelta(minutes=5)
+            elif job.stage == 'cleaning_12h':
+                # 2 minutes for 12h cleaning (testing)
+                scheduled_time = current_time + timedelta(minutes=2)
+            else:
+                # Default to machine frequency for other processes
+                scheduled_time = current_time + timedelta(hours=frequency_hours)
+                
             first_cleaning = CleaningSchedule(
                 machine_id=machine.id,
                 job_id=job_id,
                 production_order_id=job.order_id,
                 process_step=job.stage,
-                scheduled_time=current_time + timedelta(hours=frequency_hours)
+                scheduled_time=scheduled_time
             )
             db.session.add(first_cleaning)
         
@@ -2087,8 +2130,17 @@ def complete_process_machine_cleaning(log_id):
             if schedule:
                 schedule.status = 'completed'
             
-            # Create next cleaning schedule
-            next_cleaning_time = log.cleaning_end_time + timedelta(hours=log.machine.cleaning_frequency_hours)
+            # Create next cleaning schedule with adjusted frequency for testing
+            if log.process_step == 'cleaning_24h':
+                # 5 minutes for 24h cleaning (testing)
+                next_cleaning_time = log.cleaning_end_time + timedelta(minutes=5)
+            elif log.process_step == 'cleaning_12h':
+                # 2 minutes for 12h cleaning (testing)
+                next_cleaning_time = log.cleaning_end_time + timedelta(minutes=2)
+            else:
+                # Default to machine frequency for other processes
+                next_cleaning_time = log.cleaning_end_time + timedelta(hours=log.machine.cleaning_frequency_hours)
+                
             next_schedule = CleaningSchedule(
                 machine_id=log.machine_id,
                 job_id=log.job_id,

@@ -56,6 +56,63 @@
         </div>
     </div>
 
+    <!-- Machine Cleaning Reminders and Timers -->
+    {% if scheduled_cleanings or in_progress_cleanings %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Machine Cleaning Reminders</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Scheduled Machine Cleanings (Due Now) -->
+                    {% if scheduled_cleanings %}
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-bell me-2"></i>Machine Cleaning Due!</h6>
+                        {% for schedule in scheduled_cleanings %}
+                        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                            <div>
+                                <strong>{{ schedule.machine.name }}</strong> - {{ schedule.machine.location }}
+                                <br><small class="text-muted">Due: {{ schedule.scheduled_time.strftime('%H:%M:%S') }}</small>
+                            </div>
+                            <a href="{{ url_for('process_machine_cleaning', job_id=schedule.job_id) }}#machine-{{ schedule.machine_id }}" 
+                               class="btn btn-warning btn-sm">
+                                <i class="fas fa-broom me-1"></i>Start Cleaning
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- In-Progress Machine Cleanings -->
+                    {% if machine_cleaning_timers %}
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-clock me-2"></i>Active Machine Cleanings</h6>
+                        {% for timer in machine_cleaning_timers %}
+                        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                            <div>
+                                <strong>{{ timer.log.machine.name }}</strong> - {{ timer.log.machine.location }}
+                                <br><small class="text-muted">Cleaned by: {{ timer.log.cleaned_by }}</small>
+                            </div>
+                            <div class="text-end">
+                                <div class="h5 mb-0" data-machine-timer="{{ timer.log.id }}" data-start-time="{{ timer.elapsed_time }}">
+                                    <span class="badge bg-primary">
+                                        <span class="timer-minutes">{{ "%02d"|format((timer.elapsed_time // 60)|int) }}</span>:
+                                        <span class="timer-seconds">{{ "%02d"|format((timer.elapsed_time % 60)|int) }}</span>
+                                    </span>
+                                </div>
+                                <small class="text-muted">Elapsed Time</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Process Information -->
     <div class="row">
         <div class="col-md-6">
@@ -179,6 +236,27 @@ const timerInterval = setInterval(updateTimer, 1000);
 // Initial update
 updateTimer();
 
+// Machine cleaning timers update
+function updateMachineTimers() {
+    const machineTimers = document.querySelectorAll('[data-machine-timer]');
+    machineTimers.forEach(timer => {
+        const startTime = parseFloat(timer.getAttribute('data-start-time'));
+        const currentElapsed = startTime + (Date.now() - pageLoadTime) / 1000;
+        
+        const minutes = Math.floor(currentElapsed / 60);
+        const seconds = Math.floor(currentElapsed % 60);
+        
+        timer.querySelector('.timer-minutes').textContent = minutes.toString().padStart(2, '0');
+        timer.querySelector('.timer-seconds').textContent = seconds.toString().padStart(2, '0');
+    });
+}
+
+// Track page load time for machine timer calculations
+const pageLoadTime = Date.now();
+
+// Update machine timers every second
+setInterval(updateMachineTimers, 1000);
+
 // Auto-refresh page data every 30 seconds
 setInterval(function() {
     fetch('/api/cleaning_timer/{{ process.id }}')
@@ -206,6 +284,27 @@ setInterval(function() {
             }
         })
         .catch(error => console.error('Error fetching timer data:', error));
+}, 30000);
+
+// Check for new machine cleaning reminders every 30 seconds
+setInterval(function() {
+    // Reload page if there are new machine cleanings due
+    fetch('/production_execution/cleaning_monitor/{{ process.id }}')
+        .then(response => {
+            if (response.ok) {
+                // Check if page content has changed (simple approach)
+                const currentReminders = document.querySelectorAll('.alert-warning').length;
+                return response.text().then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newReminders = doc.querySelectorAll('.alert-warning').length;
+                    if (newReminders > currentReminders) {
+                        location.reload(); // Reload if new reminders appeared
+                    }
+                });
+            }
+        })
+        .catch(error => console.error('Error checking for new reminders:', error));
 }, 30000);
 
 // Request notification permission
