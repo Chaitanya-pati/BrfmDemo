@@ -2540,6 +2540,140 @@ def uploaded_file(filename):
         flash(f'File not found: {str(e)}', 'error')
         return redirect(url_for('sales_dispatch'))
 
+@app.route('/api/storage_details/<int:storage_area_id>')
+def api_storage_details(storage_area_id):
+    """API endpoint to get detailed storage area information including products and bag details"""
+    try:
+        storage_area = StorageArea.query.get_or_404(storage_area_id)
+        
+        # Get all packing processes for this storage area
+        packing_processes = PackingProcess.query.filter_by(storage_area_id=storage_area_id).all()
+        
+        # Get storage transfers to this area
+        storage_transfers = StorageTransfer.query.filter_by(to_storage_id=storage_area_id).all()
+        
+        # Aggregate product data
+        products_data = {}
+        total_quantity = 0
+        total_bags = 0
+        
+        # Process packing data
+        for packing in packing_processes:
+            product_name = packing.product.name
+            product_category = packing.product.category
+            
+            if product_name not in products_data:
+                products_data[product_name] = {
+                    'name': product_name,
+                    'category': product_category,
+                    'total_quantity': 0,
+                    'bag_details': [],
+                    'shallow_storage': 0,
+                    'last_updated': None,
+                    'operators': set()
+                }
+            
+            products_data[product_name]['total_quantity'] += packing.total_packed_kg
+            products_data[product_name]['shallow_storage'] += packing.stored_in_shallow_kg
+            products_data[product_name]['bag_details'].append({
+                'bag_weight_kg': packing.bag_weight_kg,
+                'number_of_bags': packing.number_of_bags,
+                'total_packed_kg': packing.total_packed_kg,
+                'packed_date': packing.packed_time.strftime('%d/%m/%Y %H:%M')
+            })
+            products_data[product_name]['operators'].add(packing.operator_name)
+            
+            # Update last updated time
+            if not products_data[product_name]['last_updated'] or packing.packed_time > datetime.strptime(products_data[product_name]['last_updated'], '%d/%m/%Y %H:%M'):
+                products_data[product_name]['last_updated'] = packing.packed_time.strftime('%d/%m/%Y %H:%M')
+            
+            total_quantity += packing.total_packed_kg + packing.stored_in_shallow_kg
+            total_bags += packing.number_of_bags
+        
+        # Process storage transfer data
+        for transfer in storage_transfers:
+            product_name = transfer.product.name
+            product_category = transfer.product.category
+            
+            if product_name not in products_data:
+                products_data[product_name] = {
+                    'name': product_name,
+                    'category': product_category,
+                    'total_quantity': 0,
+                    'bag_details': [],
+                    'shallow_storage': 0,
+                    'last_updated': None,
+                    'operators': set()
+                }
+            
+            products_data[product_name]['total_quantity'] += transfer.quantity_kg
+            products_data[product_name]['operators'].add(transfer.operator_name)
+            
+            # Update last updated time
+            if not products_data[product_name]['last_updated'] or transfer.transfer_time > datetime.strptime(products_data[product_name]['last_updated'], '%d/%m/%Y %H:%M'):
+                products_data[product_name]['last_updated'] = transfer.transfer_time.strftime('%d/%m/%Y %H:%M')
+            
+            total_quantity += transfer.quantity_kg
+        
+        # Convert sets to lists for JSON serialization
+        for product in products_data.values():
+            product['operators'] = list(product['operators'])
+            if not product['last_updated']:
+                product['last_updated'] = 'N/A'
+        
+        # Get recent activities
+        recent_activities = []
+        
+        # Add recent packing activities
+        recent_packing = PackingProcess.query.filter_by(storage_area_id=storage_area_id)\
+                                           .order_by(PackingProcess.packed_time.desc())\
+                                           .limit(5).all()
+        for packing in recent_packing:
+            recent_activities.append({
+                'date_time': packing.packed_time.strftime('%d/%m/%Y %H:%M'),
+                'activity_type': f'Packed {packing.product.name}',
+                'quantity': f'{packing.total_packed_kg:.2f}',
+                'operator': packing.operator_name
+            })
+        
+        # Add recent transfer activities
+        recent_transfers_in = StorageTransfer.query.filter_by(to_storage_id=storage_area_id)\
+                                                 .order_by(StorageTransfer.transfer_time.desc())\
+                                                 .limit(3).all()
+        for transfer in recent_transfers_in:
+            recent_activities.append({
+                'date_time': transfer.transfer_time.strftime('%d/%m/%Y %H:%M'),
+                'activity_type': f'Transfer In - {transfer.product.name}',
+                'quantity': f'{transfer.quantity_kg:.2f}',
+                'operator': transfer.operator_name
+            })
+        
+        # Sort activities by date
+        recent_activities.sort(key=lambda x: datetime.strptime(x['date_time'], '%d/%m/%Y %H:%M'), reverse=True)
+        recent_activities = recent_activities[:10]  # Limit to 10 most recent
+        
+        utilization = (storage_area.current_stock_kg / storage_area.capacity_kg * 100) if storage_area.capacity_kg > 0 else 0
+        
+        response_data = {
+            'storage_area': {
+                'id': storage_area.id,
+                'name': storage_area.name,
+                'capacity_kg': storage_area.capacity_kg,
+                'current_stock_kg': storage_area.current_stock_kg,
+                'location': storage_area.location
+            },
+            'products': list(products_data.values()),
+            'total_quantity': total_quantity,
+            'total_bags': total_bags,
+            'utilization': utilization,
+            'recent_activities': recent_activities
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/init_data')
 def init_data():
     """Initialize sample data for the application"""
