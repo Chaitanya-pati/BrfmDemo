@@ -362,7 +362,7 @@ class CleaningProcess(db.Model):
     job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
     process_type = db.Column(db.String(20), nullable=False)  # 24_hour, 12_hour
     cleaning_bin_id = db.Column(db.Integer, db.ForeignKey('cleaning_bin.id'), nullable=False)
-    duration_hours = db.Column(db.Integer, nullable=False)
+    duration_hours = db.Column(db.Float, nullable=False)
     target_moisture = db.Column(db.Float)  # For 12-hour process
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)

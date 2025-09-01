@@ -756,7 +756,7 @@ def cleaning_setup(job_id):
             elif duration_option == '12':
                 duration_hours = 12
             elif duration_option == 'custom':
-                duration_hours = int(request.form['custom_hours'])
+                duration_hours = float(request.form['custom_hours'])
 
             # Create cleaning process
             cleaning = CleaningProcess()
@@ -831,7 +831,14 @@ def cleaning_monitor(process_id):
 
     # Get machine cleaning schedules for this process
     job_id = process.job_id
-    active_machines = ProductionMachine.query.filter_by(process_step=process.process_type, is_active=True).all()
+    
+    # Get the job to find the correct process step
+    job = ProductionJobNew.query.get(job_id)
+    process_step = job.stage if job else None
+    
+    # Find active machines for this process step
+    active_machines = ProductionMachine.query.filter_by(process_step=process_step, is_active=True).all()
+    print(f"DEBUG: Process type: {process.process_type}, Job stage: {process_step}, Active machines: {len(active_machines)}")
     
     # Get scheduled machine cleanings that are due
     scheduled_cleanings = CleaningSchedule.query.filter(
@@ -962,7 +969,7 @@ def cleaning_12h_setup(job_id):
             elif duration_option == '12':
                 duration_hours = 12
             elif duration_option == 'custom':
-                duration_hours = int(request.form['custom_hours'])
+                duration_hours = float(request.form['custom_hours'])
 
             # Create 12-hour cleaning process
             cleaning = CleaningProcess()
@@ -1913,6 +1920,7 @@ def start_process(job_id):
         
         # Find machines for this process step
         machines = ProductionMachine.query.filter_by(process_step=job.stage).all()
+        print(f"DEBUG: Looking for machines with process_step='{job.stage}', found {len(machines)} machines")
         
         # Activate machines and create cleaning schedules
         for machine in machines:

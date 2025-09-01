@@ -57,12 +57,11 @@
     </div>
 
     <!-- Machine Cleaning Reminders and Timers -->
-    {% if scheduled_cleanings or in_progress_cleanings %}
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Machine Cleaning Reminders</h5>
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Machine Cleaning Status</h5>
                 </div>
                 <div class="card-body">
                     <!-- Scheduled Machine Cleanings (Due Now) -->
@@ -106,12 +105,31 @@
                         </div>
                         {% endfor %}
                     </div>
+                    {% elif active_machines %}
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-info-circle me-2"></i>Active Machines for This Process</h6>
+                        <p class="mb-2">The following machines are active for this {{ process.process_type.replace('_', ' ').title() }} process:</p>
+                        {% for machine in active_machines %}
+                        <div class="d-flex justify-content-between align-items-center py-1">
+                            <div>
+                                <strong>{{ machine.name }}</strong> - {{ machine.location }}
+                                <br><small class="text-muted">Next cleaning: Every {{ "5 minutes (24h)" if process.process_type == '24_hour_cleaning' else "2 minutes (12h)" if '12h' in process.process_type else machine.cleaning_frequency_hours ~ " hours" }}</small>
+                            </div>
+                            <span class="badge bg-success">Active</span>
+                        </div>
+                        {% endfor %}
+                        <small class="text-muted mt-2 d-block">Machine cleaning reminders will appear here when due.</small>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-secondary">
+                        <h6><i class="fas fa-info-circle me-2"></i>No Active Machine Cleanings</h6>
+                        <p class="mb-0">No machine cleaning reminders or active cleanings at the moment.</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
 
     <!-- Process Information -->
     <div class="row">
