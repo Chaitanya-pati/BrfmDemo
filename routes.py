@@ -792,10 +792,30 @@ def cleaning_setup(job_id):
             job.started_at = datetime.utcnow()
             job.started_by = request.form['operator_name']
 
+            # Start machine cleaning schedules for this process
+            from models import ProductionMachine, CleaningSchedule
+            machines = ProductionMachine.query.filter_by(process_step=job.stage).all()
+            
+            for machine in machines:
+                machine.is_active = True
+                machine.status = 'active'
+                
+                # Create cleaning schedule with 5 minutes for testing (or use machine frequency)
+                scheduled_time = datetime.utcnow() + timedelta(minutes=5)
+                
+                cleaning_schedule = CleaningSchedule(
+                    machine_id=machine.id,
+                    job_id=job_id,
+                    production_order_id=job.order_id,
+                    process_step=job.stage,
+                    scheduled_time=scheduled_time
+                )
+                db.session.add(cleaning_schedule)
+
             db.session.add(cleaning)
             db.session.commit()
 
-            flash(f'Cleaning process started! Duration: {duration_hours} hours', 'success')
+            flash(f'Cleaning process started! Duration: {duration_hours} hours. Machine cleaning schedules activated.', 'success')
             return redirect(url_for('cleaning_monitor', process_id=cleaning.id))
 
         except Exception as e:
@@ -1005,10 +1025,30 @@ def cleaning_12h_setup(job_id):
             job.started_at = datetime.utcnow()
             job.started_by = request.form['operator_name']
 
+            # Start machine cleaning schedules for this process
+            from models import ProductionMachine, CleaningSchedule
+            machines = ProductionMachine.query.filter_by(process_step=job.stage).all()
+            
+            for machine in machines:
+                machine.is_active = True
+                machine.status = 'active'
+                
+                # Create cleaning schedule with 2 minutes for testing (or use machine frequency)
+                scheduled_time = datetime.utcnow() + timedelta(minutes=2)
+                
+                cleaning_schedule = CleaningSchedule(
+                    machine_id=machine.id,
+                    job_id=job_id,
+                    production_order_id=job.order_id,
+                    process_step=job.stage,
+                    scheduled_time=scheduled_time
+                )
+                db.session.add(cleaning_schedule)
+
             db.session.add(cleaning)
             db.session.commit()
 
-            flash(f'12-hour cleaning process started! Duration: {duration_hours} hours', 'success')
+            flash(f'12-hour cleaning process started! Duration: {duration_hours} hours. Machine cleaning schedules activated.', 'success')
             return redirect(url_for('cleaning_monitor', process_id=cleaning.id))
 
         except Exception as e:
