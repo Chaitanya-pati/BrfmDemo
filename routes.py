@@ -8,7 +8,7 @@ from models import (Vehicle, Supplier, Godown, GodownType, QualityTest, Transfer
                    PrecleaningBin, ProductionOrder, ProductionPlan, ProductionPlanItem, ProductionJobNew,
                    Customer, Product, SalesDispatch, CleaningProcess, CleaningMachine, CleaningBin,
                    ProductionTransfer, GrindingProcess, ProductOutput, PackingProcess,
-                   CleaningLog, StorageArea, StorageTransfer)
+                   CleaningLog, StorageArea, StorageTransfer, MachineCleaningLog, CleaningSchedule)
 from utils import allowed_file, generate_order_number
 import random
 import string
