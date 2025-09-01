@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Machine Cleaning - {{ job.job_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-tools me-2"></i>Machine Cleaning - {{ job.stage.replace('_', ' ').title() }}
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <span class="badge bg-info fs-6">Order: {{ job.order.order_number }}</span>
+                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Jobs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Information -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Process Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Job Number:</strong> {{ job.job_number }}</p>
+                            <p><strong>Process Stage:</strong> {{ job.stage.replace('_', ' ').title() }}</p>
+                            <p><strong>Order:</strong> {{ job.order.order_number }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Status:</strong> 
+                                <span class="badge bg-{% if job.status == 'in_progress' %}warning{% elif job.status == 'completed' %}success{% else %}secondary{% endif %}">
+                                    {{ job.status.title() }}
+                                </span>
+                            </p>
+                            <p><strong>Started:</strong> 
+                                {% if job.started_at %}{{ job.started_at.strftime('%Y-%m-%d %H:%M') }}{% else %}Not started{% endif %}
+                            </p>
+                            <p><strong>Started By:</strong> {{ job.started_by or 'Unknown' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Cleaning Status</h6>
+                </div>
+                <div class="card-body text-center">
+                    {% if pending_cleanings %}
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                        <h6 class="text-warning">{{ pending_cleanings|length }} Machine(s) Need Cleaning</h6>
+                    {% else %}
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <h6 class="text-success">All Machines Clean</h6>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Machines -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Active Machines - {{ job.stage.replace('_', ' ').title() }} Process</h5>
+                </div>
+                <div class="card-body">
+                    {% if machines %}
+                        <div class="row">
+                            {% for machine in machines %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card {% if machine.id in [p.machine_id for p in pending_cleanings] %}border-warning{% else %}border-success{% endif %}">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-1">{{ machine.name }}</h6>
+                                                <small class="text-muted">{{ machine.location }}</small>
+                                            </div>
+                                            {% set needs_cleaning = machine.id in [p.machine_id for p in pending_cleanings] %}
+                                            {% if needs_cleaning %}
+                                                <span class="badge bg-warning">Needs Cleaning</span>
+                                            {% else %}
+                                                <span class="badge bg-success">Clean</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="row mt-2">
+                                            <div class="col-sm-6">
+                                                <small><strong>Frequency:</strong> {{ machine.cleaning_frequency_hours }}h</small>
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <small><strong>Last Cleaned:</strong> 
+                                                    {% if machine.last_cleaned %}
+                                                        {{ machine.last_cleaned.strftime('%m-%d %H:%M') }}
+                                                    {% else %}
+                                                        Never
+                                                    {% endif %}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        {% if needs_cleaning %}
+                                            <form method="POST" class="mt-2" enctype="multipart/form-data">
+                                                <input type="hidden" name="action" value="start_cleaning">
+                                                <input type="hidden" name="machine_id" value="{{ machine.id }}">
+                                                <div class="row">
+                                                    <div class="col-sm-8">
+                                                        <input type="text" name="cleaned_by" class="form-control form-control-sm" placeholder="Your name" required>
+                                                    </div>
+                                                    <div class="col-sm-4">
+                                                        <button type="submit" class="btn btn-warning btn-sm w-100">
+                                                            <i class="fas fa-play me-1"></i>Start Cleaning
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-2">
+                                                    <input type="file" name="before_photo" class="form-control form-control-sm" accept="image/*" required>
+                                                    <small class="form-text text-muted">Upload before cleaning photo</small>
+                                                </div>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">No machines configured for this process step.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Cleaning History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Cleaning History</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_logs %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Machine</th>
+                                        <th>Cleaned By</th>
+                                        <th>Start Time</th>
+                                        <th>Duration</th>
+                                        <th>Waste (kg)</th>
+                                        <th>Status</th>
+                                        <th>Photos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for log in recent_logs %}
+                                    <tr>
+                                        <td>{{ log.machine.name }}</td>
+                                        <td>{{ log.cleaned_by }}</td>
+                                        <td>{{ log.cleaning_start_time.strftime('%m-%d %H:%M') if log.cleaning_start_time }}</td>
+                                        <td>
+                                            {% if log.cleaning_duration_minutes %}
+                                                {{ log.cleaning_duration_minutes }} min
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ "%.1f"|format(log.waste_collected_kg or 0) }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if log.status == 'completed' %}success{% elif log.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
+                                                {{ log.status.title() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if log.photo_before %}
+                                                <a href="{{ url_for('static', filename='../uploads/' + log.photo_before) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-image me-1"></i>Before
+                                                </a>
+                                            {% endif %}
+                                            {% if log.photo_after %}
+                                                <a href="{{ url_for('static', filename='../uploads/' + log.photo_after) }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                                    <i class="fas fa-image me-1"></i>After
+                                                </a>
+                                            {% endif %}
+                                            {% if log.status == 'in_progress' %}
+                                                <a href="{{ url_for('complete_process_machine_cleaning', log_id=log.id) }}" class="btn btn-sm btn-success">
+                                                    <i class="fas fa-check me-1"></i>Complete
+                                                </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">No cleaning history for this job.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.fade-in {
+    animation: fadeIn 0.5s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.border-warning {
+    border-color: #ffc107 !important;
+    border-width: 2px !important;
+}
+
+.border-success {
+    border-color: #198754 !important;
+}
+</style>
+{% endblock %}

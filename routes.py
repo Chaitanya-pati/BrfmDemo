@@ -1010,11 +1010,29 @@ def order_tracking_detail(order_number):
     # Build job details with associated processes
     job_details = []
     for job in jobs:
+        # Get machine cleaning logs for this job
+        machine_cleanings = MachineCleaningLog.query.filter_by(job_id=job.id).all()
+        
+        # Get cleaning schedules for this job  
+        cleaning_schedules = CleaningSchedule.query.filter_by(job_id=job.id).all()
+        
+        # Calculate cleaning statistics
+        completed_cleanings = [c for c in machine_cleanings if c.status == 'completed']
+        total_cleaning_time = sum([c.cleaning_duration_minutes or 0 for c in completed_cleanings])
+        
         job_detail = {
             'job': job,
             'transfers': ProductionTransfer.query.filter_by(job_id=job.id).all(),
             'cleaning_processes': CleaningProcess.query.filter_by(job_id=job.id).all(),
-            'grinding_processes': GrindingProcess.query.filter_by(job_id=job.id).all() if hasattr(job, 'grinding_processes') else []
+            'grinding_processes': GrindingProcess.query.filter_by(job_id=job.id).all() if hasattr(job, 'grinding_processes') else [],
+            'machine_cleanings': machine_cleanings,
+            'cleaning_schedules': cleaning_schedules,
+            'cleaning_stats': {
+                'total_cleanings': len(completed_cleanings),
+                'total_cleaning_time_minutes': total_cleaning_time,
+                'pending_cleanings': len([s for s in cleaning_schedules if s.status == 'scheduled']),
+                'cancelled_cleanings': len([s for s in cleaning_schedules if s.status == 'cancelled'])
+            }
         }
         job_details.append(job_detail)
 
@@ -1045,9 +1063,12 @@ def api_order_tracking(order_number):
 
     # Get all cleaning processes
     cleaning_processes = []
+    machine_cleanings = []
     for job in jobs:
         job_cleanings = CleaningProcess.query.filter_by(job_id=job.id).all()
+        job_machine_cleanings = MachineCleaningLog.query.filter_by(job_id=job.id).all()
         cleaning_processes.extend(job_cleanings)
+        machine_cleanings.extend(job_machine_cleanings)
 
     # Build response
     tracking_data = {
@@ -1100,7 +1121,22 @@ def api_order_tracking(order_number):
             'status': cleaning.status,
             'operator_name': cleaning.operator_name,
             'completed_by': cleaning.completed_by
-        } for cleaning in cleaning_processes]
+        } for cleaning in cleaning_processes],
+        'machine_cleanings': [{
+            'id': mc.id,
+            'machine_name': mc.machine.name,
+            'machine_location': mc.machine.location,
+            'process_step': mc.process_step,
+            'cleaned_by': mc.cleaned_by,
+            'cleaning_start_time': mc.cleaning_start_time.isoformat() if mc.cleaning_start_time else None,
+            'cleaning_end_time': mc.cleaning_end_time.isoformat() if mc.cleaning_end_time else None,
+            'cleaning_duration_minutes': mc.cleaning_duration_minutes,
+            'waste_collected_kg': mc.waste_collected_kg,
+            'status': mc.status,
+            'has_before_photo': bool(mc.photo_before),
+            'has_after_photo': bool(mc.photo_after),
+            'notes': mc.notes
+        } for mc in machine_cleanings]
     }
 
     return jsonify(tracking_data)
@@ -1599,6 +1635,67 @@ def packing_execution(job_id):
                 db.session.commit()
 
                 flash(f'Packed {number_of_bags} bags of {bag_weight}kg each successfully!', 'success')
+
+            elif action == 'complete_packing':
+                operator = request.form['operator_name']
+                
+                # Handle photo upload
+                packing_photo = None
+                if 'packing_photo' in request.files:
+                    file = request.files['packing_photo']
+                    if file and file.filename and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"packing_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        packing_photo = filename
+
+                # Process all products from the form (handle multiple products)
+                product_ids = request.form.getlist('product_id')
+                bag_weights = request.form.getlist('bag_weight')
+                bag_counts = request.form.getlist('bag_count')
+                storage_area_ids = request.form.getlist('storage_area_id')
+                shallow_storages = request.form.getlist('shallow_storage')
+                
+                total_packed_count = 0
+                
+                for i in range(len(product_ids)):
+                    if product_ids[i] and bag_weights[i] and bag_counts[i]:
+                        product_id = int(product_ids[i])
+                        bag_weight = float(bag_weights[i])
+                        number_of_bags = int(bag_counts[i])
+                        storage_area_id = storage_area_ids[i] if i < len(storage_area_ids) and storage_area_ids[i] else None
+                        stored_in_shallow = float(shallow_storages[i]) if i < len(shallow_storages) and shallow_storages[i] else 0
+                        
+                        # Create packing process
+                        packing = PackingProcess()
+                        packing.job_id = job_id
+                        packing.product_id = product_id
+                        packing.bag_weight_kg = bag_weight
+                        packing.number_of_bags = number_of_bags
+                        packing.total_packed_kg = bag_weight * number_of_bags
+                        packing.operator_name = operator
+                        packing.storage_area_id = int(storage_area_id) if storage_area_id else None
+                        packing.stored_in_shallow_kg = stored_in_shallow
+                        packing.packing_photo = packing_photo
+                        
+                        # Update storage area stock if selected
+                        if storage_area_id:
+                            storage_area = StorageArea.query.get(int(storage_area_id))
+                            if storage_area:
+                                storage_area.current_stock_kg += packing.total_packed_kg
+                        
+                        db.session.add(packing)
+                        total_packed_count += 1
+                
+                # Mark job as completed
+                job.status = 'completed'
+                job.completed_at = datetime.utcnow()
+                job.completed_by = operator
+                
+                db.session.commit()
+                
+                flash(f'Packing process completed successfully! Processed {total_packed_count} products.', 'success')
+                return redirect(url_for('production_execution'))
 
         except Exception as e:
             db.session.rollback()

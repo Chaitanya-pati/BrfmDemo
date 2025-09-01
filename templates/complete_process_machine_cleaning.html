@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Complete Machine Cleaning{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-check-circle me-2"></i>Complete Machine Cleaning
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <span class="badge bg-info fs-6">{{ log.machine.name }}</span>
+                            <a href="{{ url_for('process_machine_cleaning', job_id=log.job_id) }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Cleaning
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cleaning Information -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Cleaning Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <p><strong>Machine:</strong> {{ log.machine.name }}</p>
+                            <p><strong>Location:</strong> {{ log.machine.location }}</p>
+                            <p><strong>Process Step:</strong> {{ log.process_step.replace('_', ' ').title() }}</p>
+                        </div>
+                        <div class="col-12">
+                            <p><strong>Started By:</strong> {{ log.cleaned_by }}</p>
+                            <p><strong>Start Time:</strong> {{ log.cleaning_start_time.strftime('%Y-%m-%d %H:%M') if log.cleaning_start_time }}</p>
+                            <p><strong>Duration:</strong> 
+                                {% if log.cleaning_start_time %}
+                                    {% set duration_minutes = ((moment_now - log.cleaning_start_time).total_seconds() / 60)|int %}
+                                    {{ duration_minutes }} minutes
+                                {% else %}
+                                    Unknown
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Before Photo</h6>
+                </div>
+                <div class="card-body text-center">
+                    {% if log.photo_before %}
+                        <img src="{{ url_for('static', filename='../uploads/' + log.photo_before) }}" 
+                             class="img-fluid rounded" style="max-height: 200px;" 
+                             alt="Before cleaning photo">
+                    {% else %}
+                        <div class="text-muted">
+                            <i class="fas fa-image fa-2x mb-2"></i>
+                            <p>No before photo available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completion Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Complete Cleaning Process</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">After Cleaning Photo *</label>
+                                <input type="file" name="after_photo" class="form-control" accept="image/*" required>
+                                <small class="form-text text-muted">Upload photo showing the machine after cleaning</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Waste Collected (kg)</label>
+                                <input type="number" name="waste_collected" class="form-control" step="0.1" min="0" value="0">
+                                <small class="form-text text-muted">Amount of waste/debris collected during cleaning</small>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label class="form-label">Cleaning Notes</label>
+                                <textarea name="notes" class="form-control" rows="3" 
+                                          placeholder="Optional: Notes about the cleaning process, any issues found, maintenance needed, etc."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Completion Notes:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>After photo is required to document the cleaning completion</li>
+                                <li>Record any waste or debris collected during the cleaning process</li>
+                                <li>Add notes if any maintenance issues were discovered</li>
+                                <li>The next cleaning reminder will be automatically scheduled based on machine frequency</li>
+                            </ul>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check me-1"></i>Complete Cleaning
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.fade-in {
+    animation: fadeIn 0.5s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+</style>
+
+<script>
+// Set current timestamp for moment_now if needed
+const momentNow = new Date();
+</script>
+{% endblock %}
