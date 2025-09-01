@@ -93,14 +93,7 @@
                                   placeholder="Any observations, issues, or special notes about the cleaning process..."></textarea>
                     </div>
                     
-                    <div id="machine-info" class="mb-3" style="display: none;">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6 class="card-title">Machine Information</h6>
-                                <div id="machine-details"></div>
-                            </div>
-                        </div>
-                    </div>
+                    
                     
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save me-2"></i>Record Cleaning
@@ -265,86 +258,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Machine selection change handler
     const machineSelect = document.getElementById('machine_id');
-    const machineInfo = document.getElementById('machine-info');
-    const machineDetails = document.getElementById('machine-details');
 
-    machineSelect.addEventListener('change', function() {
-        if (this.value) {
-            const option = this.options[this.selectedIndex];
-            const machineType = option.getAttribute('data-type');
-            const frequency = option.getAttribute('data-frequency');
-            const lastCleaned = option.getAttribute('data-last-cleaned');
-
-            let status = 'Never cleaned';
-            let nextDue = 'Overdue';
-            
-            if (lastCleaned) {
-                const lastCleanedDate = new Date(lastCleaned);
-                const now = new Date();
-                const hoursSince = (now - lastCleanedDate) / (1000 * 60 * 60);
-                const hoursUntilNext = frequency - hoursSince;
-                
-                status = `Last cleaned: ${lastCleanedDate.toLocaleDateString()} ${lastCleanedDate.toLocaleTimeString()}`;
-                
-                if (hoursUntilNext > 0) {
-                    nextDue = `Due in ${Math.ceil(hoursUntilNext)} hours`;
-                } else {
-                    nextDue = `Overdue by ${Math.ceil(-hoursUntilNext)} hours`;
-                }
-            }
-
-            let typeDescription = '';
-            switch(machineType) {
-                case 'drum_shield':
-                    typeDescription = 'Removes plastic, cotton string, and thread materials';
-                    break;
-                case 'magnet':
-                    typeDescription = 'Removes metal particles and iron filings';
-                    break;
-                case 'separator':
-                    typeDescription = 'Removes stones and heavy debris';
-                    break;
-                case 'grinding':
-                    typeDescription = 'Grinding machine for wheat processing';
-                    break;
-                default:
-                    typeDescription = 'Equipment cleaning';
-            }
-
-            machineDetails.innerHTML = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <small class="text-muted">Type:</small><br>
-                        <strong>${machineType.replace('_', ' ').toUpperCase()}</strong>
-                    </div>
-                    <div class="col-md-6">
-                        <small class="text-muted">Frequency:</small><br>
-                        <strong>Every ${frequency} hours</strong>
-                    </div>
-                </div>
-                <div class="row mt-2">
-                    <div class="col-12">
-                        <small class="text-muted">Description:</small><br>
-                        <span>${typeDescription}</span>
-                    </div>
-                </div>
-                <div class="row mt-2">
-                    <div class="col-md-6">
-                        <small class="text-muted">Status:</small><br>
-                        <span>${status}</span>
-                    </div>
-                    <div class="col-md-6">
-                        <small class="text-muted">Next Due:</small><br>
-                        <span class="${hoursUntilNext < 0 ? 'text-danger' : 'text-success'}">${nextDue}</span>
-                    </div>
-                </div>
-            `;
-            
-            machineInfo.style.display = 'block';
-        } else {
-            machineInfo.style.display = 'none';
-        }
-    });
+    
 
     // Initialize tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
