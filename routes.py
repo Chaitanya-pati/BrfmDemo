@@ -932,6 +932,11 @@ def live_production_dashboard():
                          active_machine_cleanings=active_machine_cleanings,
                          concurrent_bins=concurrent_bins)
 
+@app.route('/live_production_monitor')
+def live_production_monitor():
+    """Dedicated live production monitoring view with step controls"""
+    return render_template('live_production_monitor.html')
+
 # PRODUCTION ORDER DETAILS WITH MACHINE CLEANING RECORDS
 @app.route('/order_tracking/<order_number>')
 def order_tracking_detail(order_number):
@@ -1419,7 +1424,10 @@ def job_control(job_id, action):
     """Control job execution: pause, resume, complete, cancel"""
     try:
         job = ProductionJobNew.query.get_or_404(job_id)
-        operator = request.json.get('operator_name', 'System') if request.is_json else request.form.get('operator_name', 'System')
+        data = request.json if request.is_json else request.form
+        operator = data.get('operator_name', 'System')
+        notes = data.get('notes', '')
+        auto_move_next = data.get('auto_move_next', False)
         
         if action == 'pause':
             if job.status == 'in_progress':
@@ -1454,6 +1462,8 @@ def job_control(job_id, action):
                 job.status = 'completed'
                 job.completed_at = datetime.now()
                 job.completed_by = operator
+                if notes:
+                    job.notes = (job.notes or '') + f'\nCompletion notes: {notes}'
                 
                 # Complete related processes
                 if job.stage in ['cleaning_24h', 'cleaning_12h']:
@@ -1461,14 +1471,39 @@ def job_control(job_id, action):
                     if cleaning_process:
                         cleaning_process.status = 'completed'
                         cleaning_process.actual_end_time = datetime.now()
+                        # Free up cleaning bin
+                        if cleaning_process.cleaning_bin_id:
+                            cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
+                            if cleaning_bin:
+                                cleaning_bin.status = 'available'
+                                
                 elif job.stage == 'grinding':
                     grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
                     if grinding_process:
                         grinding_process.status = 'completed'
                         grinding_process.end_time = datetime.now()
                 
+                # Auto-progression to next step
+                if auto_move_next:
+                    next_stage = get_next_production_stage(job.stage)
+                    if next_stage:
+                        next_job = ProductionJobNew.query.filter_by(
+                            order_id=job.order_id, 
+                            stage=next_stage, 
+                            status='pending'
+                        ).first()
+                        
+                        if next_job:
+                            next_job.status = 'pending'  # Ready to start
+                            db.session.add(next_job)
+                
                 db.session.commit()
-                return jsonify({'success': True, 'message': f'Job {job.job_number} completed successfully'})
+                
+                message = f'Job {job.job_number} completed successfully'
+                if auto_move_next and next_stage:
+                    message += f'. Next stage ({next_stage}) is now ready to start.'
+                
+                return jsonify({'success': True, 'message': message})
             else:
                 return jsonify({'success': False, 'message': 'Can only complete jobs that are in progress or paused'})
                 
@@ -1477,10 +1512,14 @@ def job_control(job_id, action):
                 job.status = 'cancelled'
                 job.completed_at = datetime.now()
                 job.completed_by = operator
+                if notes:
+                    job.notes = (job.notes or '') + f'\nCancellation notes: {notes}'
                 
                 # Cancel related processes
                 if job.stage in ['cleaning_24h', 'cleaning_12h']:
-                    cleaning_process = CleaningProcess.query.filter_by(job_id=job_id, status__in=['running', 'paused']).first()
+                    cleaning_process = CleaningProcess.query.filter_by(job_id=job_id).filter(
+                        CleaningProcess.status.in_(['running', 'paused'])
+                    ).first()
                     if cleaning_process:
                         cleaning_process.status = 'cancelled'
                         if cleaning_process.cleaning_bin_id:
@@ -1499,6 +1538,19 @@ def job_control(job_id, action):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+def get_next_production_stage(current_stage):
+    """Get the next production stage in sequence"""
+    stage_sequence = ['transfer', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing']
+    
+    try:
+        current_index = stage_sequence.index(current_stage)
+        if current_index < len(stage_sequence) - 1:
+            return stage_sequence[current_index + 1]
+    except ValueError:
+        pass
+    
+    return None
 
 @app.route('/api/job_progress/<int:job_id>')
 def job_progress_api(job_id):
@@ -1668,6 +1720,39 @@ def active_processes_api():
             processes.append(process_data)
             
         return jsonify({'success': True, 'processes': processes})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/production_pipeline_status')
+def api_production_pipeline_status():
+    """Get overall production pipeline status"""
+    try:
+        stages = ['transfer', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing']
+        pipeline_status = {}
+        
+        for stage in stages:
+            active_count = ProductionJobNew.query.filter_by(
+                stage=stage, 
+                status='in_progress'
+            ).count()
+            
+            total_count = ProductionJobNew.query.filter_by(stage=stage).filter(
+                ProductionJobNew.status.in_(['pending', 'in_progress', 'paused'])
+            ).count()
+            
+            completed_count = ProductionJobNew.query.filter_by(
+                stage=stage, 
+                status='completed'
+            ).count()
+            
+            pipeline_status[stage] = {
+                'active': active_count,
+                'total': total_count,
+                'completed': completed_count
+            }
+        
+        return jsonify({'success': True, 'pipeline': pipeline_status})
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

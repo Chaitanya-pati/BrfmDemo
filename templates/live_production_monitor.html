@@ -1,0 +1,784 @@
+
+{% extends "base.html" %}
+
+{% block title %}Live Production Monitor{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3 class="mb-0">
+                            <i class="fas fa-tv me-2 text-success"></i>
+                            Live Production Monitor
+                            <span class="badge bg-success ms-2 pulse">LIVE</span>
+                        </h3>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-primary btn-sm" onclick="refreshData()">
+                                <i class="fas fa-sync-alt me-1"></i>Refresh
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="toggleAutoRefresh()">
+                                <i class="fas fa-clock me-1"></i><span id="autoRefreshText">Auto: ON</span>
+                            </button>
+                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-arrow-left me-1"></i>Back
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Pipeline Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-stream me-2"></i>Production Pipeline Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="production-pipeline" id="productionPipeline">
+                        <!-- Pipeline will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Production Jobs -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>Active Production Jobs
+                        <span class="badge bg-primary ms-2" id="activeJobsCount">0</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="activeJobsContainer">
+                        <!-- Active jobs will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Steps Control Matrix -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tasks me-2"></i>Production Steps Control Matrix
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Step Navigation Tabs -->
+                    <ul class="nav nav-tabs" id="productionStepTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="transfer-tab" data-bs-toggle="tab" data-bs-target="#transfer" type="button" role="tab">
+                                <i class="fas fa-exchange-alt me-1"></i>Transfer <span class="badge bg-secondary ms-1" id="transferCount">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="cleaning24h-tab" data-bs-toggle="tab" data-bs-target="#cleaning24h" type="button" role="tab">
+                                <i class="fas fa-clock me-1"></i>24H Cleaning <span class="badge bg-secondary ms-1" id="cleaning24hCount">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="cleaning12h-tab" data-bs-toggle="tab" data-bs-target="#cleaning12h" type="button" role="tab">
+                                <i class="fas fa-stopwatch me-1"></i>12H Cleaning <span class="badge bg-secondary ms-1" id="cleaning12hCount">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="grinding-tab" data-bs-toggle="tab" data-bs-target="#grinding" type="button" role="tab">
+                                <i class="fas fa-cog me-1"></i>Grinding <span class="badge bg-secondary ms-1" id="grindingCount">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="packing-tab" data-bs-toggle="tab" data-bs-target="#packing" type="button" role="tab">
+                                <i class="fas fa-box me-1"></i>Packing <span class="badge bg-secondary ms-1" id="packingCount">0</span>
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content mt-3" id="productionStepTabContent">
+                        <!-- Transfer Tab -->
+                        <div class="tab-pane fade show active" id="transfer" role="tabpanel">
+                            <div id="transferJobs" class="production-step-container">
+                                <!-- Transfer jobs will be loaded here -->
+                            </div>
+                        </div>
+                        
+                        <!-- 24H Cleaning Tab -->
+                        <div class="tab-pane fade" id="cleaning24h" role="tabpanel">
+                            <div id="cleaning24hJobs" class="production-step-container">
+                                <!-- 24H cleaning jobs will be loaded here -->
+                            </div>
+                        </div>
+                        
+                        <!-- 12H Cleaning Tab -->
+                        <div class="tab-pane fade" id="cleaning12h" role="tabpanel">
+                            <div id="cleaning12hJobs" class="production-step-container">
+                                <!-- 12H cleaning jobs will be loaded here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Grinding Tab -->
+                        <div class="tab-pane fade" id="grinding" role="tabpanel">
+                            <div id="grindingJobs" class="production-step-container">
+                                <!-- Grinding jobs will be loaded here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Packing Tab -->
+                        <div class="tab-pane fade" id="packing" role="tabpanel">
+                            <div id="packingJobs" class="production-step-container">
+                                <!-- Packing jobs will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Job Action Modal -->
+<div class="modal fade" id="jobActionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="jobActionModalTitle">Job Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="jobActionContent">
+                    <!-- Job action content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step Completion Modal -->
+<div class="modal fade" id="stepCompletionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Complete Production Step</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="stepCompletionForm">
+                    <input type="hidden" id="completionJobId" name="job_id">
+                    <input type="hidden" id="completionAction" name="action" value="complete">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Operator Name</label>
+                        <input type="text" class="form-control" id="completionOperator" name="operator_name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Completion Notes</label>
+                        <textarea class="form-control" id="completionNotes" name="notes" rows="3" placeholder="Any notes about the completed step..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="autoMoveNext" checked>
+                            <label class="form-check-label" for="autoMoveNext">
+                                Automatically start next production step
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="completeStep()">
+                    <i class="fas fa-check me-1"></i>Complete Step
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.production-pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background: linear-gradient(90deg, #f8f9fa, #e9ecef);
+    border-radius: 10px;
+}
+
+.pipeline-step {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    min-width: 150px;
+}
+
+.pipeline-step.active {
+    background: #28a745;
+    color: white;
+    transform: scale(1.05);
+}
+
+.pipeline-step.completed {
+    background: #6c757d;
+    color: white;
+}
+
+.pipeline-arrow {
+    font-size: 24px;
+    color: #6c757d;
+    margin: 0 10px;
+}
+
+.job-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.job-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.job-card.in-progress {
+    border-left: 4px solid #28a745;
+}
+
+.job-card.pending {
+    border-left: 4px solid #ffc107;
+}
+
+.job-card.paused {
+    border-left: 4px solid #fd7e14;
+}
+
+.job-card.completed {
+    border-left: 4px solid #6c757d;
+}
+
+.progress-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: conic-gradient(#28a745 0deg, #e9ecef 0deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #28a745;
+}
+
+.production-step-container {
+    min-height: 300px;
+}
+
+.action-buttons .btn {
+    margin: 2px;
+}
+
+.time-remaining {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-indicator.running {
+    background: #28a745;
+    animation: pulse 1s infinite;
+}
+
+.status-indicator.pending {
+    background: #ffc107;
+}
+
+.status-indicator.paused {
+    background: #fd7e14;
+}
+
+.status-indicator.completed {
+    background: #6c757d;
+}
+</style>
+
+<script>
+let autoRefresh = true;
+let refreshInterval;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadProductionData();
+    startAutoRefresh();
+});
+
+function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(function() {
+        if (autoRefresh) {
+            loadProductionData();
+        }
+    }, 10000); // Refresh every 10 seconds
+}
+
+function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    document.getElementById('autoRefreshText').textContent = autoRefresh ? 'Auto: ON' : 'Auto: OFF';
+    
+    if (autoRefresh) {
+        startAutoRefresh();
+    } else {
+        clearInterval(refreshInterval);
+    }
+}
+
+function refreshData() {
+    loadProductionData();
+    showToast('Data refreshed', 'success');
+}
+
+function loadProductionData() {
+    // Load pipeline overview
+    loadProductionPipeline();
+    
+    // Load active jobs
+    loadActiveJobs();
+    
+    // Load jobs by stage
+    loadJobsByStage();
+}
+
+function loadProductionPipeline() {
+    fetch('/api/production_pipeline_status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayProductionPipeline(data.pipeline);
+            }
+        })
+        .catch(error => console.error('Error loading pipeline:', error));
+}
+
+function displayProductionPipeline(pipeline) {
+    const container = document.getElementById('productionPipeline');
+    const steps = ['transfer', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing'];
+    const stepNames = ['Transfer', '24H Cleaning', '12H Cleaning', 'Grinding', 'Packing'];
+    
+    let html = '';
+    
+    steps.forEach((step, index) => {
+        const stepData = pipeline[step] || { active: 0, completed: 0, total: 0 };
+        const isActive = stepData.active > 0;
+        const isCompleted = stepData.total > 0 && stepData.active === 0;
+        
+        let stepClass = '';
+        if (isActive) stepClass = 'active';
+        else if (isCompleted) stepClass = 'completed';
+        
+        html += `
+            <div class="pipeline-step ${stepClass}">
+                <i class="fas fa-${getStepIcon(step)} fa-2x mb-2"></i>
+                <h6>${stepNames[index]}</h6>
+                <div class="small">
+                    <div>Active: ${stepData.active}</div>
+                    <div>Total: ${stepData.total}</div>
+                </div>
+            </div>
+        `;
+        
+        if (index < steps.length - 1) {
+            html += '<i class="fas fa-arrow-right pipeline-arrow"></i>';
+        }
+    });
+    
+    container.innerHTML = html;
+}
+
+function loadActiveJobs() {
+    fetch('/api/production_jobs_by_stage')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayActiveJobs(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading active jobs:', error));
+}
+
+function displayActiveJobs(jobsData) {
+    const container = document.getElementById('activeJobsContainer');
+    let totalJobs = 0;
+    let html = '';
+    
+    // Count total active jobs
+    Object.values(jobsData).forEach(jobs => totalJobs += jobs.length);
+    document.getElementById('activeJobsCount').textContent = totalJobs;
+    
+    if (totalJobs === 0) {
+        html = `
+            <div class="text-center py-4">
+                <i class="fas fa-pause-circle fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Active Production Jobs</h5>
+                <p class="text-muted">All production processes are idle</p>
+            </div>
+        `;
+    } else {
+        html = '<div class="row">';
+        
+        Object.entries(jobsData).forEach(([stage, jobs]) => {
+            jobs.forEach(job => {
+                html += createJobCard(job, stage);
+            });
+        });
+        
+        html += '</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+function loadJobsByStage() {
+    fetch('/api/production_jobs_by_stage')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayJobsByStage(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading jobs by stage:', error));
+}
+
+function displayJobsByStage(jobsData) {
+    const stages = ['transfer', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing'];
+    
+    stages.forEach(stage => {
+        const container = document.getElementById(`${stage}Jobs`);
+        const jobs = jobsData[stage] || [];
+        const countBadge = document.getElementById(`${stage}Count`);
+        
+        countBadge.textContent = jobs.length;
+        countBadge.className = `badge ms-1 ${jobs.length > 0 ? 'bg-primary' : 'bg-secondary'}`;
+        
+        if (jobs.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-${getStepIcon(stage)} fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">No ${stage.replace('_', ' ')} jobs</h6>
+                    <p class="text-muted">All processes are complete or idle</p>
+                </div>
+            `;
+        } else {
+            let html = '';
+            jobs.forEach(job => {
+                html += createDetailedJobCard(job, stage);
+            });
+            container.innerHTML = html;
+        }
+    });
+}
+
+function createJobCard(job, stage) {
+    const progressPercent = job.progress || 0;
+    const statusClass = job.status.replace('_', '-');
+    
+    return `
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card job-card ${statusClass}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="card-title mb-1">${job.job_number}</h6>
+                            <p class="card-text mb-2">
+                                <small class="text-muted">Order: ${job.order_number}</small><br>
+                                <small class="text-muted">Stage: ${stage.replace('_', ' ')}</small>
+                            </p>
+                        </div>
+                        <div class="text-end">
+                            <div class="progress-circle" style="background: conic-gradient(#28a745 ${progressPercent * 3.6}deg, #e9ecef ${progressPercent * 3.6}deg);">
+                                ${progressPercent}%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <span class="status-indicator ${job.status}"></span>
+                        <span class="badge bg-${getStatusColor(job.status)}">${job.status.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createDetailedJobCard(job, stage) {
+    const progressPercent = job.progress || 0;
+    const statusClass = job.status.replace('_', '-');
+    
+    return `
+        <div class="card job-card ${statusClass} mb-3">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h6 class="mb-1">${job.job_number}</h6>
+                        <p class="mb-1">
+                            <strong>Order:</strong> ${job.order_number}<br>
+                            <strong>Status:</strong> <span class="badge bg-${getStatusColor(job.status)}">${job.status.replace('_', ' ')}</span>
+                        </p>
+                        ${job.started_by ? `<small class="text-muted">Operator: ${job.started_by}</small>` : ''}
+                    </div>
+                    <div class="col-md-3">
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-${getStatusColor(job.status)}" style="width: ${progressPercent}%"></div>
+                        </div>
+                        <small class="text-muted">${progressPercent}% Complete</small>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <div class="action-buttons">
+                            ${createActionButtons(job, stage)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createActionButtons(job, stage) {
+    let buttons = '';
+    
+    if (job.status === 'pending') {
+        buttons += `<button class="btn btn-sm btn-success" onclick="startJob(${job.id}, '${stage}')">
+            <i class="fas fa-play me-1"></i>Start
+        </button>`;
+    }
+    
+    if (job.status === 'in_progress') {
+        buttons += `
+            <button class="btn btn-sm btn-warning" onclick="pauseJob(${job.id})">
+                <i class="fas fa-pause me-1"></i>Pause
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="showStepCompletion(${job.id}, '${job.job_number}', '${stage}')">
+                <i class="fas fa-check me-1"></i>Complete
+            </button>
+        `;
+    }
+    
+    if (job.status === 'paused') {
+        buttons += `<button class="btn btn-sm btn-info" onclick="resumeJob(${job.id})">
+            <i class="fas fa-play me-1"></i>Resume
+        </button>`;
+    }
+    
+    buttons += `<button class="btn btn-sm btn-outline-primary" onclick="viewJobDetails(${job.id})">
+        <i class="fas fa-eye me-1"></i>Details
+    </button>`;
+    
+    return buttons;
+}
+
+function startJob(jobId, stage) {
+    // Redirect to appropriate setup page based on stage
+    const stageUrls = {
+        'transfer': `/production_execution/transfer_setup/${jobId}`,
+        'cleaning_24h': `/production_execution/cleaning_setup/${jobId}`,
+        'cleaning_12h': `/production_execution/cleaning_12h_setup/${jobId}`,
+        'grinding': `/production_execution/b1_scale/${jobId}`,
+        'packing': `/production_execution/packing/${jobId}`
+    };
+    
+    if (stageUrls[stage]) {
+        window.open(stageUrls[stage], '_blank');
+    } else {
+        showToast('Setup page not available for this stage', 'warning');
+    }
+}
+
+function pauseJob(jobId) {
+    controlJob(jobId, 'pause');
+}
+
+function resumeJob(jobId) {
+    controlJob(jobId, 'resume');
+}
+
+function controlJob(jobId, action) {
+    fetch(`/api/job_control/${jobId}/${action}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            operator_name: 'Live Monitor User'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            loadProductionData();
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error controlling job:', error);
+        showToast('Error controlling job', 'error');
+    });
+}
+
+function showStepCompletion(jobId, jobNumber, stage) {
+    document.getElementById('completionJobId').value = jobId;
+    document.getElementById('jobActionModalTitle').textContent = `Complete ${jobNumber}`;
+    
+    new bootstrap.Modal(document.getElementById('stepCompletionModal')).show();
+}
+
+function completeStep() {
+    const jobId = document.getElementById('completionJobId').value;
+    const operator = document.getElementById('completionOperator').value;
+    const notes = document.getElementById('completionNotes').value;
+    const autoMoveNext = document.getElementById('autoMoveNext').checked;
+    
+    if (!operator) {
+        showToast('Please enter operator name', 'warning');
+        return;
+    }
+    
+    fetch(`/api/job_control/${jobId}/complete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            operator_name: operator,
+            notes: notes,
+            auto_move_next: autoMoveNext
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('stepCompletionModal')).hide();
+            loadProductionData();
+            
+            // Clear form
+            document.getElementById('stepCompletionForm').reset();
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error completing step:', error);
+        showToast('Error completing step', 'error');
+    });
+}
+
+function viewJobDetails(jobId) {
+    fetch(`/api/job_details/${jobId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const job = data.job;
+                const content = `
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr><td><strong>Job Number:</strong></td><td>${job.job_number}</td></tr>
+                            <tr><td><strong>Order:</strong></td><td>${job.order_number}</td></tr>
+                            <tr><td><strong>Stage:</strong></td><td>${job.stage}</td></tr>
+                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getStatusColor(job.status)}">${job.status}</span></td></tr>
+                            <tr><td><strong>Created:</strong></td><td>${job.created_at || 'N/A'}</td></tr>
+                            <tr><td><strong>Started:</strong></td><td>${job.started_at || 'N/A'}</td></tr>
+                            <tr><td><strong>Started By:</strong></td><td>${job.started_by || 'N/A'}</td></tr>
+                            <tr><td><strong>Completed:</strong></td><td>${job.completed_at || 'N/A'}</td></tr>
+                            <tr><td><strong>Completed By:</strong></td><td>${job.completed_by || 'N/A'}</td></tr>
+                            <tr><td><strong>Notes:</strong></td><td>${job.notes || 'None'}</td></tr>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('jobActionContent').innerHTML = content;
+                document.getElementById('jobActionModalTitle').textContent = `Job Details: ${job.job_number}`;
+                new bootstrap.Modal(document.getElementById('jobActionModal')).show();
+            }
+        })
+        .catch(error => console.error('Error loading job details:', error));
+}
+
+// Utility functions
+function getStepIcon(step) {
+    const icons = {
+        'transfer': 'exchange-alt',
+        'cleaning_24h': 'clock',
+        'cleaning_12h': 'stopwatch',
+        'grinding': 'cog',
+        'packing': 'box'
+    };
+    return icons[step] || 'cog';
+}
+
+function getStatusColor(status) {
+    switch(status) {
+        case 'in_progress': return 'success';
+        case 'pending': return 'warning';
+        case 'paused': return 'secondary';
+        case 'completed': return 'primary';
+        case 'cancelled': return 'danger';
+        default: return 'light';
+    }
+}
+
+function showToast(message, type) {
+    // Simple toast notification
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'error' ? 'danger' : type} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

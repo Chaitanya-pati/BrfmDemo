@@ -100,9 +100,12 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link py-2" href="{{ url_for('production_execution') }}">
-                                    <i class="fas fa-cogs"></i>Production Execution
+                                    <i class="fas fa-cogs me-2"></i>Production Execution
                                 </a>
                             </li>
+                            <a class="dropdown-item" href="{{ url_for('live_production_monitor') }}">
+                                <i class="fas fa-tv me-2"></i>Live Production Monitor
+                            </a>
                             <li class="nav-item">
                                 <a class="nav-link py-2" href="{{ url_for('production_tracking') }}">
                                     <i class="fas fa-search"></i>Order Tracking
