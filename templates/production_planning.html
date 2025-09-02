@@ -51,42 +51,59 @@
                 {% if order and existing_plan %}
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        This order already has a production plan created by <strong>{{ existing_plan.planned_by }}</strong> 
-                        on {{ existing_plan.planning_date.strftime('%m/%d/%Y %H:%M') }}.
+                        <strong>This order already has a production plan created by {{ existing_plan.planned_by }} on {{ existing_plan.planning_date.strftime('%m/%d/%Y %H:%M') }}.</strong>
                     </div>
-                    
-                    <h6 class="text-primary mb-3">Current Plan</h6>
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Pre-cleaning Bin</th>
-                                    <th>Percentage</th>
-                                    <th>Quantity (tons)</th>
-                                    <th>Available Stock</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in existing_plan.plan_items %}
-                                <tr>
-                                    <td>{{ item.precleaning_bin.name }}</td>
-                                    <td>{{ "%.1f"|format(item.percentage) }}%</td>
-                                    <td>{{ "%.2f"|format(item.quantity) }} tons</td>
-                                    <td class="{{ 'text-success' if item.precleaning_bin.current_stock >= item.quantity else 'text-danger' }}">
-                                        {{ "%.2f"|format(item.precleaning_bin.current_stock) }} tons
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot>
-                                <tr class="table-active">
-                                    <th>Total</th>
-                                    <th>{{ "%.1f"|format(existing_plan.total_percentage) }}%</th>
-                                    <th>{{ "%.2f"|format(order.quantity) }} tons</th>
-                                    <th>-</th>
-                                </tr>
-                            </tfoot>
-                        </table>
+                    {% if existing_plan.status == 'approved' and order.status == 'planned' %}
+                    <div class="mt-3">
+                        <a href="{{ url_for('start_production_execution', order_id=order.id) }}" 
+                           class="btn btn-success btn-lg"
+                           onclick="return confirm('Are you sure you want to start production execution? This will create all production jobs.')">
+                            <i class="fas fa-play me-2"></i>Start Production Execution
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- Display Current Plan Details -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-list me-2"></i>Current Plan</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Pre-cleaning Bin</th>
+                                            <th>Percentage</th>
+                                            <th>Quantity (tons)</th>
+                                            <th>Available Stock</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in existing_plan.plan_items %}
+                                        <tr>
+                                            <td>{{ item.precleaning_bin.name }}</td>
+                                            <td>{{ "%.1f"|format(item.percentage) }}%</td>
+                                            <td>{{ "%.2f"|format(item.quantity) }} tons</td>
+                                            <td>
+                                                <span class="badge bg-{{ 'success' if item.precleaning_bin.current_stock >= item.quantity else 'warning' }}">
+                                                    {{ "%.2f"|format(item.precleaning_bin.current_stock) }} tons
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="fw-bold">
+                                            <td>TOTAL</td>
+                                            <td>{{ "%.1f"|format(existing_plan.total_percentage) }}%</td>
+                                            <td>{{ "%.2f"|format(order.quantity) }} tons</td>
+                                            <td>-</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 {% elif order %}
                     <form method="POST" id="planningForm">
@@ -314,14 +331,14 @@ function showNotification(message, type) {
     notification.style.right = '20px';
     notification.style.zIndex = '9999';
     notification.style.minWidth = '300px';
-    
+
     notification.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     // Auto-remove after 5 seconds
     setTimeout(() => {
         if (notification.parentNode) {
@@ -353,10 +370,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.percentage-input').forEach(input => {
             const percentage = parseFloat(input.value) || 0;
             totalPercentage += percentage;
-            
+
             const quantity = (percentage / 100) * orderQuantity;
             totalQuantity += quantity;
-            
+
             // Update quantity display for this row
             const quantityDisplay = input.closest('.allocation-row').querySelector('.quantity-display');
             quantityDisplay.value = quantity.toFixed(2);
@@ -365,13 +382,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update totals display
         document.getElementById('total-percentage').textContent = totalPercentage.toFixed(1) + '%';
         document.getElementById('total-quantity').textContent = totalQuantity.toFixed(2) + ' tons';
-        
+
         // Update progress bar
         const progressBar = document.getElementById('progress-bar');
         const progressWidth = Math.min(totalPercentage, 100);
         progressBar.style.width = progressWidth + '%';
         progressBar.className = 'progress-bar';
-        
+
         if (totalPercentage < 100) {
             progressBar.classList.add('bg-warning');
         } else if (totalPercentage === 100) {
@@ -391,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('allocation-container');
         const newRow = document.createElement('div');
         newRow.className = 'row mb-3 allocation-row';
-        
+
         let binOptions = '<option value="">Select Bin</option>';
         Object.keys(availableBins).forEach(binId => {
             const bin = availableBins[binId];
@@ -421,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </button>
             </div>
         `;
-        
+
         container.appendChild(newRow);
         attachRowEvents(newRow);
     }
@@ -453,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (planningForm) {
         planningForm.addEventListener('submit', function(e) {
             const totalPercentage = parseFloat(document.getElementById('total-percentage').textContent);
-            
+
             if (Math.abs(totalPercentage - 100) > 0.1) {
                 e.preventDefault();
                 alert('Total percentage must equal 100%. Current total: ' + totalPercentage.toFixed(1) + '%');
@@ -465,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.allocation-row').forEach(row => {
                 const binSelect = row.querySelector('.bin-select');
                 const percentageInput = row.querySelector('.percentage-input');
-                
+
                 if (binSelect.value && percentageInput.value) {
                     const binId = binSelect.value;
                     const percentage = parseFloat(percentageInput.value);

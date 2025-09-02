@@ -954,6 +954,178 @@ def complete_process_machine_cleaning(log_id):
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+@app.route('/api/production_jobs_by_stage')
+def api_production_jobs_by_stage():
+    """API endpoint to get production jobs grouped by stage"""
+    try:
+        jobs_by_stage = {
+            'cleaning_24h': [],
+            'cleaning_12h': [],
+            'grinding': [],
+            'packing': []
+        }
+        
+        # Get all active jobs
+        active_jobs = ProductionJobNew.query.filter(
+            ProductionJobNew.status.in_(['pending', 'in_progress'])
+        ).all()
+        
+        for job in active_jobs:
+            job_data = {
+                'id': job.id,
+                'job_number': job.job_number,
+                'order_number': job.order.order_number if job.order else 'N/A',
+                'status': job.status,
+                'stage': job.stage,
+                'progress': 0 if job.status == 'pending' else 50 if job.status == 'in_progress' else 100,
+                'can_proceed': job.status == 'pending',
+                'is_previous_step': False,
+                'is_running': job.status == 'in_progress',
+                'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '',
+                'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '',
+                'started_by': job.started_by,
+                'completed_at': job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else '',
+                'completed_by': job.completed_by
+            }
+            
+            if job.stage in jobs_by_stage:
+                jobs_by_stage[job.stage].append(job_data)
+        
+        return jsonify(jobs_by_stage)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/job_details/<int:job_id>')
+def api_job_details(job_id):
+    """API endpoint to get detailed job information"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        job_data = {
+            'id': job.id,
+            'job_number': job.job_number,
+            'order_number': job.order.order_number if job.order else 'N/A',
+            'status': job.status,
+            'stage': job.stage,
+            'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '',
+            'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '',
+            'started_by': job.started_by,
+            'completed_at': job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else '',
+            'completed_by': job.completed_by,
+            'notes': job.notes
+        }
+        
+        return jsonify({'success': True, 'job': job_data})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/start_production_execution/<int:order_id>')
+def start_production_execution(order_id):
+    """Start production execution by creating jobs for all stages"""
+    try:
+        order = ProductionOrder.query.get_or_404(order_id)
+        plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+        
+        if not plan:
+            flash('No production plan found for this order!', 'error')
+            return redirect(url_for('production_planning', order_id=order_id))
+        
+        if plan.status != 'approved':
+            flash('Production plan must be approved before starting execution!', 'error')
+            return redirect(url_for('production_planning', order_id=order_id))
+        
+        # Check if jobs already exist
+        existing_jobs = ProductionJobNew.query.filter_by(order_id=order_id).count()
+        if existing_jobs > 0:
+            flash('Production jobs already exist for this order!', 'info')
+            return redirect(url_for('production_execution'))
+        
+        # Create jobs for all production stages
+        stages = ['transfer', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing']
+        
+        for i, stage in enumerate(stages):
+            job = ProductionJobNew()
+            job.job_number = f"JOB-{order.order_number}-{stage.upper()}-{datetime.now().strftime('%m%d%H%M')}"
+            job.order_id = order_id
+            job.plan_id = plan.id
+            job.stage = stage
+            job.status = 'pending'
+            job.started_by = 'System'
+            job.notes = f'Auto-created job for {stage} stage'
+            job.created_at = datetime.now()
+            
+            db.session.add(job)
+        
+        # Update order status
+        order.status = 'in_progress'
+        
+        db.session.commit()
+        flash('Production execution started! All jobs have been created.', 'success')
+        return redirect(url_for('production_execution'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error starting production execution: {str(e)}', 'error')
+        return redirect(url_for('production_planning', order_id=order_id))
+
+@app.route('/production_execution/cleaning_setup/<int:job_id>')
+def cleaning_setup(job_id):
+    """Set up 24-hour cleaning process"""
+    job = ProductionJobNew.query.get_or_404(job_id)
+    return render_template('cleaning_setup.html', job=job)
+
+@app.route('/production_execution/cleaning_12h_setup/<int:job_id>')
+def cleaning_12h_setup(job_id):
+    """Set up 12-hour cleaning process"""
+    job = ProductionJobNew.query.get_or_404(job_id)
+    return render_template('cleaning_12h_setup.html', job=job)
+
+@app.route('/production_execution/b1_scale/<int:job_id>')
+def b1_scale_process(job_id):
+    """B1 scale and grinding process"""
+    job = ProductionJobNew.query.get_or_404(job_id)
+    return render_template('b1_scale_process.html', job=job)
+
+@app.route('/production_execution/packing/<int:job_id>')
+def packing_execution_route(job_id):
+    """Redirect to existing packing execution"""
+    return redirect(url_for('packing_execution', job_id=job_id))
+
+@app.route('/process_cleaning_24h/<int:job_id>', methods=['POST'])
+def process_cleaning_24h(job_id):
+    """Process 24-hour cleaning start"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Create cleaning process
+        cleaning_process = CleaningProcess()
+        cleaning_process.job_id = job_id
+        cleaning_process.process_type = '24_hour'
+        cleaning_process.duration_hours = 24
+        cleaning_process.start_time = datetime.now()
+        cleaning_process.end_time = datetime.now() + timedelta(hours=24)
+        cleaning_process.start_moisture = float(request.form.get('initial_moisture', 0))
+        cleaning_process.operator_name = request.form['operator_name']
+        cleaning_process.status = 'running'
+        
+        # Update job status
+        job.status = 'in_progress'
+        job.started_at = datetime.now()
+        job.started_by = request.form['operator_name']
+        
+        db.session.add(cleaning_process)
+        db.session.commit()
+        
+        flash('24-hour cleaning process started successfully!', 'success')
+        return redirect(url_for('production_execution'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error starting cleaning process: {str(e)}', 'error')
+        return redirect(url_for('cleaning_setup', job_id=job_id))
+
 @app.route('/debug_production_order')
 def debug_production_order():
     """Debug route to test production order creation"""
