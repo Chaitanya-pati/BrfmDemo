@@ -110,7 +110,7 @@
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="radio" 
                                                            name="duration_option" id="duration_custom" value="custom">
-                                                    <label class="form-label" for="duration_custom">
+                                                    <label class="form-check-label" for="duration_custom">
                                                         <strong>Custom Duration</strong><br>
                                                         <small class="text-muted">Specify your own hours</small>
                                                     </label>
@@ -202,10 +202,40 @@ function initializeCleaningForm() {
     }
 }
 
-// Auto-calculate end time based on 24-hour duration
+// Handle custom duration toggle
+document.querySelectorAll('input[name="duration_option"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const customHoursDiv = document.getElementById('custom_hours_div');
+        const customHoursInput = document.getElementById('custom_hours');
+        
+        if (this.value === 'custom') {
+            customHoursDiv.style.display = 'block';
+            customHoursInput.required = true;
+        } else {
+            customHoursDiv.style.display = 'none';
+            customHoursInput.required = false;
+        }
+        
+        updateEndTime();
+    });
+});
+
+// Auto-calculate end time based on selected duration
 function updateEndTime() {
+    const selectedDuration = document.querySelector('input[name="duration_option"]:checked');
+    let hours = 24; // default
+    
+    if (selectedDuration) {
+        if (selectedDuration.value === 'custom') {
+            const customHours = document.getElementById('custom_hours').value;
+            hours = customHours ? parseFloat(customHours) : 24;
+        } else {
+            hours = parseFloat(selectedDuration.value);
+        }
+    }
+    
     const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + (24 * 60 * 60 * 1000));
+    const endTime = new Date(startTime.getTime() + (hours * 60 * 60 * 1000));
 
     const endTimeElement = document.getElementById('end-time-display');
     if (endTimeElement) {
@@ -215,5 +245,11 @@ function updateEndTime() {
 
 // Call on page load
 updateEndTime();
+
+// Update end time when custom hours input changes
+const customHoursInput = document.getElementById('custom_hours');
+if (customHoursInput) {
+    customHoursInput.addEventListener('input', updateEndTime);
+}
 </script>
 {% endblock %}
