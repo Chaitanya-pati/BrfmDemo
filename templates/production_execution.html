@@ -7,7 +7,9 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fas fa-cogs me-2"></i>Production Execution Dashboard</h2>
+                <h2><i class="fas fa-cogs me-2"></i>Production Execution Dashboard 
+                    <span id="activeProcessesIndicator" class="badge bg-secondary ms-2">0</span> Active
+                </h2>
                 <a href="{{ url_for('production_orders') }}" class="btn btn-outline-primary">
                     <i class="fas fa-arrow-left me-2"></i>Back to Orders
                 </a>
@@ -222,6 +224,21 @@
     </div>
 </div>
 
+<!-- Progress Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Real-time Progress</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="progressModalContent">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Notification Area -->
 <div id="notificationArea" class="toast-container position-fixed bottom-0 end-0 p-3">
     <!-- Notifications will appear here -->
@@ -375,6 +392,7 @@ function updateTabContent(containerId, jobs, stage) {
                 </td>
                 <td>
                     ${canStart ? getActionButtons(job, stage) : '<span class="text-muted">Waiting</span>'}
+                    ${job.status === 'in_progress' || job.status === 'paused' ? getControlButtons(job) : ''}
                 </td>
             </tr>
         `;
@@ -401,9 +419,21 @@ function getActionButtons(job, stage) {
 
     if (job.status === 'in_progress') {
         return `
-            <button class="btn btn-info btn-sm" onclick="viewJob(${job.id})">
+            <button class="btn btn-info btn-sm me-1" onclick="viewJob(${job.id})">
                 <i class="fas fa-eye me-1"></i>Monitor
             </button>
+            <button class="btn btn-warning btn-sm me-1" onclick="showProgressModal(${job.id})">
+                <i class="fas fa-chart-line me-1"></i>Progress
+            </button>
+        `;
+    }
+
+    if (job.status === 'paused') {
+        return `
+            <button class="btn btn-info btn-sm me-1" onclick="viewJob(${job.id})">
+                <i class="fas fa-eye me-1"></i>Details
+            </button>
+            <span class="badge bg-warning">Paused</span>
         `;
     }
 
@@ -517,5 +547,156 @@ function showJobDetails(job) {
     document.getElementById('jobDetailContent').innerHTML = content;
     new bootstrap.Modal(document.getElementById('jobDetailModal')).show();
 }
+
+function getControlButtons(job) {
+    let buttons = '';
+    
+    if (job.status === 'in_progress') {
+        buttons += `
+            <button class="btn btn-secondary btn-sm ms-1" onclick="controlJob(${job.id}, 'pause')" title="Pause Job">
+                <i class="fas fa-pause"></i>
+            </button>
+            <button class="btn btn-success btn-sm ms-1" onclick="controlJob(${job.id}, 'complete')" title="Complete Job">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-danger btn-sm ms-1" onclick="controlJob(${job.id}, 'cancel')" title="Cancel Job">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+    } else if (job.status === 'paused') {
+        buttons += `
+            <button class="btn btn-primary btn-sm ms-1" onclick="controlJob(${job.id}, 'resume')" title="Resume Job">
+                <i class="fas fa-play"></i>
+            </button>
+            <button class="btn btn-success btn-sm ms-1" onclick="controlJob(${job.id}, 'complete')" title="Complete Job">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-danger btn-sm ms-1" onclick="controlJob(${job.id}, 'cancel')" title="Cancel Job">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+    }
+    
+    return buttons;
+}
+
+function controlJob(jobId, action) {
+    const operatorName = prompt(`Enter operator name for ${action} action:`);
+    if (!operatorName) return;
+    
+    fetch(`/api/job_control/${jobId}/${action}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ operator_name: operatorName })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadProductionJobs(); // Refresh the jobs list
+        } else {
+            showNotification('Error: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Error controlling job', 'error');
+    });
+}
+
+function showProgressModal(jobId) {
+    fetch(`/api/job_progress/${jobId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const progress = data.progress;
+                const content = `
+                    <div class="row">
+                        <div class="col-12">
+                            <h6>Real-time Progress: ${progress.job_number}</h6>
+                            <div class="progress mb-3" style="height: 25px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     style="width: ${progress.progress}%">
+                                    ${progress.progress}%
+                                </div>
+                            </div>
+                            <table class="table table-sm">
+                                <tr><td><strong>Stage:</strong></td><td>${progress.stage}</td></tr>
+                                <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getStatusColor(progress.status)}">${progress.status}</span></td></tr>
+                                <tr><td><strong>Current Step:</strong></td><td>${progress.current_step || 'N/A'}</td></tr>
+                                <tr><td><strong>Operator:</strong></td><td>${progress.operator || 'N/A'}</td></tr>
+                                ${progress.machine ? `<tr><td><strong>Machine:</strong></td><td>${progress.machine}</td></tr>` : ''}
+                                ${progress.time_remaining ? `<tr><td><strong>Time Remaining:</strong></td><td>${progress.time_remaining}</td></tr>` : ''}
+                                ${progress.estimated_completion ? `<tr><td><strong>Est. Completion:</strong></td><td>${new Date(progress.estimated_completion).toLocaleString()}</td></tr>` : ''}
+                            </table>
+                            
+                            ${progress.can_control ? `
+                                <div class="mt-3">
+                                    <h6>Quick Controls:</h6>
+                                    <div class="btn-group" role="group">
+                                        ${progress.status === 'in_progress' ? `
+                                            <button class="btn btn-warning btn-sm" onclick="controlJob(${progress.job_id}, 'pause'); setTimeout(() => showProgressModal(${progress.job_id}), 1000);">
+                                                <i class="fas fa-pause me-1"></i>Pause
+                                            </button>
+                                            <button class="btn btn-success btn-sm" onclick="controlJob(${progress.job_id}, 'complete'); $('#progressModal').modal('hide');">
+                                                <i class="fas fa-check me-1"></i>Complete
+                                            </button>
+                                        ` : ''}
+                                        ${progress.status === 'paused' ? `
+                                            <button class="btn btn-primary btn-sm" onclick="controlJob(${progress.job_id}, 'resume'); setTimeout(() => showProgressModal(${progress.job_id}), 1000);">
+                                                <i class="fas fa-play me-1"></i>Resume
+                                            </button>
+                                        ` : ''}
+                                        <button class="btn btn-danger btn-sm" onclick="controlJob(${progress.job_id}, 'cancel'); $('#progressModal').modal('hide');">
+                                            <i class="fas fa-times me-1"></i>Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('progressModalContent').innerHTML = content;
+                new bootstrap.Modal(document.getElementById('progressModal')).show();
+                
+                // Auto-refresh progress every 5 seconds while modal is open
+                const refreshInterval = setInterval(() => {
+                    if ($('#progressModal').hasClass('show')) {
+                        showProgressModal(jobId);
+                    } else {
+                        clearInterval(refreshInterval);
+                    }
+                }, 5000);
+            } else {
+                alert('Error loading progress: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading progress');
+        });
+}
+
+// Real-time updates
+setInterval(() => {
+    // Update active processes counter
+    fetch('/api/active_processes')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const activeCount = data.processes.length;
+                const indicator = document.getElementById('activeProcessesIndicator');
+                if (indicator) {
+                    indicator.textContent = activeCount;
+                    indicator.className = activeCount > 0 ? 'badge bg-warning' : 'badge bg-secondary';
+                }
+            }
+        })
+        .catch(error => console.log('Error updating active processes:', error));
+}, 10000); // Every 10 seconds
+
 </script>
 {% endblock %}

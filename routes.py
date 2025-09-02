@@ -1130,7 +1130,7 @@ def api_production_jobs_by_stage():
                 'order_number': job.order.order_number if job.order else 'N/A',
                 'status': job.status,
                 'stage': job.stage,
-                'progress': 0 if job.status == 'pending' else 50 if job.status == 'in_progress' else 100,
+                'progress': calculate_job_progress(job),
                 'can_proceed': job.status == 'pending',
                 'is_previous_step': False,
                 'is_running': job.status == 'in_progress',
@@ -1146,7 +1146,7 @@ def api_production_jobs_by_stage():
 
         return jsonify({
             'success': True,
-            'jobs': jobs_by_stage,
+            'data': jobs_by_stage,  # Fix API response format
             'total_jobs': len(active_jobs)
         })
 
@@ -1310,6 +1310,212 @@ def process_cleaning_24h(job_id):
         db.session.rollback()
         flash(f'Error starting cleaning process: {str(e)}', 'error')
         return redirect(url_for('cleaning_setup', job_id=job_id))
+
+def calculate_job_progress(job):
+    """Calculate job progress based on stage and status"""
+    try:
+        if job.status == 'completed':
+            return 100
+        elif job.status == 'pending':
+            return 0
+        elif job.status == 'in_progress':
+            # Calculate progress based on stage type
+            if job.stage in ['cleaning_24h', 'cleaning_12h']:
+                cleaning_process = CleaningProcess.query.filter_by(job_id=job.id).first()
+                if cleaning_process:
+                    elapsed = datetime.now() - cleaning_process.start_time
+                    total_duration = timedelta(hours=cleaning_process.duration_hours)
+                    progress = min(100, (elapsed.total_seconds() / total_duration.total_seconds()) * 100)
+                    return int(progress)
+            elif job.stage == 'grinding':
+                grinding_process = GrindingProcess.query.filter_by(job_id=job.id).first()
+                if grinding_process and grinding_process.status == 'running':
+                    return 75  # Running grinding process
+            elif job.stage == 'packing':
+                return 50  # Basic progress for packing
+            return 50  # Default in-progress
+    except Exception:
+        pass
+    return 0
+
+# Enhanced execution control routes
+@app.route('/api/job_control/<int:job_id>/<action>', methods=['POST'])
+def job_control(job_id, action):
+    """Control job execution: pause, resume, complete, cancel"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        operator = request.json.get('operator_name', 'System') if request.is_json else request.form.get('operator_name', 'System')
+        
+        if action == 'pause':
+            if job.status == 'in_progress':
+                job.status = 'paused'
+                # Pause related processes
+                if job.stage in ['cleaning_24h', 'cleaning_12h']:
+                    cleaning_process = CleaningProcess.query.filter_by(job_id=job_id, status='running').first()
+                    if cleaning_process:
+                        cleaning_process.status = 'paused'
+                
+                db.session.commit()
+                return jsonify({'success': True, 'message': f'Job {job.job_number} paused successfully'})
+            else:
+                return jsonify({'success': False, 'message': 'Can only pause jobs that are in progress'})
+                
+        elif action == 'resume':
+            if job.status == 'paused':
+                job.status = 'in_progress'
+                # Resume related processes
+                if job.stage in ['cleaning_24h', 'cleaning_12h']:
+                    cleaning_process = CleaningProcess.query.filter_by(job_id=job_id, status='paused').first()
+                    if cleaning_process:
+                        cleaning_process.status = 'running'
+                
+                db.session.commit()
+                return jsonify({'success': True, 'message': f'Job {job.job_number} resumed successfully'})
+            else:
+                return jsonify({'success': False, 'message': 'Can only resume paused jobs'})
+                
+        elif action == 'complete':
+            if job.status in ['in_progress', 'paused']:
+                job.status = 'completed'
+                job.completed_at = datetime.now()
+                job.completed_by = operator
+                
+                # Complete related processes
+                if job.stage in ['cleaning_24h', 'cleaning_12h']:
+                    cleaning_process = CleaningProcess.query.filter_by(job_id=job_id).first()
+                    if cleaning_process:
+                        cleaning_process.status = 'completed'
+                        cleaning_process.actual_end_time = datetime.now()
+                elif job.stage == 'grinding':
+                    grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
+                    if grinding_process:
+                        grinding_process.status = 'completed'
+                        grinding_process.end_time = datetime.now()
+                
+                db.session.commit()
+                return jsonify({'success': True, 'message': f'Job {job.job_number} completed successfully'})
+            else:
+                return jsonify({'success': False, 'message': 'Can only complete jobs that are in progress or paused'})
+                
+        elif action == 'cancel':
+            if job.status in ['pending', 'in_progress', 'paused']:
+                job.status = 'cancelled'
+                job.completed_at = datetime.now()
+                job.completed_by = operator
+                
+                # Cancel related processes
+                if job.stage in ['cleaning_24h', 'cleaning_12h']:
+                    cleaning_process = CleaningProcess.query.filter_by(job_id=job_id, status__in=['running', 'paused']).first()
+                    if cleaning_process:
+                        cleaning_process.status = 'cancelled'
+                        if cleaning_process.cleaning_bin_id:
+                            cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
+                            if cleaning_bin:
+                                cleaning_bin.status = 'available'
+                
+                db.session.commit()
+                return jsonify({'success': True, 'message': f'Job {job.job_number} cancelled successfully'})
+            else:
+                return jsonify({'success': False, 'message': 'Can only cancel jobs that are pending, in progress, or paused'})
+        
+        else:
+            return jsonify({'success': False, 'message': 'Invalid action'}), 400
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/job_progress/<int:job_id>')
+def job_progress_api(job_id):
+    """Get real-time progress for a specific job"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        progress_data = {
+            'job_id': job.id,
+            'job_number': job.job_number,
+            'stage': job.stage,
+            'status': job.status,
+            'progress': calculate_job_progress(job),
+            'started_at': job.started_at.isoformat() if job.started_at else None,
+            'estimated_completion': None,
+            'current_step': '',
+            'operator': job.started_by,
+            'can_control': job.status in ['pending', 'in_progress', 'paused']
+        }
+        
+        # Add stage-specific details
+        if job.stage in ['cleaning_24h', 'cleaning_12h']:
+            cleaning_process = CleaningProcess.query.filter_by(job_id=job_id).first()
+            if cleaning_process:
+                progress_data['current_step'] = f'{cleaning_process.process_type} cleaning'
+                progress_data['estimated_completion'] = cleaning_process.end_time.isoformat()
+                progress_data['machine'] = cleaning_process.machine_name
+                progress_data['operator'] = cleaning_process.operator_name
+                
+                # Calculate remaining time
+                if cleaning_process.status == 'running':
+                    remaining = cleaning_process.end_time - datetime.now()
+                    if remaining.total_seconds() > 0:
+                        progress_data['time_remaining'] = str(remaining).split('.')[0]  # Remove microseconds
+                    else:
+                        progress_data['time_remaining'] = 'Overdue'
+                        
+        elif job.stage == 'grinding':
+            grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
+            if grinding_process:
+                progress_data['current_step'] = 'Grinding process'
+                progress_data['machine'] = grinding_process.machine_name
+                progress_data['operator'] = grinding_process.operator_name
+                if grinding_process.input_quantity_kg:
+                    progress_data['input_quantity'] = grinding_process.input_quantity_kg
+                if grinding_process.total_output_kg:
+                    progress_data['output_quantity'] = grinding_process.total_output_kg
+                    
+        return jsonify({'success': True, 'progress': progress_data})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/active_processes')
+def active_processes_api():
+    """Get all active processes for real-time monitoring"""
+    try:
+        active_jobs = ProductionJobNew.query.filter(
+            ProductionJobNew.status.in_(['in_progress', 'paused'])
+        ).all()
+        
+        processes = []
+        for job in active_jobs:
+            process_data = {
+                'job_id': job.id,
+                'job_number': job.job_number,
+                'order_number': job.order.order_number if job.order else '',
+                'stage': job.stage,
+                'status': job.status,
+                'progress': calculate_job_progress(job),
+                'operator': job.started_by,
+                'started_at': job.started_at.isoformat() if job.started_at else None
+            }
+            
+            # Add process-specific details
+            if job.stage in ['cleaning_24h', 'cleaning_12h']:
+                cleaning_process = CleaningProcess.query.filter_by(job_id=job.id).first()
+                if cleaning_process:
+                    process_data['end_time'] = cleaning_process.end_time.isoformat()
+                    process_data['machine'] = cleaning_process.machine_name
+                    
+            elif job.stage == 'grinding':
+                grinding_process = GrindingProcess.query.filter_by(job_id=job.id).first()
+                if grinding_process:
+                    process_data['machine'] = grinding_process.machine_name
+                    
+            processes.append(process_data)
+            
+        return jsonify({'success': True, 'processes': processes})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/debug_production_order')
 def debug_production_order():
