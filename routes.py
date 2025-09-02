@@ -321,6 +321,44 @@ def production_planning(order_id=None):
                          products=products,
                          existing_plan=existing_plan)
 
+@app.route('/edit_production_order/<int:order_id>', methods=['GET', 'POST'])
+def edit_production_order(order_id):
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    if request.method == 'POST':
+        try:
+            order.quantity = float(request.form['quantity'])
+            order.product = request.form.get('product')
+            order.finished_good_type = request.form.get('finished_good_type')
+            order.deadline = datetime.strptime(request.form['deadline'], '%Y-%m-%d') if request.form.get('deadline') else None
+            order.priority = request.form.get('priority', 'normal')
+            order.description = request.form.get('notes')
+            order.target_completion = datetime.strptime(request.form['target_completion'], '%Y-%m-%d') if request.form.get('target_completion') else None
+            
+            db.session.commit()
+            flash('Production order updated successfully!', 'success')
+            return redirect(url_for('production_orders'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating production order: {str(e)}', 'error')
+    
+    customers = Customer.query.all()
+    products = Product.query.filter_by(category='Main Product').all()
+    return render_template('edit_production_order.html', order=order, customers=customers, products=products)
+
+@app.route('/delete_production_order/<int:order_id>', methods=['POST'])
+def delete_production_order(order_id):
+    try:
+        order = ProductionOrder.query.get_or_404(order_id)
+        db.session.delete(order)
+        db.session.commit()
+        flash('Production order deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting production order: {str(e)}', 'error')
+    return redirect(url_for('production_orders'))
+
 @app.route('/reports')
 def reports():
     # Various report data
@@ -341,8 +379,60 @@ def reports():
                          godown_inventory=godown_inventory,
                          production_stats=production_stats)
 
-@app.route('/masters')
+@app.route('/masters', methods=['GET', 'POST'])
 def masters():
+    if request.method == 'POST':
+        try:
+            form_type = request.form.get('form_type')
+            
+            if form_type == 'supplier':
+                supplier = Supplier()
+                supplier.company_name = request.form['company_name']
+                supplier.contact_person = request.form.get('contact_person')
+                supplier.phone = request.form.get('phone')
+                supplier.address = request.form.get('address')
+                supplier.city = request.form.get('city')
+                supplier.state = request.form.get('state')
+                supplier.postal_code = request.form.get('postal_code')
+                db.session.add(supplier)
+                flash('Supplier added successfully!', 'success')
+                
+            elif form_type == 'customer':
+                customer = Customer()
+                customer.company_name = request.form['company_name']
+                customer.contact_person = request.form.get('contact_person')
+                customer.phone = request.form.get('phone')
+                customer.email = request.form.get('email')
+                customer.address = request.form.get('address')
+                customer.city = request.form.get('city')
+                customer.state = request.form.get('state')
+                customer.postal_code = request.form.get('postal_code')
+                db.session.add(customer)
+                flash('Customer added successfully!', 'success')
+                
+            elif form_type == 'product':
+                product = Product()
+                product.name = request.form['name']
+                product.category = request.form.get('category', 'Main Product')
+                product.description = request.form.get('description')
+                db.session.add(product)
+                flash('Product added successfully!', 'success')
+                
+            elif form_type == 'godown_type':
+                godown_type = GodownType()
+                godown_type.name = request.form['name']
+                godown_type.description = request.form.get('description')
+                db.session.add(godown_type)
+                flash('Godown type added successfully!', 'success')
+                
+            db.session.commit()
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding record: {str(e)}', 'error')
+            
+        return redirect(url_for('masters'))
+
     suppliers = Supplier.query.all()
     customers = Customer.query.all()
     products = Product.query.all()
@@ -354,8 +444,26 @@ def masters():
                          products=products,
                          godown_types=godown_types)
 
-@app.route('/godown_management')
+@app.route('/godown_management', methods=['GET', 'POST'])
 def godown_management():
+    if request.method == 'POST':
+        try:
+            godown = Godown()
+            godown.name = request.form['name']
+            godown.type_id = int(request.form['type_id'])
+            godown.capacity = float(request.form.get('capacity', 0))
+            godown.current_stock = float(request.form.get('current_stock', 0))
+            
+            db.session.add(godown)
+            db.session.commit()
+            flash('Godown added successfully!', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding godown: {str(e)}', 'error')
+            
+        return redirect(url_for('godown_management'))
+
     godowns = Godown.query.join(GodownType).all()
     godown_types = GodownType.query.all()
 
@@ -556,8 +664,8 @@ def init_data():
         # Create sample suppliers if none exist
         if Supplier.query.count() == 0:
             suppliers = [
-                Supplier(name='ABC Farm Supplies', contact_person='John Doe', phone='9876543210', address='Sample Address 1'),
-                Supplier(name='XYZ Agricultural Co.', contact_person='Jane Smith', phone='9876543211', address='Sample Address 2')
+                Supplier(company_name='ABC Farm Supplies', contact_person='John Doe', phone='9876543210', address='Sample Address 1'),
+                Supplier(company_name='XYZ Agricultural Co.', contact_person='Jane Smith', phone='9876543211', address='Sample Address 2')
             ]
             for supplier in suppliers:
                 db.session.add(supplier)
@@ -565,8 +673,8 @@ def init_data():
         # Create sample customers if none exist
         if Customer.query.count() == 0:
             customers = [
-                Customer(name='Sample Customer 1', contact_person='Customer Rep 1', phone='9876543212', address='Customer Address 1'),
-                Customer(name='Sample Customer 2', contact_person='Customer Rep 2', phone='9876543213', address='Customer Address 2')
+                Customer(company_name='Sample Customer 1', contact_person='Customer Rep 1', phone='9876543212', address='Customer Address 1'),
+                Customer(company_name='Sample Customer 2', contact_person='Customer Rep 2', phone='9876543213', address='Customer Address 2')
             ]
             for customer in customers:
                 db.session.add(customer)
@@ -574,9 +682,9 @@ def init_data():
         # Create sample products if none exist
         if Product.query.count() == 0:
             products = [
-                Product(name='Wheat Flour', category='Main Product', unit='kg', standard_price=50.0),
-                Product(name='Wheat Bran', category='By-product', unit='kg', standard_price=25.0),
-                Product(name='Fine Flour', category='Main Product', unit='kg', standard_price=55.0)
+                Product(name='Wheat Flour', category='Main Product', description='Premium wheat flour'),
+                Product(name='Wheat Bran', category='Bran', description='High quality wheat bran'),
+                Product(name='Fine Flour', category='Main Product', description='Fine wheat flour')
             ]
             for product in products:
                 db.session.add(product)
@@ -953,6 +1061,51 @@ def complete_process_machine_cleaning(log_id):
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# CRUD API Routes for better functionality
+@app.route('/api/delete_supplier/<int:supplier_id>', methods=['POST'])
+def delete_supplier(supplier_id):
+    try:
+        supplier = Supplier.query.get_or_404(supplier_id)
+        db.session.delete(supplier)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Supplier deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/delete_customer/<int:customer_id>', methods=['POST'])
+def delete_customer(customer_id):
+    try:
+        customer = Customer.query.get_or_404(customer_id)
+        db.session.delete(customer)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Customer deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/delete_product/<int:product_id>', methods=['POST'])
+def delete_product(product_id):
+    try:
+        product = Product.query.get_or_404(product_id)
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Product deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/delete_godown/<int:godown_id>', methods=['POST'])
+def delete_godown(godown_id):
+    try:
+        godown = Godown.query.get_or_404(godown_id)
+        db.session.delete(godown)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Godown deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/production_jobs_by_stage')
 def api_production_jobs_by_stage():
