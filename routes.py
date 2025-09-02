@@ -204,11 +204,37 @@ def production_orders():
         try:
             order = ProductionOrder()
             order.order_number = generate_order_number('PO')
-            order.customer_id = int(request.form['customer_id']) if request.form.get('customer_id') else None
+            
+            # Handle customer field - check if it's customer_id or customer name
+            if request.form.get('customer_id'):
+                order.customer_id = int(request.form['customer_id'])
+            elif request.form.get('customer'):
+                # If customer name is provided, find or create customer
+                customer_name = request.form['customer']
+                customer = Customer.query.filter_by(company_name=customer_name).first()
+                if customer:
+                    order.customer_id = customer.id
+                else:
+                    # Create new customer with minimal info
+                    new_customer = Customer(company_name=customer_name)
+                    db.session.add(new_customer)
+                    db.session.flush()
+                    order.customer_id = new_customer.id
+            
             order.quantity = float(request.form['quantity'])
-            order.product_id = int(request.form['product_id'])
-            order.description = request.form.get('description')
-            order.created_by = request.form['created_by']
+            
+            # Handle product field - check if it's product_id or product name
+            if request.form.get('product_id'):
+                product = Product.query.get(int(request.form['product_id']))
+                order.product = product.name if product else 'Unknown Product'
+            elif request.form.get('product'):
+                order.product = request.form['product']
+            
+            order.finished_good_type = request.form.get('finished_good_type')
+            order.deadline = datetime.strptime(request.form['deadline'], '%Y-%m-%d') if request.form.get('deadline') else None
+            order.priority = request.form.get('priority', 'normal')
+            order.description = request.form.get('notes')  # Map notes to description
+            order.created_by = request.form.get('created_by', 'System')
             order.target_completion = datetime.strptime(request.form['target_completion'], '%Y-%m-%d') if request.form.get('target_completion') else None
             
             db.session.add(order)
@@ -217,6 +243,7 @@ def production_orders():
             
         except Exception as e:
             db.session.rollback()
+            print(f"Production order creation error: {str(e)}")  # Debug print
             flash(f'Error creating production order: {str(e)}', 'error')
     
     orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
@@ -886,3 +913,42 @@ def complete_process_machine_cleaning(log_id):
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/debug_production_order')
+def debug_production_order():
+    """Debug route to test production order creation"""
+    try:
+        from sqlalchemy import text
+        
+        # Test database connection
+        result = db.session.execute(text("SELECT 1")).fetchone()
+        print("Database connection: OK")
+        
+        # Check production_order table structure
+        result = db.session.execute(text("""
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns 
+            WHERE table_name = 'production_order'
+            ORDER BY column_name;
+        """)).fetchall()
+        
+        print("Production Order table structure:")
+        for row in result:
+            print(f"  {row[0]}: {row[1]} (nullable: {row[2]})")
+        
+        # Test creating a simple production order
+        test_order = ProductionOrder(
+            order_number=generate_order_number('TEST'),
+            quantity=100.0,
+            product='Test Product',
+            created_by='Debug Test'
+        )
+        
+        db.session.add(test_order)
+        db.session.commit()
+        
+        return f"Debug successful! Test order created with ID: {test_order.id}"
+        
+    except Exception as e:
+        db.session.rollback()
+        return f"Debug error: {str(e)}"

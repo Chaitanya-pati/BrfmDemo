@@ -28,6 +28,22 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="customer" class="form-label">Customer</label>
+                        <select class="form-select" id="customer" name="customer_id">
+                            <option value="">Select Customer (Optional)</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}">{{ customer.company_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="created_by" class="form-label">Created By</label>
+                        <input type="text" class="form-control" id="created_by" name="created_by" 
+                               placeholder="Enter your name" required>
+                    </div>
+
+                    <div class="mb-3">
                         <label for="finished_good_type" class="form-label">Type of Finished Good</label>
                         <input type="text" class="form-control" id="finished_good_type" name="finished_good_type" 
                                placeholder="e.g., Premium Quality, Standard Grade, Bulk Order" required>
@@ -41,6 +57,11 @@
                     <div class="mb-3">
                         <label for="deadline" class="form-label">Deadline</label>
                         <input type="date" class="form-control" id="deadline" name="deadline">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="target_completion" class="form-label">Target Completion Date</label>
+                        <input type="date" class="form-control" id="target_completion" name="target_completion">
                     </div>
 
                     <div class="mb-3">
