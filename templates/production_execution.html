@@ -256,52 +256,27 @@ document.addEventListener('DOMContentLoaded', function() {
 function showNotification(message, type) {
     const toastContainer = document.getElementById('notificationArea');
 
-    const toastId = `toast-${Date.now()}`;
     const toast = document.createElement('div');
-    toast.setStyle(toast, {
-        'position': 'relative',
-        'padding': '0.75rem 1.25rem',
-        'margin-bottom': '1rem',
-        'border': '1px solid transparent',
-        'border-radius': '0.25rem',
-        'color': '#155724',
-        'background-color': '#d4edda',
-        'border-color': '#c3e6cb'
-    });
-
-    if (type === 'error') {
-        toast.setStyle(toast, {
-            'color': '#721c24',
-            'background-color': '#f8d7da',
-            'border-color': '#f5c6cb'
-        });
-    }
+    toast.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show`;
+    toast.setAttribute('role', 'alert');
+    toast.style.position = 'relative';
+    toast.style.marginBottom = '1rem';
 
     toast.innerHTML = `
         <div class="d-flex w-100 justify-content-between">
             <span>${message}</span>
-            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
 
     toastContainer.appendChild(toast);
 
-    // Initialize Bootstrap toast and show it
-    const bsToast = new bootstrap.Toast(toast, {
-        autohide: true,
-        delay: 5000
-    });
-    bsToast.show();
-
-    // Clean up the toast element after it's hidden
-    toast.addEventListener('hidden.bs.toast', function() {
-        toastContainer.removeChild(toast);
-    });
-}
-
-// Helper to set multiple styles
-function setStyle(element, styles) {
-    Object.assign(element.style, styles);
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toastContainer.removeChild(toast);
+        }
+    }, 5000);
 }
 
 
@@ -322,10 +297,10 @@ function loadProductionJobs() {
                 // Update each stage
                 Object.keys(data).forEach(stage => {
                     const jobs = data[stage];
-                    updateTabContent(`${stage}-jobs`, jobs, stage);
+                    updateTabContent(`${stage.replace('_', '-')}-jobs`, jobs, stage);
 
                     // Update tab badges
-                    const tabBadge = document.getElementById(`${stage}-count`);
+                    const tabBadge = document.getElementById(`${stage.replace('_', '-')}-count`);
                     if (tabBadge) {
                         tabBadge.textContent = jobs.length;
                     }
@@ -391,8 +366,7 @@ function updateTabContent(containerId, jobs, stage) {
                     <small>${job.progress}%</small>
                 </td>
                 <td>
-                    ${canStart ? getActionButtons(job, stage) : '<span class="text-muted">Waiting</span>'}
-                    ${job.status === 'in_progress' || job.status === 'paused' ? getControlButtons(job) : ''}
+                    ${getActionButtons(job, stage)}
                 </td>
             </tr>
         `;
@@ -422,27 +396,44 @@ function getActionButtons(job, stage) {
             <button class="btn btn-info btn-sm me-1" onclick="viewJob(${job.id})">
                 <i class="fas fa-eye me-1"></i>Monitor
             </button>
-            <button class="btn btn-warning btn-sm me-1" onclick="showProgressModal(${job.id})">
-                <i class="fas fa-chart-line me-1"></i>Progress
+            <button class="btn btn-warning btn-sm me-1" onclick="controlJob(${job.id}, 'pause')">
+                <i class="fas fa-pause me-1"></i>Pause
+            </button>
+            <button class="btn btn-success btn-sm me-1" onclick="controlJob(${job.id}, 'complete')">
+                <i class="fas fa-check me-1"></i>Complete
             </button>
         `;
     }
 
     if (job.status === 'paused') {
         return `
-            <button class="btn btn-info btn-sm me-1" onclick="viewJob(${job.id})">
-                <i class="fas fa-eye me-1"></i>Details
+            <button class="btn btn-primary btn-sm me-1" onclick="controlJob(${job.id}, 'resume')">
+                <i class="fas fa-play me-1"></i>Resume
             </button>
-            <span class="badge bg-warning">Paused</span>
+            <button class="btn btn-success btn-sm me-1" onclick="controlJob(${job.id}, 'complete')">
+                <i class="fas fa-check me-1"></i>Complete
+            </button>
         `;
     }
 
-    // Pending jobs
+    if (job.status === 'pending') {
+        return getStartButton(job, stage);
+    }
+
+    return '<span class="text-muted">N/A</span>';
+}
+
+function getStartButton(job, stage) {
     let actionUrl = '';
     let actionText = '';
     let actionIcon = '';
 
     switch(stage) {
+        case 'transfer':
+            actionUrl = `/transfer_execution/${job.id}`;
+            actionText = 'Start Transfer';
+            actionIcon = 'fas fa-arrow-right';
+            break;
         case 'cleaning_24h':
             actionUrl = `/production_execution/cleaning_setup/${job.id}`;
             actionText = 'Start 24h Cleaning';
@@ -459,10 +450,12 @@ function getActionButtons(job, stage) {
             actionIcon = 'fas fa-cog';
             break;
         case 'packing':
-            actionUrl = `/production_execution/packing/${job.id}`;
+            actionUrl = `/packing_execution/${job.id}`;
             actionText = 'Start Packing';
             actionIcon = 'fas fa-box';
             break;
+        default:
+            return '<span class="text-muted">Not Ready</span>';
     }
 
     return `
@@ -473,6 +466,7 @@ function getActionButtons(job, stage) {
             <i class="fas fa-info me-1"></i>Details
         </button>
     `;
+
 }
 
 function updateTabStates(jobsByStage) {
@@ -696,7 +690,10 @@ setInterval(() => {
             }
         })
         .catch(error => console.log('Error updating active processes:', error));
-}, 10000); // Every 10 seconds
+        
+    // Also refresh the jobs list
+    loadProductionJobs();
+}, 15000); // Every 15 seconds
 
 </script>
 {% endblock %}
