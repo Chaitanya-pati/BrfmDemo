@@ -97,7 +97,9 @@
                                                 <h6 class="mb-1">{{ machine.name }}</h6>
                                                 <small class="text-muted">{{ machine.location }}</small>
                                             </div>
-                                            {% if needs_cleaning %}
+                                            {% if active_cleaning %}
+                                                <span class="badge bg-info">Cleaning in Progress</span>
+                                            {% elif needs_cleaning %}
                                                 <span class="badge bg-warning">Needs Cleaning</span>
                                             {% else %}
                                                 <span class="badge bg-success">Clean</span>
@@ -117,7 +119,42 @@
                                                 </small>
                                             </div>
                                         </div>
-                                        {% if needs_cleaning %}
+                                        {% set active_cleaning = None %}
+                                        {% for log in in_progress_cleanings %}
+                                            {% if log.machine_id == machine.id %}
+                                                {% set active_cleaning = log %}
+                                            {% endif %}
+                                        {% endfor %}
+
+                                        {% if active_cleaning %}
+                                            <!-- Complete Cleaning Controls -->
+                                            <div class="mt-2 p-2 bg-info bg-opacity-10 rounded">
+                                                <small class="text-info fw-bold">
+                                                    <i class="fas fa-clock me-1"></i>Cleaning in progress by {{ active_cleaning.cleaned_by }}
+                                                </small>
+                                                <form method="POST" action="{{ url_for('complete_machine_cleaning', log_id=active_cleaning.id) }}" class="mt-2" enctype="multipart/form-data">
+                                                    <div class="row g-2">
+                                                        <div class="col-sm-6">
+                                                            <input type="number" name="waste_collected" class="form-control form-control-sm" 
+                                                                   placeholder="Waste (kg)" step="0.1" value="{{ active_cleaning.waste_collected_kg or '' }}">
+                                                        </div>
+                                                        <div class="col-sm-6">
+                                                            <input type="file" name="after_photo" class="form-control form-control-sm" accept="image/*">
+                                                        </div>
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <textarea name="notes" class="form-control form-control-sm" rows="2" 
+                                                                  placeholder="Cleaning notes (optional)">{{ active_cleaning.notes or '' }}</textarea>
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <button type="submit" class="btn btn-success btn-sm w-100">
+                                                            <i class="fas fa-check me-1"></i>Complete Cleaning
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        {% elif needs_cleaning %}
+                                            <!-- Start Cleaning Controls -->
                                             <form method="POST" class="mt-2" enctype="multipart/form-data">
                                                 <input type="hidden" name="action" value="start_cleaning">
                                                 <input type="hidden" name="machine_id" value="{{ machine.id }}">
@@ -136,6 +173,13 @@
                                                     <small class="form-text text-muted">Upload before cleaning photo</small>
                                                 </div>
                                             </form>
+                                        {% else %}
+                                            <!-- Machine is Clean -->
+                                            <div class="mt-2 p-2 bg-success bg-opacity-10 rounded">
+                                                <small class="text-success fw-bold">
+                                                    <i class="fas fa-check-circle me-1"></i>Machine is clean and ready
+                                                </small>
+                                            </div>
                                         {% endif %}
                                     </div>
                                 </div>

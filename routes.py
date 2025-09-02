@@ -2130,11 +2130,18 @@ def process_machine_cleaning(job_id):
             db.session.rollback()
             flash(f'Error starting machine cleaning: {str(e)}', 'error')
     
+    # Get in-progress cleaning logs for this job
+    in_progress_cleanings = MachineCleaningLog.query.filter_by(
+        job_id=job_id,
+        status='in_progress'
+    ).all()
+    
     return render_template('process_machine_cleaning.html',
                          job=job,
                          machines=machines,
                          pending_cleanings=pending_cleanings,
-                         recent_logs=recent_logs)
+                         recent_logs=recent_logs,
+                         in_progress_cleanings=in_progress_cleanings)
 
 @app.route('/complete_process_machine_cleaning/<int:log_id>', methods=['GET', 'POST'])
 def complete_process_machine_cleaning(log_id):
