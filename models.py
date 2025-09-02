@@ -12,7 +12,7 @@ class Supplier(db.Model):
     state = db.Column(db.String(50))
     postal_code = db.Column(db.String(10))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationship
     vehicles = db.relationship('Vehicle', backref='supplier', lazy=True)
 
@@ -20,7 +20,7 @@ class GodownType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)  # mill, low mill, hd
     description = db.Column(db.String(200))
-    
+
     # Relationship
     godowns = db.relationship('Godown', backref='godown_type', lazy=True)
 
@@ -30,7 +30,7 @@ class Godown(db.Model):
     type_id = db.Column(db.Integer, db.ForeignKey('godown_type.id'), nullable=False)
     capacity = db.Column(db.Float, default=0)  # in tons
     current_stock = db.Column(db.Float, default=0)  # in tons
-    
+
     # Relationship
     transfers_from = db.relationship('Transfer', foreign_keys='Transfer.from_godown_id', backref='from_godown', lazy=True)
     transfers_to = db.relationship('Transfer', foreign_keys='Transfer.to_godown_id', backref='to_godown', lazy=True)
@@ -40,7 +40,7 @@ class PrecleaningBin(db.Model):
     name = db.Column(db.String(50), nullable=False)
     capacity = db.Column(db.Float, nullable=False)  # in tons
     current_stock = db.Column(db.Float, default=0)
-    
+
     # Relationship
     transfers_to = db.relationship('Transfer', foreign_keys='Transfer.to_precleaning_bin_id', backref='to_precleaning_bin', lazy=True)
 
@@ -83,7 +83,7 @@ class Vehicle(db.Model):
     final_weight = db.Column(db.Float)
     godown_id = db.Column(db.Integer, db.ForeignKey('godown.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationship
     quality_tests = db.relationship('QualityTest', backref='vehicle', lazy=True)
 
@@ -140,7 +140,7 @@ class CleaningMachine(db.Model):
     cleaning_frequency_hours = db.Column(db.Integer, default=3)
     location = db.Column(db.String(100))
     last_cleaned = db.Column(db.DateTime)
-    
+
     # Relationship
     cleaning_logs = db.relationship('CleaningLog', backref='machine', lazy=True)
 
@@ -168,7 +168,7 @@ class ProductionOrder(db.Model):
     created_by = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     target_completion = db.Column(db.DateTime)
-    
+
     # Relationships
     production_plan = db.relationship('ProductionPlan', backref='order', uselist=False)
     production_jobs = db.relationship('ProductionJobNew', back_populates='order', lazy=True)
@@ -181,7 +181,7 @@ class ProductionPlan(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     total_percentage = db.Column(db.Float, default=0)
     status = db.Column(db.String(20), default='draft')  # draft, approved, executed
-    
+
     # Relationship
     plan_items = db.relationship('ProductionPlanItem', backref='plan', lazy=True)
     jobs = db.relationship('ProductionJobNew', back_populates='plan', lazy=True)
@@ -192,7 +192,7 @@ class ProductionPlanItem(db.Model):
     precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=False)
     percentage = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Float, nullable=False)  # calculated from percentage
-    
+
     # Relationship
     precleaning_bin = db.relationship('PrecleaningBin', backref='plan_items')
 
@@ -216,7 +216,7 @@ class FinishedGoods(db.Model):
     production_date = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     batch_number = db.Column(db.String(50))
-    
+
     # Relationships
     product = db.relationship('Product', backref='finished_goods')
     storage = db.relationship('FinishedGoodsStorage', backref='stored_goods')
@@ -232,7 +232,7 @@ class SalesOrder(db.Model):
     delivered_quantity = db.Column(db.Float, default=0)
     pending_quantity = db.Column(db.Float)
     status = db.Column(db.String(20), default='pending')  # pending, partial, completed
-    
+
     # Relationships
     customer = db.relationship('Customer', backref='sales_orders')
     order_items = db.relationship('SalesOrderItem', backref='sales_order', lazy=True)
@@ -245,7 +245,7 @@ class SalesOrderItem(db.Model):
     quantity = db.Column(db.Float, nullable=False)
     delivered_quantity = db.Column(db.Float, default=0)
     pending_quantity = db.Column(db.Float)
-    
+
     # Relationship
     product = db.relationship('Product', backref='sales_order_items')
 
@@ -258,7 +258,7 @@ class DispatchVehicle(db.Model):
     city = db.Column(db.String(50))
     capacity = db.Column(db.Float)
     status = db.Column(db.String(20), default='available')  # available, dispatched, blocked
-    
+
     # Relationship
     dispatches = db.relationship('Dispatch', backref='vehicle', lazy=True)
 
@@ -295,7 +295,7 @@ class DispatchItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Float, nullable=False)
     bag_count = db.Column(db.Integer)
-    
+
     # Relationship
     product = db.relationship('Product', backref='dispatch_items')
 
@@ -330,7 +330,7 @@ class ProductionJobNew(db.Model):
     completed_by = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     order = db.relationship('ProductionOrder', back_populates='production_jobs')
     plan = db.relationship('ProductionPlan', back_populates='jobs')
 
@@ -343,7 +343,7 @@ class ProductionTransfer(db.Model):
     operator_name = db.Column(db.String(100), nullable=False)
     start_photo = db.Column(db.String(255))
     end_photo = db.Column(db.String(255))
-    
+
     job = db.relationship('ProductionJobNew', backref=db.backref('transfers', lazy=True))
     from_bin = db.relationship('PrecleaningBin', backref=db.backref('transfers', lazy=True))
 
@@ -355,40 +355,37 @@ class CleaningBin(db.Model):
     status = db.Column(db.String(20), default='empty')  # empty, occupied, cleaning
     location = db.Column(db.String(100))
     cleaning_type = db.Column(db.String(20), default='24_hour')  # 24_hour, 12_hour
-    
+
     # Relationship
     cleaning_processes = db.relationship('CleaningProcess', backref='cleaning_bin', lazy=True)
 
 class CleaningProcess(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
-    process_type = db.Column(db.String(50), nullable=False)  # 24_hour, 12_hour
-    cleaning_bin_id = db.Column(db.Integer, db.ForeignKey('cleaning_bin.id'), nullable=False)
+    cleaning_bin_id = db.Column(db.Integer, db.ForeignKey('cleaning_bin.id'))
+    process_type = db.Column(db.String(20), nullable=False)  # '24_hour', '12_hour', 'custom'
     duration_hours = db.Column(db.Float, nullable=False)
-    target_moisture = db.Column(db.Float)  # For 12-hour process
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
     actual_end_time = db.Column(db.DateTime)
     start_moisture = db.Column(db.Float)
     end_moisture = db.Column(db.Float)
-    water_added_liters = db.Column(db.Float)
-    waste_collected_kg = db.Column(db.Float)
+    target_moisture = db.Column(db.Float)  # For 12-hour cleaning
+    water_added_liters = db.Column(db.Float, default=0.0)
+    waste_collected_kg = db.Column(db.Float, default=0.0)
     machine_name = db.Column(db.String(100))
-    status = db.Column(db.String(50), default='pending')  # pending, running, completed
-    start_photo = db.Column(db.String(255))
-    end_photo = db.Column(db.String(255))
     operator_name = db.Column(db.String(100))
-    completed_by = db.Column(db.String(100))
+    status = db.Column(db.String(20), default='pending')  # pending, running, completed, paused
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Enhanced tracking fields for step requirements
     is_locked = db.Column(db.Boolean, default=True, nullable=True)  # Locks access during cleaning
     reminder_sent_5min = db.Column(db.Boolean, default=False, nullable=True)
     reminder_sent_10min = db.Column(db.Boolean, default=False, nullable=True)
     reminder_sent_30min = db.Column(db.Boolean, default=False, nullable=True)
     next_process_job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=True)  # For 12h process after 24h
-    
+
     job = db.relationship('ProductionJobNew', foreign_keys=[job_id], backref=db.backref('cleaning_processes', lazy=True))
     next_process_job = db.relationship('ProductionJobNew', foreign_keys=[next_process_job_id], backref=db.backref('previous_cleaning_processes', lazy=True))
 
@@ -408,16 +405,16 @@ class GrindingProcess(db.Model):
     start_photo = db.Column(db.String(255))
     end_photo = db.Column(db.String(255))
     notes = db.Column(db.Text)
-    
+
     # Enhanced fields for B1 scale tracking
     b1_scale_operator = db.Column(db.String(100))  # B1 scale operator
     b1_scale_start_time = db.Column(db.DateTime)  # When wheat moved from B1 scale
     b1_scale_weight_kg = db.Column(db.Float)  # Weight from B1 scale
-    
+
     # Bran percentage validation
     bran_percentage_alert = db.Column(db.Boolean, default=False)  # True if bran > 25%
     main_products_percentage = db.Column(db.Float)  # Calculated main products %
-    
+
     job = db.relationship('ProductionJobNew', backref=db.backref('grinding_processes', lazy=True))
 
 class ProductOutput(db.Model):
@@ -426,7 +423,7 @@ class ProductOutput(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity_produced_kg = db.Column(db.Float, nullable=False)
     percentage = db.Column(db.Float, nullable=False)
-    
+
     grinding_process = db.relationship('GrindingProcess', backref=db.backref('product_outputs', lazy=True))
     product = db.relationship('Product', backref=db.backref('production_outputs', lazy=True))
 
@@ -442,7 +439,7 @@ class PackingProcess(db.Model):
     storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'))
     stored_in_shallow_kg = db.Column(db.Float, default=0)
     packing_photo = db.Column(db.String(255))
-    
+
     job = db.relationship('ProductionJobNew', backref=db.backref('packing_processes', lazy=True))
     product = db.relationship('Product', backref=db.backref('packing_processes', lazy=True))
     storage_area = db.relationship('StorageArea', backref=db.backref('packed_goods', lazy=True))
@@ -453,7 +450,7 @@ class StorageArea(db.Model):
     capacity_kg = db.Column(db.Float, nullable=False)
     current_stock_kg = db.Column(db.Float, default=0)
     location = db.Column(db.String(200))
-    
+
 class StorageTransfer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     from_storage_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=False)
@@ -463,7 +460,7 @@ class StorageTransfer(db.Model):
     transfer_time = db.Column(db.DateTime, default=datetime.utcnow)
     operator_name = db.Column(db.String(100), nullable=False)
     reason = db.Column(db.String(200))
-    
+
     from_storage = db.relationship('StorageArea', foreign_keys=[from_storage_id], backref=db.backref('outgoing_transfers', lazy=True))
     to_storage = db.relationship('StorageArea', foreign_keys=[to_storage_id], backref=db.backref('incoming_transfers', lazy=True))
     product = db.relationship('Product', backref=db.backref('storage_transfers', lazy=True))
@@ -476,7 +473,7 @@ class ProcessReminder(db.Model):
     reminder_type = db.Column(db.String(20), nullable=False)  # 5min, 10min, 30min
     status = db.Column(db.String(20), default='pending')  # pending, sent, dismissed
     message = db.Column(db.Text)
-    
+
     job = db.relationship('ProductionJobNew', backref=db.backref('reminders', lazy=True))
 
 # Enhanced Machine Cleaning Model for Hourly Cleaning with B1 Scale
@@ -487,10 +484,10 @@ class B1ScaleCleaning(db.Model):
     last_cleaned = db.Column(db.DateTime)
     next_cleaning_due = db.Column(db.DateTime)
     status = db.Column(db.String(20), default='due')  # due, cleaning, completed
-    
+
     # Cleaning log relationship
     cleaning_logs = db.relationship('B1ScaleCleaningLog', backref='machine', lazy=True)
-    
+
 class B1ScaleCleaningLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     machine_id = db.Column(db.Integer, db.ForeignKey('b1_scale_cleaning.id'), nullable=False)
@@ -503,7 +500,7 @@ class B1ScaleCleaningLog(db.Model):
     waste_collected_kg = db.Column(db.Float)
     notes = db.Column(db.Text)
     status = db.Column(db.String(20), default='completed')
-    
+
     # Relationship with grinding process
     grinding_process = db.relationship('GrindingProcess', backref='b1_cleaning_logs')
 
@@ -520,7 +517,7 @@ class ProductStorageTransfer(db.Model):
     operator_name = db.Column(db.String(100), nullable=False)
     reason = db.Column(db.String(200))
     notes = db.Column(db.Text)
-    
+
     # Relationships
     from_storage = db.relationship('StorageArea', foreign_keys=[from_storage_area_id], backref='outbound_transfers')
     to_storage = db.relationship('StorageArea', foreign_keys=[to_storage_area_id], backref='inbound_transfers')
@@ -538,7 +535,7 @@ class ProductionMachine(db.Model):
     status = db.Column(db.String(20), default='operational')
     is_active = db.Column(db.Boolean, default=False)  # Active during process
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     cleaning_logs = db.relationship('MachineCleaningLog', backref='machine', lazy=True)
     cleaning_schedules = db.relationship('CleaningSchedule', backref='machine', lazy=True)
@@ -585,7 +582,7 @@ class ProductionOrderTracking(db.Model):
     total_duration_hours = db.Column(db.Float)
     total_cleanings_performed = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Process parameters tracking
     precleaning_moisture = db.Column(db.Float)
     cleaning_24h_start_moisture = db.Column(db.Float)

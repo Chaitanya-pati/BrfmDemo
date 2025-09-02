@@ -197,6 +197,47 @@ def add_master_data():
                         name='Drum Shield Machine 1',
                         machine_type='drum_shield',
                         cleaning_frequency_hours=3,
+
+        # Create Cleaning Bins
+        if CleaningBin.query.count() == 0:
+            print("Creating cleaning bins...")
+            cleaning_bins = [
+                CleaningBin(
+                    name='Cleaning Bin #1',
+                    capacity=50.0,
+                    current_stock=0.0,
+                    status='available',
+                    location='Cleaning Area A'
+                ),
+                CleaningBin(
+                    name='Cleaning Bin #2', 
+                    capacity=50.0,
+                    current_stock=0.0,
+                    status='available',
+                    location='Cleaning Area B'
+                ),
+                CleaningBin(
+                    name='Cleaning Bin #3',
+                    capacity=75.0,
+                    current_stock=0.0,
+                    status='available',
+                    location='Cleaning Area C'
+                ),
+                CleaningBin(
+                    name='Cleaning Bin #4',
+                    capacity=75.0,
+                    current_stock=0.0,
+                    status='available',
+                    location='Cleaning Area D'
+                )
+            ]
+            
+            for bin in cleaning_bins:
+                db.session.add(bin)
+            
+            print(f"Created {len(cleaning_bins)} cleaning bins")
+
+
                         location='Pre-cleaning Area A',
                         last_cleaned=datetime.now()
                     ),
