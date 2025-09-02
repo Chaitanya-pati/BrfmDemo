@@ -213,6 +213,7 @@ class FinishedGoods(db.Model):
     bag_count = db.Column(db.Integer)
     storage_id = db.Column(db.Integer, db.ForeignKey('finished_goods_storage.id'))
     production_date = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     batch_number = db.Column(db.String(50))
     
     # Relationships

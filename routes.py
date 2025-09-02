@@ -400,6 +400,19 @@ def approve_vehicle(vehicle_id):
         flash(f'Error approving vehicle: {str(e)}', 'error')
     return redirect(url_for('quality_control'))
 
+@app.route('/reject_vehicle/<int:vehicle_id>')
+def reject_vehicle(vehicle_id):
+    try:
+        vehicle = Vehicle.query.get_or_404(vehicle_id)
+        vehicle.status = 'rejected'
+        vehicle.owner_approved = False
+        db.session.commit()
+        flash('Vehicle rejected!', 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error rejecting vehicle: {str(e)}', 'error')
+    return redirect(url_for('quality_control'))
+
 @app.route('/production_tracking')
 def production_tracking():
     """General production tracking overview with links to detailed views"""
@@ -430,7 +443,7 @@ def machine_cleaning():
     machines = CleaningMachine.query.all()
     
     # Get recent cleaning logs
-    recent_logs = MachineCleaningLog.query.join(CleaningMachine).order_by(MachineCleaningLog.cleaning_start_time.desc()).limit(20).all()
+    recent_logs = MachineCleaningLog.query.join(ProductionMachine).order_by(MachineCleaningLog.cleaning_start_time.desc()).limit(20).all()
     
     # Get in-progress cleanings
     in_progress = MachineCleaningLog.query.filter_by(status='in_progress').all()
