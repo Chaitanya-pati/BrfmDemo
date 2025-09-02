@@ -54,7 +54,7 @@
                     <h5 class="mb-0"><i class="fas fa-play me-2"></i>Setup Cleaning Process</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('process_cleaning_24h', job_id=job.id) }}">
+                    <form id="cleaning-form" method="POST" action="{{ url_for('process_cleaning_24h', job_id=job.id) }}">
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <label for="cleaning_bin_id" class="form-label">
@@ -90,7 +90,7 @@
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="radio" 
                                                            name="duration_option" id="duration_24" value="24" checked>
-                                                    <label class="form-check-label" for="duration_24">
+                                                    <label class="form-label" for="duration_24">
                                                         <strong>24 Hours (Standard)</strong><br>
                                                         <small class="text-muted">Complete cleaning cycle</small>
                                                     </label>
@@ -100,7 +100,7 @@
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="radio" 
                                                            name="duration_option" id="duration_12" value="12">
-                                                    <label class="form-check-label" for="duration_12">
+                                                    <label class="form-label" for="duration_12">
                                                         <strong>12 Hours (Quick)</strong><br>
                                                         <small class="text-muted">Fast cleaning cycle</small>
                                                     </label>
@@ -110,7 +110,7 @@
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="radio" 
                                                            name="duration_option" id="duration_custom" value="custom">
-                                                    <label class="form-check-label" for="duration_custom">
+                                                    <label class="form-label" for="duration_custom">
                                                         <strong>Custom Duration</strong><br>
                                                         <small class="text-muted">Specify your own hours</small>
                                                     </label>
@@ -133,14 +133,21 @@
                                     <i class="fas fa-user me-2"></i>Operator Name *
                                 </label>
                                 <input type="text" class="form-control" id="operator_name" 
-                                       name="operator_name" required>
+                                       name="operator_name" required placeholder="Enter operator name">
                             </div>
                             <div class="col-md-6">
                                 <label for="initial_moisture" class="form-label">
                                     <i class="fas fa-tint me-2"></i>Initial Moisture % (Optional)
                                 </label>
                                 <input type="number" class="form-control" id="initial_moisture" 
-                                       name="initial_moisture" step="0.1" placeholder="e.g., 14.5">
+                                       name="initial_moisture" step="0.1" min="0" max="50" placeholder="e.g., 14.5">
+                            </div>
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Process Duration:</strong> 24 hours
+                                    <br><strong>Expected End Time:</strong> <span id="end-time-display">Calculating...</span>
+                                </div>
                             </div>
                         </div>
 
@@ -167,21 +174,46 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const customRadio = document.getElementById('duration_custom');
-    const customHoursDiv = document.getElementById('custom_hours_div');
-    const customHoursInput = document.getElementById('custom_hours');
+    // Initialize cleaning process form
+    initializeCleaningForm();
+});
 
-    document.querySelectorAll('input[name="duration_option"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            if (this.value === 'custom') {
-                customHoursDiv.style.display = 'block';
-                customHoursInput.required = true;
-            } else {
-                customHoursDiv.style.display = 'none';
-                customHoursInput.required = false;
+function initializeCleaningForm() {
+    const form = document.getElementById('cleaning-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const operatorName = document.getElementById('operator_name');
+            const initialMoisture = document.getElementById('initial_moisture');
+
+            if (!operatorName.value.trim()) {
+                e.preventDefault();
+                alert('Please enter operator name');
+                operatorName.focus();
+                return false;
+            }
+
+            if (!initialMoisture.value || initialMoisture.value <= 0) {
+                e.preventDefault();
+                alert('Please enter valid initial moisture content');
+                initialMoisture.focus();
+                return false;
             }
         });
-    });
-});
+    }
+}
+
+// Auto-calculate end time based on 24-hour duration
+function updateEndTime() {
+    const startTime = new Date();
+    const endTime = new Date(startTime.getTime() + (24 * 60 * 60 * 1000));
+
+    const endTimeElement = document.getElementById('end-time-display');
+    if (endTimeElement) {
+        endTimeElement.textContent = endTime.toLocaleString();
+    }
+}
+
+// Call on page load
+updateEndTime();
 </script>
 {% endblock %}
