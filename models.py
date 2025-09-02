@@ -178,6 +178,7 @@ class ProductionPlan(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
     planned_by = db.Column(db.String(100), nullable=False)
     planning_date = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     total_percentage = db.Column(db.Float, default=0)
     status = db.Column(db.String(20), default='draft')  # draft, approved, executed
     
