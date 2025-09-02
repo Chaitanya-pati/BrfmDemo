@@ -588,10 +588,39 @@ def reject_vehicle(vehicle_id):
         flash(f'Error rejecting vehicle: {str(e)}', 'error')
     return redirect(url_for('quality_control'))
 
+@app.route('/production_dashboard')
+def production_dashboard():
+    """Main production management dashboard"""
+    try:
+        # Get dashboard statistics
+        total_orders = ProductionOrder.query.count()
+        active_productions = ProductionJobNew.query.filter(
+            ProductionJobNew.status.in_(['in_progress', 'pending'])
+        ).count()
+        pending_plans = ProductionPlan.query.filter_by(status='draft').count()
+        
+        # Get today's completed orders
+        from datetime import date
+        today = date.today()
+        completed_today = ProductionOrder.query.filter(
+            ProductionOrder.status == 'completed',
+            db.func.date(ProductionOrder.created_at) == today
+        ).count()
+        
+        return render_template('production_dashboard.html',
+                             total_orders=total_orders,
+                             active_productions=active_productions,
+                             pending_plans=pending_plans,
+                             completed_today=completed_today)
+    except Exception as e:
+        flash(f'Error loading dashboard: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
 @app.route('/production_tracking')
 def production_tracking():
     """General production tracking overview with links to detailed views"""
     orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).limit(20).all()
+    recent_orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).limit(10).all()
 
     # Build tracking data for each order
     tracking_data = []
@@ -610,7 +639,7 @@ def production_tracking():
         }
         tracking_data.append(order_data)
 
-    return render_template('production_tracking.html', tracking_data=tracking_data)
+    return render_template('production_tracking.html', tracking_data=tracking_data, recent_orders=recent_orders)
 
 @app.route('/machine_cleaning')
 def machine_cleaning():
@@ -1107,6 +1136,52 @@ def delete_godown(godown_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/api/order_tracking/<order_number>')
+def api_order_tracking(order_number):
+    """API endpoint to get order tracking data"""
+    try:
+        order = ProductionOrder.query.filter_by(order_number=order_number).first()
+        if not order:
+            return jsonify({'success': False, 'error': 'Order not found'}), 404
+            
+        jobs = ProductionJobNew.query.filter_by(order_id=order.id).order_by(ProductionJobNew.created_at).all()
+        
+        # Build job data
+        jobs_data = []
+        for job in jobs:
+            job_data = {
+                'id': job.id,
+                'job_number': job.job_number,
+                'stage': job.stage,
+                'status': job.status,
+                'started_at': job.started_at.isoformat() if job.started_at else None,
+                'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+                'started_by': job.started_by,
+                'completed_by': job.completed_by,
+                'machines_active': job.status == 'in_progress'
+            }
+            jobs_data.append(job_data)
+        
+        order_data = {
+            'id': order.id,
+            'order_number': order.order_number,
+            'customer': order.customer.company_name if order.customer_id else 'N/A',
+            'product': order.product,
+            'quantity': order.quantity,
+            'status': order.status,
+            'created_at': order.created_at.isoformat() if order.created_at else None,
+            'deadline': order.deadline.isoformat() if order.deadline else None
+        }
+        
+        return jsonify({
+            'success': True,
+            'order': order_data,
+            'jobs': jobs_data
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/production_jobs_by_stage')
 def api_production_jobs_by_stage():
     """API endpoint to get production jobs grouped by stage"""
@@ -1474,6 +1549,86 @@ def job_progress_api(job_id):
                     
         return jsonify({'success': True, 'progress': progress_data})
         
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/dashboard_stats')
+def api_dashboard_stats():
+    """API endpoint for dashboard statistics"""
+    try:
+        total_orders = ProductionOrder.query.count()
+        active_productions = ProductionJobNew.query.filter(
+            ProductionJobNew.status.in_(['in_progress', 'pending'])
+        ).count()
+        pending_plans = ProductionPlan.query.filter_by(status='draft').count()
+        
+        # Get today's completed orders
+        from datetime import date
+        today = date.today()
+        completed_today = ProductionOrder.query.filter(
+            ProductionOrder.status == 'completed',
+            db.func.date(ProductionOrder.created_at) == today
+        ).count()
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'total_orders': total_orders,
+                'active_productions': active_productions,
+                'pending_plans': pending_plans,
+                'completed_today': completed_today
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/recent_orders')
+def api_recent_orders():
+    """API endpoint for recent orders"""
+    try:
+        orders = ProductionOrder.query.order_by(
+            ProductionOrder.created_at.desc()
+        ).limit(10).all()
+        
+        orders_data = []
+        for order in orders:
+            orders_data.append({
+                'id': order.id,
+                'order_number': order.order_number,
+                'product': order.product,
+                'status': order.status,
+                'created_at': order.created_at.isoformat() if order.created_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'orders': orders_data
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/approved_plans')
+def api_approved_plans():
+    """API endpoint for approved production plans"""
+    try:
+        plans = db.session.query(ProductionPlan, ProductionOrder).join(
+            ProductionOrder, ProductionPlan.order_id == ProductionOrder.id
+        ).filter(ProductionPlan.status == 'approved').all()
+        
+        plans_data = []
+        for plan, order in plans:
+            plans_data.append({
+                'plan_id': plan.id,
+                'order_id': order.id,
+                'order_number': order.order_number,
+                'product': order.product,
+                'quantity': order.quantity
+            })
+        
+        return jsonify({
+            'success': True,
+            'plans': plans_data
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
