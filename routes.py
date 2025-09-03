@@ -668,11 +668,60 @@ def machine_cleaning():
                          in_progress=in_progress, 
                          due_machines=due_machines)
 
-@app.route('/storage_management')
+@app.route('/storage_management', methods=['GET', 'POST'])
 def storage_management():
     """Storage and finished goods management"""
+    if request.method == 'POST':
+        try:
+            action = request.form.get('action')
+            
+            if action == 'transfer_storage':
+                from_storage_id = int(request.form['from_storage_id'])
+                to_storage_id = int(request.form['to_storage_id'])
+                product_id = int(request.form['product_id'])
+                quantity = float(request.form['quantity'])
+                operator_name = request.form['operator_name']
+                reason = request.form.get('reason', '')
+                
+                # Validate transfer
+                from_storage = StorageArea.query.get_or_404(from_storage_id)
+                to_storage = StorageArea.query.get_or_404(to_storage_id)
+                
+                if from_storage.current_stock_kg < quantity:
+                    flash(f'Insufficient stock in {from_storage.name}!', 'error')
+                    return redirect(url_for('storage_management'))
+                
+                if (to_storage.current_stock_kg + quantity) > to_storage.capacity_kg:
+                    flash(f'Transfer would exceed capacity of {to_storage.name}!', 'warning')
+                
+                # Create transfer record
+                transfer = StorageTransfer()
+                transfer.from_storage_id = from_storage_id
+                transfer.to_storage_id = to_storage_id
+                transfer.product_id = product_id
+                transfer.quantity_kg = quantity
+                transfer.operator_name = operator_name
+                transfer.reason = reason
+                
+                # Update storage stocks
+                from_storage.current_stock_kg -= quantity
+                to_storage.current_stock_kg += quantity
+                
+                db.session.add(transfer)
+                db.session.commit()
+                
+                flash(f'Storage transfer completed: {quantity}kg from {from_storage.name} to {to_storage.name}', 'success')
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error in storage transfer: {str(e)}', 'error')
+        
+        return redirect(url_for('storage_management'))
+    
     storage_areas = StorageArea.query.all()
     finished_goods = FinishedGoods.query.order_by(FinishedGoods.created_at.desc()).limit(50).all()
+    products = Product.query.all()
+    recent_transfers = StorageTransfer.query.order_by(StorageTransfer.transfer_time.desc()).limit(20).all()
 
     # Calculate storage utilization
     total_capacity = sum([area.capacity_kg for area in storage_areas])
@@ -682,6 +731,8 @@ def storage_management():
     return render_template('storage_management.html', 
                          storage_areas=storage_areas,
                          finished_goods=finished_goods,
+                         products=products,
+                         recent_transfers=recent_transfers,
                          total_capacity=total_capacity,
                          total_current=total_current,
                          utilization_percent=utilization_percent)
@@ -809,7 +860,7 @@ def packing_execution(job_id):
 
     if request.method == 'POST':
         try:
-            if request.form.get('action') == 'pack_products':
+            if request.form.get('action') == 'complete_packing':
                 operator = request.form['operator_name']
 
                 # Handle photo upload
@@ -830,6 +881,7 @@ def packing_execution(job_id):
                 shallow_storages = request.form.getlist('shallow_storage')
 
                 total_packed_count = 0
+                total_packed_weight = 0
 
                 for i in range(len(product_ids)):
                     if product_ids[i] and bag_weights[i] and bag_counts[i]:
@@ -838,6 +890,8 @@ def packing_execution(job_id):
                         number_of_bags = int(bag_counts[i])
                         storage_area_id = storage_area_ids[i] if i < len(storage_area_ids) and storage_area_ids[i] else None
                         stored_in_shallow = float(shallow_storages[i]) if i < len(shallow_storages) and shallow_storages[i] else 0
+
+                        total_weight = bag_weight * number_of_bags + stored_in_shallow
 
                         # Create packing process
                         packing = PackingProcess()
@@ -855,31 +909,44 @@ def packing_execution(job_id):
                         if storage_area_id:
                             storage_area = StorageArea.query.get(int(storage_area_id))
                             if storage_area:
-                                storage_area.current_stock_kg += packing.total_packed_kg
+                                # Add both bagged and shallow storage quantities
+                                storage_area.current_stock_kg += total_weight
+                                
+                                # Check capacity
+                                if storage_area.current_stock_kg > storage_area.capacity_kg:
+                                    flash(f'Warning: Storage area {storage_area.name} is over capacity!', 'warning')
 
                         db.session.add(packing)
 
-                        # Create finished goods entry - THIS IS THE FIX FOR FINISHED GOODS DATA
+                        # Create finished goods entry
                         finished_goods = FinishedGoods()
                         finished_goods.order_id = job.order_id
                         finished_goods.product_id = product_id
-                        finished_goods.quantity = packing.total_packed_kg
-                        finished_goods.storage_type = 'bags'
+                        finished_goods.quantity = total_weight
+                        finished_goods.storage_type = 'mixed' if stored_in_shallow > 0 else 'bags'
                         finished_goods.bag_weight = bag_weight
                         finished_goods.bag_count = number_of_bags
+                        finished_goods.storage_id = int(storage_area_id) if storage_area_id else None
                         finished_goods.batch_number = f"BATCH-{job.order.order_number}-{datetime.now().strftime('%Y%m%d')}"
 
                         db.session.add(finished_goods)
                         total_packed_count += 1
+                        total_packed_weight += total_weight
 
                 # Mark job as completed
                 job.status = 'completed'
                 job.completed_at = datetime.now()
                 job.completed_by = operator
 
+                # Update order status if all jobs are completed
+                all_jobs = ProductionJobNew.query.filter_by(order_id=job.order_id).all()
+                completed_jobs = [j for j in all_jobs if j.status == 'completed']
+                if len(completed_jobs) == len(all_jobs):
+                    job.order.status = 'completed'
+
                 db.session.commit()
 
-                flash(f'Packing process completed successfully! Processed {total_packed_count} products.', 'success')
+                flash(f'Packing process completed successfully! Processed {total_packed_count} products ({total_packed_weight:.2f} kg total).', 'success')
                 return redirect(url_for('production_execution'))
 
         except Exception as e:
@@ -890,7 +957,7 @@ def packing_execution(job_id):
     storage_areas = StorageArea.query.all()
     existing_packing = PackingProcess.query.filter_by(job_id=job_id).all()
 
-    # Get finished goods for this order - THIS FIXES THE DATA DISPLAY
+    # Get finished goods for this order
     finished_goods = FinishedGoods.query.filter_by(order_id=job.order_id).all()
 
     return render_template('packing_execution.html', 
@@ -2277,6 +2344,106 @@ def api_cleaning_reminders():
 
         return jsonify({'success': True, 'reminders': reminders})
 
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/storage_details/<int:storage_area_id>')
+def api_storage_details(storage_area_id):
+    """Get detailed storage area information"""
+    try:
+        storage_area = StorageArea.query.get_or_404(storage_area_id)
+        
+        # Get all packed goods in this storage area
+        packed_goods = PackingProcess.query.filter_by(storage_area_id=storage_area_id).all()
+        
+        # Calculate totals
+        total_quantity = 0
+        total_bags = 0
+        total_shallow = 0
+        
+        # Group by product
+        products_dict = {}
+        
+        for packing in packed_goods:
+            if packing.product:
+                product_name = packing.product.name
+                if product_name not in products_dict:
+                    products_dict[product_name] = {
+                        'name': product_name,
+                        'category': packing.product.category or 'Main Product',
+                        'total_quantity': 0,
+                        'shallow_storage': 0,
+                        'bag_details': [],
+                        'last_updated': '',
+                        'operators': set()
+                    }
+                
+                products_dict[product_name]['total_quantity'] += packing.total_packed_kg
+                products_dict[product_name]['shallow_storage'] += packing.stored_in_shallow_kg or 0
+                products_dict[product_name]['bag_details'].append({
+                    'bag_weight_kg': packing.bag_weight_kg,
+                    'number_of_bags': packing.number_of_bags,
+                    'total_packed_kg': packing.total_packed_kg
+                })
+                products_dict[product_name]['operators'].add(packing.operator_name)
+                
+                if not products_dict[product_name]['last_updated'] or packing.packed_time > datetime.strptime(products_dict[product_name]['last_updated'], '%Y-%m-%d %H:%M'):
+                    products_dict[product_name]['last_updated'] = packing.packed_time.strftime('%Y-%m-%d %H:%M')
+                
+                total_quantity += packing.total_packed_kg
+                total_bags += packing.number_of_bags
+                total_shallow += packing.stored_in_shallow_kg or 0
+        
+        # Convert to list and clean up
+        products_list = []
+        for product_data in products_dict.values():
+            product_data['operators'] = list(product_data['operators'])
+            products_list.append(product_data)
+        
+        # Calculate utilization
+        utilization = (storage_area.current_stock_kg / storage_area.capacity_kg * 100) if storage_area.capacity_kg > 0 else 0
+        
+        # Get recent activities (storage transfers)
+        recent_activities = []
+        transfers_in = StorageTransfer.query.filter_by(to_storage_id=storage_area_id).order_by(StorageTransfer.transfer_time.desc()).limit(10).all()
+        transfers_out = StorageTransfer.query.filter_by(from_storage_id=storage_area_id).order_by(StorageTransfer.transfer_time.desc()).limit(10).all()
+        
+        for transfer in transfers_in:
+            recent_activities.append({
+                'date_time': transfer.transfer_time.strftime('%Y-%m-%d %H:%M'),
+                'activity_type': f'Transfer IN from {transfer.from_storage.name}',
+                'quantity': f'{transfer.quantity_kg:.2f}',
+                'operator': transfer.operator_name
+            })
+        
+        for transfer in transfers_out:
+            recent_activities.append({
+                'date_time': transfer.transfer_time.strftime('%Y-%m-%d %H:%M'),
+                'activity_type': f'Transfer OUT to {transfer.to_storage.name}',
+                'quantity': f'{transfer.quantity_kg:.2f}',
+                'operator': transfer.operator_name
+            })
+        
+        # Sort by date
+        recent_activities.sort(key=lambda x: x['date_time'], reverse=True)
+        recent_activities = recent_activities[:10]  # Keep only 10 most recent
+        
+        return jsonify({
+            'success': True,
+            'storage_area': {
+                'id': storage_area.id,
+                'name': storage_area.name,
+                'capacity': storage_area.capacity_kg,
+                'current_stock': storage_area.current_stock_kg
+            },
+            'total_quantity': total_quantity,
+            'total_bags': total_bags,
+            'total_shallow': total_shallow,
+            'utilization': utilization,
+            'products': products_list,
+            'recent_activities': recent_activities
+        })
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
