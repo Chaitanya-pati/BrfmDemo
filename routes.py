@@ -2062,6 +2062,7 @@ def api_job_timer(job_id):
             'job_id': job.id,
             'status': job.status,
             'elapsed_time': '--:--:--',
+            'start_time': job.started_at.isoformat() if job.started_at else None,
             'cleaning_reminder': None
         }
         
@@ -2140,6 +2141,51 @@ def api_cleaning_alerts():
                         })
         
         return jsonify({'success': True, 'alerts': alerts})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/cleaning_reminders')
+def api_cleaning_reminders():
+    """Get machine cleaning reminders for active jobs"""
+    try:
+        reminders = []
+        
+        # Get all active jobs
+        active_jobs = ProductionJobNew.query.filter(
+            ProductionJobNew.status.in_(['in_progress'])
+        ).all()
+        
+        for job in active_jobs:
+            if job.started_at and job.stage in ['cleaning_24h', 'cleaning_12h']:
+                elapsed = datetime.now() - job.started_at
+                elapsed_minutes = elapsed.total_seconds() / 60
+                
+                # Determine cleaning frequency (5 min for 24h, 2 min for 12h)
+                frequency_minutes = 5 if job.stage == 'cleaning_24h' else 2
+                
+                # Calculate next cleaning time
+                cycles_completed = int(elapsed_minutes // frequency_minutes)
+                next_cleaning_minutes = (cycles_completed + 1) * frequency_minutes
+                next_cleaning_time = job.started_at + timedelta(minutes=next_cleaning_minutes)
+                time_until_cleaning = (next_cleaning_time - datetime.now()).total_seconds() / 60
+                
+                # Show reminder if cleaning is due soon or overdue
+                if time_until_cleaning <= 1:  # Within 1 minute or overdue
+                    urgent = time_until_cleaning <= 0
+                    
+                    reminders.append({
+                        'job_id': job.id,
+                        'job_number': job.job_number,
+                        'stage': job.stage,
+                        'machine_name': f"{job.stage.replace('_', ' ').title()} Machine",
+                        'next_cleaning_time': next_cleaning_time.strftime('%H:%M:%S'),
+                        'time_until_minutes': max(0, time_until_cleaning),
+                        'urgent': urgent,
+                        'cycles_completed': cycles_completed
+                    })
+        
+        return jsonify({'success': True, 'reminders': reminders})
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

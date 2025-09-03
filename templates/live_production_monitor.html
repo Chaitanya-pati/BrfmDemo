@@ -67,6 +67,23 @@
         </div>
     </div>
 
+    <!-- Real-time Machine Cleaning Reminders -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-warning" id="cleaning-reminders-card" style="display: none;">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bell me-2"></i>Machine Cleaning Reminders
+                        <span class="badge bg-danger" id="cleaning-reminders-count">0</span>
+                    </h5>
+                </div>
+                <div class="card-body" id="cleaning-reminders-container">
+                    <!-- Cleaning reminders will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Machine Cleaning Alerts -->
     <div class="col-12">
         <div class="card border-warning" id="cleaning-alerts-card" style="display: none;">
@@ -219,6 +236,9 @@ function loadData() {
             }
         })
         .catch(error => console.error('Error loading cleaning alerts:', error));
+    
+    // Load cleaning reminders
+    updateCleaningReminders();
 }
 
 function updatePipelineStatus(pipeline) {
@@ -276,6 +296,24 @@ function updateActiveJobs(jobsData) {
         jobs.forEach(job => {
             const progressBarClass = job.status === 'in_progress' ? 'bg-success' : 'bg-warning';
             const statusBadge = job.status === 'in_progress' ? 'bg-success' : 'bg-warning';
+            
+            // Calculate countdown for cleaning processes
+            let countdownHtml = '';
+            if (job.stage.includes('cleaning') && job.status === 'in_progress') {
+                const duration = job.stage === 'cleaning_24h' ? 24 : 12;
+                countdownHtml = `
+                    <div class="countdown-timer mt-2 p-2 bg-light rounded" data-job-id="${job.id}" data-duration="${duration}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="fw-bold">Time Remaining:</small>
+                            <span class="badge bg-primary countdown-display" id="countdown-${job.id}">--:--:--</span>
+                        </div>
+                        <div class="progress mt-1" style="height: 6px;">
+                            <div class="progress-bar bg-primary countdown-progress" id="countdown-progress-${job.id}" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                `;
+            }
 
             html += `
                 <div class="col-md-6 col-lg-4 mb-3">
@@ -297,12 +335,25 @@ function updateActiveJobs(jobsData) {
                                 </div>
                             </div>
 
-                            <div class="d-flex justify-content-between align-items-center">
+                            ${countdownHtml}
+
+                            <div class="d-flex justify-content-between align-items-center mt-2">
                                 <small class="text-muted">
                                     Started: ${job.started_at || 'Not started'}
                                 </small>
                                 <div class="timer-display" data-job-id="${job.id}" data-stage="${job.stage}">
                                     <span class="badge bg-info" id="timer-${job.id}">--:--:--</span>
+                                </div>
+                            </div>
+
+                            <!-- Machine Cleaning Alert -->
+                            <div class="cleaning-alert mt-2" id="cleaning-alert-${job.id}" style="display: none;">
+                                <div class="alert alert-warning alert-sm py-1 px-2 mb-2">
+                                    <i class="fas fa-tools me-1"></i>
+                                    <small class="fw-bold">Machine cleaning required!</small>
+                                    <button class="btn btn-xs btn-warning ms-2" onclick="startMachineCleaning(${job.id}, '${job.stage}')">
+                                        Clean Now
+                                    </button>
                                 </div>
                             </div>
 
@@ -341,6 +392,9 @@ function updateActiveJobs(jobsData) {
 
     container.innerHTML = html;
     countBadge.textContent = totalJobs;
+    
+    // Initialize countdown timers
+    initializeCountdownTimers();
 }
 
 function updateTimers() {
@@ -366,6 +420,126 @@ function updateTimers() {
             })
             .catch(error => console.error('Error updating timer:', error));
     });
+    
+    // Update countdown timers
+    updateCountdownTimers();
+}
+
+function initializeCountdownTimers() {
+    document.querySelectorAll('.countdown-timer').forEach(timer => {
+        const jobId = timer.getAttribute('data-job-id');
+        const duration = parseInt(timer.getAttribute('data-duration'));
+        
+        // Fetch job start time and calculate countdown
+        fetch(`/api/job_timer/${jobId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.start_time) {
+                    const startTime = new Date(data.start_time);
+                    const endTime = new Date(startTime.getTime() + (duration * 60 * 60 * 1000));
+                    timer.setAttribute('data-end-time', endTime.toISOString());
+                }
+            })
+            .catch(error => console.error('Error initializing countdown:', error));
+    });
+}
+
+function updateCountdownTimers() {
+    document.querySelectorAll('.countdown-timer').forEach(timer => {
+        const endTimeStr = timer.getAttribute('data-end-time');
+        if (!endTimeStr) return;
+        
+        const jobId = timer.getAttribute('data-job-id');
+        const endTime = new Date(endTimeStr);
+        const now = new Date();
+        const remaining = endTime - now;
+        
+        const countdownDisplay = document.getElementById(`countdown-${jobId}`);
+        const countdownProgress = document.getElementById(`countdown-progress-${jobId}`);
+        
+        if (remaining > 0) {
+            const hours = Math.floor(remaining / (1000 * 60 * 60));
+            const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+            
+            countdownDisplay.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Calculate progress percentage
+            const duration = parseInt(timer.getAttribute('data-duration'));
+            const totalMs = duration * 60 * 60 * 1000;
+            const elapsedMs = totalMs - remaining;
+            const progressPercent = Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100));
+            
+            countdownProgress.style.width = `${progressPercent}%`;
+            
+            // Change color based on remaining time
+            if (remaining < 3600000) { // Less than 1 hour
+                countdownDisplay.className = 'badge bg-danger countdown-display';
+                countdownProgress.className = 'progress-bar bg-danger countdown-progress';
+            } else if (remaining < 7200000) { // Less than 2 hours
+                countdownDisplay.className = 'badge bg-warning countdown-display';
+                countdownProgress.className = 'progress-bar bg-warning countdown-progress';
+            } else {
+                countdownDisplay.className = 'badge bg-primary countdown-display';
+                countdownProgress.className = 'progress-bar bg-primary countdown-progress';
+            }
+        } else {
+            countdownDisplay.textContent = 'COMPLETED';
+            countdownDisplay.className = 'badge bg-success countdown-display';
+            countdownProgress.style.width = '100%';
+            countdownProgress.className = 'progress-bar bg-success countdown-progress';
+        }
+    });
+}
+
+function updateCleaningReminders() {
+    fetch('/api/cleaning_reminders')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const container = document.getElementById('cleaning-reminders-container');
+                const card = document.getElementById('cleaning-reminders-card');
+                const count = document.getElementById('cleaning-reminders-count');
+                
+                if (data.reminders.length === 0) {
+                    card.style.display = 'none';
+                    return;
+                }
+                
+                let html = '';
+                data.reminders.forEach(reminder => {
+                    const urgencyClass = reminder.urgent ? 'danger' : 'warning';
+                    const urgencyIcon = reminder.urgent ? 'exclamation-triangle' : 'clock';
+                    
+                    html += `
+                        <div class="alert alert-${urgencyClass} d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <i class="fas fa-${urgencyIcon} me-2"></i>
+                                <strong>${reminder.machine_name}</strong>
+                                <br><small>Job: ${reminder.job_number} | Stage: ${reminder.stage}</small>
+                                <br><small class="text-muted">Next cleaning due: ${reminder.next_cleaning_time}</small>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="startMachineCleaning(${reminder.job_id}, '${reminder.stage}')">
+                                <i class="fas fa-tools me-1"></i>Clean Now
+                            </button>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+                card.style.display = 'block';
+                count.textContent = data.reminders.length;
+                
+                // Show individual job cleaning alerts
+                data.reminders.forEach(reminder => {
+                    const jobAlert = document.getElementById(`cleaning-alert-${reminder.job_id}`);
+                    if (jobAlert) {
+                        jobAlert.style.display = 'block';
+                    }
+                });
+            }
+        })
+        .catch(error => console.error('Error loading cleaning reminders:', error));
 }
 
 function checkCleaningReminder(jobId, stage, reminderData) {

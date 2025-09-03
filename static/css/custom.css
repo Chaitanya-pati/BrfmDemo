@@ -281,26 +281,87 @@ body {
 
 /* Animations */
 .fade-in {
-    animation: fadeIn 0.5s ease-in;
+    animation: fadeIn 0.5s;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {opacity: 0;}
+    to {opacity: 1;}
 }
 
-/* Countdown Timer */
-.countdown {
-    font-weight: 600;
-    color: var(--info-color);
+/* Countdown Timer Styles */
+.countdown-timer {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    transition: all 0.3s ease;
 }
 
-.countdown.warning {
-    color: var(--warning-color);
+.countdown-timer:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
 }
 
-.countdown.danger {
-    color: var(--error-color);
+.countdown-display {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 0.9rem;
+    min-width: 70px;
+    text-align: center;
+}
+
+.countdown-progress {
+    transition: width 0.5s ease;
+}
+
+/* Cleaning Alert Styles */
+.cleaning-alert {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.alert-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.btn-xs {
+    padding: 0.125rem 0.25rem;
+    font-size: 0.75rem;
+}
+
+/* Machine Cleaning Reminders */
+.cleaning-reminders-card {
+    animation: slideIn 0.5s ease;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Timer Display Enhancement */
+.timer-display .badge {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    min-width: 60px;
+}
+
+/* Progress Bar Enhancements */
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.progress-bar {
+    border-radius: 4px;
+    transition: width 0.6s ease;
 }
 
 /* File Upload Preview */
@@ -332,32 +393,32 @@ body {
         transform: translateX(-100%);
         width: var(--sidebar-width);
     }
-    
+
     .sidebar.show {
         transform: translateX(0);
     }
-    
+
     .sidebar.collapsed {
         width: var(--sidebar-width);
         transform: translateX(-100%);
     }
-    
+
     .sidebar.collapsed.show {
         transform: translateX(0);
     }
-    
+
     .main-wrapper {
         margin-left: 0;
     }
-    
+
     .main-wrapper.expanded {
         margin-left: 0;
     }
-    
+
     .main-content {
         padding-top: 70px;
     }
-    
+
     /* Overlay for mobile when sidebar is open */
     .sidebar-overlay {
         position: fixed;
@@ -369,7 +430,7 @@ body {
         z-index: 999;
         display: none;
     }
-    
+
     .sidebar-overlay.show {
         display: block;
     }
@@ -389,11 +450,11 @@ body {
     .modal {
         display: none !important;
     }
-    
+
     .main-content {
         margin-left: 0;
     }
-    
+
     .card {
         box-shadow: none;
         border: 1px solid #ddd;
