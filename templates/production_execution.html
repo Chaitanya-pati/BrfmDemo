@@ -291,7 +291,7 @@ function loadProductionJobs() {
         })
         .then(result => {
             if (result.success) {
-                const data = result.data;
+                const data = result.jobs_by_stage || result.data;
                 console.log('Jobs loaded:', data);
 
                 // Update each stage
@@ -449,9 +449,13 @@ function getStartButton(job, stage) {
             }
             break;
         case 'grinding':
-            actionUrl = `/production_execution/b1_scale/${job.id}`;
-            actionText = 'Start Grinding';
-            actionIcon = 'fas fa-cog';
+            if (job.can_proceed) {
+                actionUrl = `/grinding_execution/${job.id}`;
+                actionText = 'Start Grinding';
+                actionIcon = 'fas fa-cog';
+            } else {
+                return '<span class="text-muted">12h Cleaning Required</span>';
+            }
             break;
         case 'packing':
             actionUrl = `/packing_execution/${job.id}`;

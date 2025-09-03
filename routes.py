@@ -1268,7 +1268,8 @@ def api_production_jobs_by_stage():
 
         return jsonify({
             'success': True,
-            'data': jobs_by_stage,  # Fix API response format
+            'jobs_by_stage': jobs_by_stage,  # Match frontend expectation
+            'data': jobs_by_stage,  # Keep both for compatibility
             'total_jobs': len(active_jobs)
         })
 
@@ -1644,10 +1645,24 @@ def grinding_execution(job_id):
 
     # Check if grinding process exists
     existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
+    
+    # Get job prerequisites for validation
+    prerequisite_info = None
+    if job.stage == 'grinding':
+        cleaning_12h_job = ProductionJobNew.query.filter_by(
+            order_id=job.order_id, 
+            stage='cleaning_12h', 
+            status='completed'
+        ).first()
+        prerequisite_info = {
+            'cleaning_12h_completed': bool(cleaning_12h_job),
+            'can_start_grinding': bool(cleaning_12h_job) and job.status == 'pending'
+        }
 
     return render_template('grinding_execution.html', 
                          job=job, 
-                         existing_grinding=existing_grinding)
+                         existing_grinding=existing_grinding,
+                         prerequisite_info=prerequisite_info)
 
 @app.route('/production_execution/packing/<int:job_id>')
 def packing_execution_route(job_id):
