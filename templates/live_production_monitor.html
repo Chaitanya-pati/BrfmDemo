@@ -68,18 +68,16 @@
     </div>
 
     <!-- Machine Cleaning Alerts -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-warning" id="cleaning-alerts-card" style="display: none;">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0">
-                        <i class="fas fa-exclamation-triangle me-2"></i>Machine Cleaning Required
-                        <span class="badge bg-danger" id="cleaning-alerts-count">0</span>
-                    </h5>
-                </div>
-                <div class="card-body" id="cleaning-alerts-container">
-                    <!-- Cleaning alerts will be loaded here -->
-                </div>
+    <div class="col-12">
+        <div class="card border-warning" id="cleaning-alerts-card" style="display: none;">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Machine Cleaning Required
+                    <span class="badge bg-danger" id="cleaning-alerts-count">0</span>
+                </h5>
+            </div>
+            <div class="card-body" id="cleaning-alerts-container">
+                <!-- Cleaning alerts will be loaded here -->
             </div>
         </div>
     </div>
@@ -308,7 +306,19 @@ function updateActiveJobs(jobsData) {
                                 </div>
                             </div>
 
-                            ${job.status === 'in_progress' ? `
+                            ${job.status === 'in_progress' && job.stage === 'grinding' ? `
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-warning me-1" onclick="startGrinding(${job.id})">
+                                        <i class="fas fa-play me-1"></i>Start Grinding
+                                    </button>
+                                    <button class="btn btn-sm btn-warning me-1" onclick="pauseJob(${job.id})">
+                                        <i class="fas fa-pause"></i> Pause
+                                    </button>
+                                    <button class="btn btn-sm btn-success" onclick="completeJob(${job.id})">
+                                        <i class="fas fa-check"></i> Complete
+                                    </button>
+                                </div>
+                            ` : (job.status === 'in_progress' ? `
                                 <div class="mt-2">
                                     <button class="btn btn-sm btn-warning me-1" onclick="pauseJob(${job.id})">
                                         <i class="fas fa-pause"></i> Pause
@@ -317,7 +327,7 @@ function updateActiveJobs(jobsData) {
                                         <i class="fas fa-check"></i> Complete
                                     </button>
                                 </div>
-                            ` : ''}
+                            ` : '')}
                         </div>
                     </div>
                 </div>
@@ -551,5 +561,33 @@ window.addEventListener('beforeunload', function() {
     if (refreshInterval) clearInterval(refreshInterval);
     if (timerInterval) clearInterval(timerInterval);
 });
+
+function startGrinding(jobId) {
+    // Use API endpoint to start grinding
+    fetch(`/api/start_grinding/${jobId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+            } else {
+                showToast(data.message, 'success');
+                loadData();
+            }
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Failed to start grinding process', 'error');
+    });
+}
 </script>
 {% endblock %}

@@ -1413,6 +1413,101 @@ def b1_scale_process(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
     return render_template('b1_scale_process.html', job=job)
 
+@app.route('/grinding_execution/<int:job_id>', methods=['GET', 'POST'])
+def grinding_execution(job_id):
+    """Handle grinding process execution"""
+    job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if request.method == 'POST':
+        try:
+            action = request.form.get('action')
+            
+            if action == 'start_grinding':
+                # Handle photo uploads
+                start_photo = None
+                if 'start_photo' in request.files:
+                    file = request.files['start_photo']
+                    if file and file.filename and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"grinding_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        start_photo = filename
+                
+                # Create grinding process
+                grinding = GrindingProcess()
+                grinding.job_id = job_id
+                grinding.machine_name = request.form['machine_name']
+                grinding.operator_name = request.form['operator_name']
+                grinding.input_quantity_kg = float(request.form['input_quantity'])
+                grinding.start_time = datetime.now()
+                grinding.start_photo = start_photo
+                grinding.status = 'in_progress'
+                
+                # Update job status
+                job.status = 'in_progress'
+                job.started_at = datetime.now()
+                job.started_by = request.form['operator_name']
+                
+                db.session.add(grinding)
+                db.session.commit()
+                
+                flash('Grinding process started successfully!', 'success')
+                return redirect(url_for('grinding_execution', job_id=job_id))
+                
+            elif action == 'complete_grinding':
+                # Complete the grinding process
+                grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
+                if not grinding:
+                    flash('No grinding process found for this job!', 'error')
+                    return redirect(url_for('grinding_execution', job_id=job_id))
+                
+                # Handle end photo upload
+                end_photo = None
+                if 'end_photo' in request.files:
+                    file = request.files['end_photo']
+                    if file and file.filename and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"grinding_end_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        end_photo = filename
+                
+                # Update grinding process with completion data
+                grinding.total_output_kg = float(request.form['total_output'])
+                grinding.main_products_kg = float(request.form['main_products'])
+                grinding.bran_kg = float(request.form['bran'])
+                grinding.bran_percentage = (grinding.bran_kg / grinding.total_output_kg) * 100 if grinding.total_output_kg > 0 else 0
+                grinding.main_products_percentage = (grinding.main_products_kg / grinding.total_output_kg) * 100 if grinding.total_output_kg > 0 else 0
+                grinding.end_time = datetime.now()
+                grinding.end_photo = end_photo
+                grinding.status = 'completed'
+                grinding.notes = request.form.get('notes', '')
+                
+                # Check bran percentage (should be 23-25%)
+                if grinding.bran_percentage > 25:
+                    grinding.bran_percentage_alert = True
+                    flash(f'Warning: Bran percentage ({grinding.bran_percentage:.1f}%) is higher than expected (23-25%)', 'warning')
+                
+                # Update job status
+                job.status = 'completed'
+                job.completed_at = datetime.now()
+                job.completed_by = request.form['operator_name']
+                
+                db.session.commit()
+                
+                flash('Grinding process completed successfully!', 'success')
+                return redirect(url_for('production_execution'))
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error processing grinding: {str(e)}', 'error')
+    
+    # Check if grinding process exists
+    existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
+    
+    return render_template('grinding_execution.html', 
+                         job=job, 
+                         existing_grinding=existing_grinding)
+
 @app.route('/production_execution/packing/<int:job_id>')
 def packing_execution_route(job_id):
     """Redirect to existing packing execution"""
@@ -1495,6 +1590,38 @@ def calculate_job_progress(job):
     return 0
 
 # Enhanced execution control routes
+@app.route('/api/start_grinding/<int:job_id>', methods=['POST'])
+def api_start_grinding(job_id):
+    """API endpoint to start grinding process"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        if job.stage != 'grinding':
+            return jsonify({'success': False, 'message': 'This job is not a grinding job'})
+        
+        if job.status != 'pending':
+            return jsonify({'success': False, 'message': 'Job must be in pending status to start'})
+        
+        # Check if previous stage (12h cleaning) is completed
+        cleaning_12h_job = ProductionJobNew.query.filter_by(
+            order_id=job.order_id, 
+            stage='cleaning_12h', 
+            status='completed'
+        ).first()
+        
+        if not cleaning_12h_job:
+            return jsonify({'success': False, 'message': '12-hour cleaning must be completed before starting grinding'})
+        
+        # Redirect to grinding execution page
+        return jsonify({
+            'success': True, 
+            'redirect_url': url_for('grinding_execution', job_id=job_id),
+            'message': 'Redirecting to grinding execution...'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/api/job_control/<int:job_id>/<action>', methods=['POST'])
 def job_control(job_id, action):
     """Control job execution: pause, resume, complete, cancel"""
