@@ -440,9 +440,13 @@ function getStartButton(job, stage) {
             actionIcon = 'fas fa-play';
             break;
         case 'cleaning_12h':
-            actionUrl = `/production_execution/cleaning_12h_setup/${job.id}`;
-            actionText = 'Start 12h Cleaning';
-            actionIcon = 'fas fa-play';
+            if (job.can_proceed) {
+                actionUrl = `/production_execution/cleaning_12h_setup/${job.id}`;
+                actionText = 'Start 12h Cleaning';
+                actionIcon = 'fas fa-play';
+            } else {
+                return '<span class="text-muted">24h Cleaning Required</span>';
+            }
             break;
         case 'grinding':
             actionUrl = `/production_execution/b1_scale/${job.id}`;

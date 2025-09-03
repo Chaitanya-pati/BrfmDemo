@@ -1204,6 +1204,33 @@ def api_production_jobs_by_stage():
         ).all()
 
         for job in active_jobs:
+            # Check if previous stage is completed for workflow
+            can_proceed = job.status == 'pending'
+            if job.stage == 'cleaning_12h':
+                # Check if 24h cleaning is completed
+                cleaning_24h_job = ProductionJobNew.query.filter_by(
+                    order_id=job.order_id, 
+                    stage='cleaning_24h', 
+                    status='completed'
+                ).first()
+                can_proceed = can_proceed and bool(cleaning_24h_job)
+            elif job.stage == 'grinding':
+                # Check if 12h cleaning is completed
+                cleaning_12h_job = ProductionJobNew.query.filter_by(
+                    order_id=job.order_id, 
+                    stage='cleaning_12h', 
+                    status='completed'
+                ).first()
+                can_proceed = can_proceed and bool(cleaning_12h_job)
+            elif job.stage == 'packing':
+                # Check if grinding is completed
+                grinding_job = ProductionJobNew.query.filter_by(
+                    order_id=job.order_id, 
+                    stage='grinding', 
+                    status='completed'
+                ).first()
+                can_proceed = can_proceed and bool(grinding_job)
+
             job_data = {
                 'id': job.id,
                 'job_number': job.job_number,
@@ -1211,7 +1238,7 @@ def api_production_jobs_by_stage():
                 'status': job.status,
                 'stage': job.stage,
                 'progress': calculate_job_progress(job),
-                'can_proceed': job.status == 'pending',
+                'can_proceed': can_proceed,
                 'is_previous_step': False,
                 'is_running': job.status == 'in_progress',
                 'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '',
@@ -1325,11 +1352,60 @@ def cleaning_setup(job_id):
     cleaning_bins = CleaningBin.query.filter_by(status='available').all()
     return render_template('cleaning_setup.html', job=job, cleaning_bins=cleaning_bins)
 
-@app.route('/production_execution/cleaning_12h_setup/<int:job_id>')
+@app.route('/production_execution/cleaning_12h_setup/<int:job_id>', methods=['GET', 'POST'])
 def cleaning_12h_setup(job_id):
     """Set up 12-hour cleaning process"""
     job = ProductionJobNew.query.get_or_404(job_id)
-    return render_template('cleaning_12h_setup.html', job=job)
+    
+    if request.method == 'POST':
+        try:
+            # Get duration from form
+            duration_option = request.form.get('duration_option', '12')
+            if duration_option == 'custom':
+                duration_hours = float(request.form.get('custom_hours', 12))
+            else:
+                duration_hours = float(duration_option)
+
+            # Create 12-hour cleaning process
+            cleaning_process = CleaningProcess()
+            cleaning_process.job_id = job_id
+            cleaning_process.process_type = f'{int(duration_hours)}_hour' if duration_hours == int(duration_hours) else 'custom'
+            cleaning_process.duration_hours = duration_hours
+            cleaning_process.start_time = datetime.now()
+            cleaning_process.end_time = datetime.now() + timedelta(hours=duration_hours)
+            cleaning_process.start_moisture = float(request.form.get('start_moisture', 0)) if request.form.get('start_moisture') else None
+            cleaning_process.target_moisture = float(request.form.get('target_moisture', 0)) if request.form.get('target_moisture') else None
+            cleaning_process.operator_name = request.form['operator_name']
+            cleaning_process.machine_name = request.form.get('machine_name', '12-Hour Cleaning Machine')
+            cleaning_process.status = 'running'
+
+            # Handle cleaning bin assignment if provided
+            if request.form.get('cleaning_bin_id'):
+                cleaning_process.cleaning_bin_id = int(request.form['cleaning_bin_id'])
+                # Update bin status
+                cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
+                if cleaning_bin:
+                    cleaning_bin.status = 'cleaning'
+
+            # Update job status
+            job.status = 'in_progress'
+            job.started_at = datetime.now()
+            job.started_by = request.form['operator_name']
+
+            db.session.add(cleaning_process)
+            db.session.commit()
+
+            flash(f'{duration_hours}-hour cleaning process started successfully!', 'success')
+            return redirect(url_for('production_execution'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting 12-hour cleaning process: {str(e)}', 'error')
+            return redirect(url_for('cleaning_12h_setup', job_id=job_id))
+    
+    # GET request - show the form
+    cleaning_bins_12h = CleaningBin.query.filter_by(status='available').all()
+    return render_template('cleaning_12h_setup.html', job=job, cleaning_bins_12h=cleaning_bins_12h)
 
 @app.route('/production_execution/b1_scale/<int:job_id>')
 def b1_scale_process(job_id):
