@@ -1833,6 +1833,178 @@ def api_production_pipeline_status():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/job_timer/<int:job_id>')
+def api_job_timer(job_id):
+    """Get real-time timer data for a specific job"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        response_data = {
+            'success': True,
+            'job_id': job.id,
+            'status': job.status,
+            'elapsed_time': '--:--:--',
+            'cleaning_reminder': None
+        }
+        
+        if job.started_at and job.status == 'in_progress':
+            # Calculate elapsed time
+            elapsed = datetime.now() - job.started_at
+            hours = int(elapsed.total_seconds() // 3600)
+            minutes = int((elapsed.total_seconds() % 3600) // 60)
+            seconds = int(elapsed.total_seconds() % 60)
+            response_data['elapsed_time'] = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            
+            # Check for machine cleaning reminders
+            if job.stage in ['cleaning_24h', 'cleaning_12h']:
+                cleaning_frequency_minutes = 5 if job.stage == 'cleaning_24h' else 2
+                elapsed_minutes = elapsed.total_seconds() / 60
+                
+                # Calculate reminder count (how many cleaning cycles have passed)
+                reminder_count = int(elapsed_minutes // cleaning_frequency_minutes)
+                
+                if reminder_count > 0:
+                    # Check if we should show a reminder
+                    time_since_last_reminder = elapsed_minutes % cleaning_frequency_minutes
+                    
+                    # Show reminder in the last 30 seconds of each cycle
+                    should_show = time_since_last_reminder >= (cleaning_frequency_minutes - 0.5)
+                    
+                    response_data['cleaning_reminder'] = {
+                        'reminder_count': reminder_count,
+                        'should_show': should_show,
+                        'frequency_minutes': cleaning_frequency_minutes,
+                        'next_cleaning_in': cleaning_frequency_minutes - time_since_last_reminder
+                    }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/cleaning_alerts')
+def api_cleaning_alerts():
+    """Get current machine cleaning alerts"""
+    try:
+        alerts = []
+        
+        # Get all active cleaning processes
+        active_jobs = ProductionJobNew.query.filter(
+            ProductionJobNew.status == 'in_progress',
+            ProductionJobNew.stage.in_(['cleaning_24h', 'cleaning_12h'])
+        ).all()
+        
+        for job in active_jobs:
+            if job.started_at:
+                elapsed = datetime.now() - job.started_at
+                elapsed_minutes = elapsed.total_seconds() / 60
+                
+                # Determine cleaning frequency
+                frequency_minutes = 5 if job.stage == 'cleaning_24h' else 2
+                
+                # Check if cleaning is due
+                if elapsed_minutes >= frequency_minutes:
+                    cycles_completed = int(elapsed_minutes // frequency_minutes)
+                    time_since_last = elapsed_minutes % frequency_minutes
+                    
+                    # If more than 30 seconds overdue, show alert
+                    if time_since_last >= 0.5:
+                        next_due = job.started_at + timedelta(minutes=(cycles_completed + 1) * frequency_minutes)
+                        
+                        alerts.append({
+                            'job_id': job.id,
+                            'job_number': job.job_number,
+                            'stage': job.stage,
+                            'machine_name': f"{job.stage.replace('_', ' ').title()} Machine",
+                            'due_time': next_due.strftime('%H:%M:%S'),
+                            'overdue_minutes': time_since_last,
+                            'cycles_completed': cycles_completed
+                        })
+        
+        return jsonify({'success': True, 'alerts': alerts})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/submit_machine_cleaning', methods=['POST'])
+def api_submit_machine_cleaning():
+    """Submit machine cleaning data"""
+    try:
+        job_id = request.form.get('job_id')
+        process_type = request.form.get('process_type')
+        cleaned_by = request.form.get('cleaned_by')
+        waste_collected = float(request.form.get('waste_collected', 0))
+        notes = request.form.get('notes', '')
+        
+        # Handle photo uploads
+        photo_before = None
+        photo_after = None
+        
+        if 'photo_before' in request.files:
+            file = request.files['photo_before']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filename = f"machine_before_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                photo_before = filename
+        
+        if 'photo_after' in request.files:
+            file = request.files['photo_after']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filename = f"machine_after_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                photo_after = filename
+        
+        # Get or create production machine
+        machine = ProductionMachine.query.filter_by(
+            process_step=process_type,
+            name=f"{process_type.replace('_', ' ').title()} Machine"
+        ).first()
+        
+        if not machine:
+            machine = ProductionMachine(
+                name=f"{process_type.replace('_', ' ').title()} Machine",
+                machine_type='cleaning',
+                process_step=process_type,
+                cleaning_frequency_hours=0.08 if process_type == 'cleaning_12h' else 0.03  # 2 min or 5 min in hours
+            )
+            db.session.add(machine)
+            db.session.flush()
+        
+        # Create cleaning log
+        cleaning_log = MachineCleaningLog(
+            machine_id=machine.id,
+            job_id=int(job_id),
+            process_step=process_type,
+            cleaned_by=cleaned_by,
+            photo_before=photo_before,
+            photo_after=photo_after,
+            waste_collected_kg=waste_collected,
+            notes=notes,
+            status='completed',
+            cleaning_end_time=datetime.now()
+        )
+        
+        # Calculate duration (assume 5 minutes standard)
+        cleaning_log.cleaning_duration_minutes = 5
+        
+        # Update machine last cleaned time
+        machine.last_cleaned = datetime.now()
+        
+        db.session.add(cleaning_log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Machine cleaning completed successfully!',
+            'cleaning_id': cleaning_log.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/debug_production_order')
 def debug_production_order():
     """Debug route to test production order creation"""

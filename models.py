@@ -530,7 +530,8 @@ class ProductionMachine(db.Model):
     machine_type = db.Column(db.String(50), nullable=False)
     process_step = db.Column(db.String(50), nullable=False)  # 'precleaning', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing'
     location = db.Column(db.String(100))
-    cleaning_frequency_hours = db.Column(db.Integer, default=3)  # Default 3 hours
+    cleaning_frequency_hours = db.Column(db.Float, default=3.0)  # Changed to Float for minutes support (0.08 = 5 min, 0.03 = 2 min)
+    cleaning_frequency_minutes = db.Column(db.Integer, default=180)  # Frequency in minutes (5 min for 24h, 2 min for 12h)
     last_cleaned = db.Column(db.DateTime)
     status = db.Column(db.String(20), default='operational')
     is_active = db.Column(db.Boolean, default=False)  # Active during process
@@ -539,6 +540,15 @@ class ProductionMachine(db.Model):
     # Relationships
     cleaning_logs = db.relationship('MachineCleaningLog', backref='machine', lazy=True)
     cleaning_schedules = db.relationship('CleaningSchedule', backref='machine', lazy=True)
+    
+    def get_cleaning_frequency_for_process(self):
+        """Get cleaning frequency based on process type"""
+        if self.process_step == 'cleaning_24h':
+            return 5  # 5 minutes for 24-hour process
+        elif self.process_step == 'cleaning_12h':
+            return 2  # 2 minutes for 12-hour process
+        else:
+            return 180  # 3 hours for other processes
 
 # Enhanced cleaning log linked to production processes
 class MachineCleaningLog(db.Model):
