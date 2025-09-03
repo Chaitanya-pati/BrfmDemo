@@ -1534,12 +1534,33 @@ def grinding_execution(job_id):
                 grinding.start_photo = start_photo
                 grinding.status = 'in_progress'
 
+                # Create start parameters record
+                from models import ProductionStageParameters
+                start_params = ProductionStageParameters()
+                start_params.job_id = job_id
+                start_params.stage = 'grinding'
+                start_params.parameter_type = 'start'
+                start_params.operator_name = request.form['operator_name']
+                start_params.machine_name = request.form['machine_name']
+                start_params.input_weight_kg = float(request.form['input_quantity'])
+                start_params.process_photo = start_photo
+                start_params.notes = request.form.get('start_notes', '')
+                
+                # Optional start parameters
+                if request.form.get('start_temperature'):
+                    start_params.temperature = float(request.form['start_temperature'])
+                if request.form.get('start_humidity'):
+                    start_params.humidity = float(request.form['start_humidity'])
+                if request.form.get('start_moisture'):
+                    start_params.moisture_content_start = float(request.form['start_moisture'])
+
                 # Update job status
                 job.status = 'in_progress'
                 job.started_at = datetime.now()
                 job.started_by = request.form['operator_name']
 
                 db.session.add(grinding)
+                db.session.add(start_params)
                 db.session.commit()
 
                 flash('Grinding process started successfully!', 'success')
@@ -1578,11 +1599,40 @@ def grinding_execution(job_id):
                     grinding.bran_percentage_alert = True
                     flash(f'Warning: Bran percentage ({grinding.bran_percentage:.1f}%) is higher than expected (23-25%)', 'warning')
 
+                # Create end parameters record
+                from models import ProductionStageParameters
+                end_params = ProductionStageParameters()
+                end_params.job_id = job_id
+                end_params.stage = 'grinding'
+                end_params.parameter_type = 'end'
+                end_params.operator_name = request.form['operator_name']
+                end_params.machine_name = grinding.machine_name
+                end_params.output_weight_kg = grinding.total_output_kg
+                end_params.process_photo = end_photo
+                end_params.notes = request.form.get('notes', '')
+                
+                # Quality parameters
+                end_params.quality_approved = True  # Default to approved
+                end_params.quality_notes = f'Bran %: {grinding.bran_percentage:.1f}%, Main Products %: {grinding.main_products_percentage:.1f}%'
+                
+                # Optional end parameters
+                if request.form.get('end_temperature'):
+                    end_params.temperature = float(request.form['end_temperature'])
+                if request.form.get('end_humidity'):
+                    end_params.humidity = float(request.form['end_humidity'])
+                if request.form.get('end_moisture'):
+                    end_params.moisture_content_end = float(request.form['end_moisture'])
+                if request.form.get('machine_speed'):
+                    end_params.machine_speed_rpm = float(request.form['machine_speed'])
+                if request.form.get('screen_size'):
+                    end_params.screen_size_mm = float(request.form['screen_size'])
+
                 # Update job status
                 job.status = 'completed'
                 job.completed_at = datetime.now()
                 job.completed_by = request.form['operator_name']
 
+                db.session.add(end_params)
                 db.session.commit()
 
                 flash('Grinding process completed successfully!', 'success')
