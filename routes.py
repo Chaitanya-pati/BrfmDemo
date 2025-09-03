@@ -844,19 +844,25 @@ def production_execution():
 def packing_execution(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
 
-    # Check for grinding process in this job or related grinding jobs
-    grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
-    if not grinding_process:
-        # Look for grinding process in other jobs with the same order_id
-        related_jobs = ProductionJobNew.query.filter_by(order_id=job.order_id, stage='grinding').all()
-        for related_job in related_jobs:
-            grinding_process = GrindingProcess.query.filter_by(job_id=related_job.id).first()
-            if grinding_process:
-                break
-
-    if not grinding_process:
+    # Check if grinding job is completed for this order
+    grinding_job = ProductionJobNew.query.filter_by(
+        order_id=job.order_id, 
+        stage='grinding', 
+        status='completed'
+    ).first()
+    
+    if not grinding_job:
         flash('Grinding process must be completed before packing!', 'error')
         return redirect(url_for('production_execution'))
+    
+    # Get grinding process for reference
+    grinding_process = GrindingProcess.query.filter_by(job_id=grinding_job.id).first()
+    
+    # Check if current job can proceed (prerequisites)
+    prerequisite_info = {
+        'grinding_completed': bool(grinding_job),
+        'can_start_packing': bool(grinding_job) and job.status == 'pending'
+    }
 
     if request.method == 'POST':
         try:
@@ -966,7 +972,8 @@ def packing_execution(job_id):
                          products=products,
                          storage_areas=storage_areas,
                          existing_packing=existing_packing,
-                         finished_goods=finished_goods)
+                         finished_goods=finished_goods,
+                         prerequisite_info=prerequisite_info)
 
 # LIVE PRODUCTION DASHBOARD FOR CONCURRENT OPERATIONS
 @app.route('/live_production_dashboard')

@@ -57,9 +57,81 @@
         </div>
     </div>
 
+    <!-- Prerequisites Check -->
+    {% if prerequisite_info and not prerequisite_info.can_start_packing %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <h5><i class="fas fa-exclamation-triangle me-2"></i>Prerequisites Not Met</h5>
+                <p class="mb-2">Before starting the packing process, the following must be completed:</p>
+                <ul class="mb-0">
+                    <li>
+                        {% if prerequisite_info.grinding_completed %}
+                            <i class="fas fa-check-circle text-success me-2"></i>Grinding process - <strong>Completed</strong>
+                        {% else %}
+                            <i class="fas fa-times-circle text-danger me-2"></i>Grinding process - <strong>Pending</strong>
+                        {% endif %}
+                    </li>
+                    {% if job.status != 'pending' %}
+                    <li><i class="fas fa-times-circle text-danger me-2"></i>Job status must be 'pending' - Current: <strong>{{ job.status.title() }}</strong></li>
+                    {% endif %}
+                </ul>
+                {% if not prerequisite_info.grinding_completed %}
+                <div class="mt-3">
+                    <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Production Dashboard
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Storage Areas Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Storage Areas Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for area in storage_areas %}
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-left-primary">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ area.name }}</h6>
+                                    <p class="card-text">
+                                        <strong>Location:</strong> {{ area.location }}<br>
+                                        <strong>Current Stock:</strong> {{ "%.1f"|format(area.current_stock_kg) }} kg<br>
+                                        <strong>Capacity:</strong> {{ area.capacity_kg }} kg<br>
+                                        <strong>Available:</strong> {{ "%.1f"|format(area.capacity_kg - area.current_stock_kg) }} kg
+                                    </p>
+                                    {% set utilization = (area.current_stock_kg / area.capacity_kg * 100) %}
+                                    <div class="progress">
+                                        <div class="progress-bar 
+                                            {% if utilization < 70 %}bg-success
+                                            {% elif utilization < 90 %}bg-warning
+                                            {% else %}bg-danger{% endif %}" 
+                                            style="width: {{ utilization }}%">
+                                            {{ "%.1f"|format(utilization) }}%
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Packing Process Form -->
     <div class="row">
         <div class="col-12">
+            {% if not prerequisite_info or prerequisite_info.can_start_packing %}
             <div class="card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
@@ -208,6 +280,12 @@
                     </form>
                 </div>
             </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                This packing job cannot be started until all prerequisites are met. Please complete the grinding process first.
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
