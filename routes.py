@@ -1487,11 +1487,22 @@ def b1_scale_process(job_id):
     else:
         cleaning_required = True
     
+    # Calculate time until cleaning
+    time_until_cleaning = 0
+    cleaning_urgent = False
+    if b1_machine.last_cleaned:
+        time_since_cleaned = datetime.now() - b1_machine.last_cleaned
+        time_until_cleaning = (b1_machine.cleaning_frequency_minutes * 60) - time_since_cleaned.total_seconds()
+        time_until_cleaning = max(0, time_until_cleaning / 60)  # Convert to minutes
+        cleaning_urgent = time_until_cleaning <= 5
+    
     return render_template('b1_scale_process.html', 
                          job=job, 
                          existing_grinding=existing_grinding,
                          b1_machine=b1_machine,
-                         cleaning_required=cleaning_required)
+                         cleaning_required=cleaning_required,
+                         time_until_cleaning=time_until_cleaning,
+                         cleaning_urgent=cleaning_urgent)
 
 @app.route('/grinding_execution/<int:job_id>', methods=['GET', 'POST'])
 def grinding_execution(job_id):
@@ -2250,3 +2261,57 @@ def debug_production_order():
     except Exception as e:
         db.session.rollback()
         return f"Debug error: {str(e)}"
+
+# Simple Production Dashboard Route
+@app.route("/production_execution_simple")
+def simple_production_dashboard():
+    """Simple and user-friendly production dashboard"""
+    return render_template("simple_production_dashboard.html")
+
+@app.route("/api/simple_job_control/<int:job_id>", methods=["POST"])
+def simple_job_control(job_id):
+    """Simple job control API"""
+    from flask import request, jsonify
+    from datetime import datetime
+    
+    job = ProductionJobNew.query.get_or_404(job_id)
+    action = request.form.get("action")
+    
+    try:
+        if action == "quick_start":
+            operator_name = request.form.get("operator_name")
+            notes = request.form.get("notes", "")
+            
+            job.status = "in_progress"
+            job.started_at = datetime.now()
+            job.started_by = operator_name
+            
+            if notes:
+                job.notes = notes
+            
+            db.session.commit()
+            return jsonify({"success": True, "message": f"Job {job.job_number} started successfully"})
+            
+        elif action == "pause":
+            job.status = "paused"
+            db.session.commit()
+            return jsonify({"success": True, "message": f"Job {job.job_number} paused"})
+            
+        elif action == "resume":
+            job.status = "in_progress"
+            db.session.commit()
+            return jsonify({"success": True, "message": f"Job {job.job_number} resumed"})
+            
+        elif action == "complete":
+            job.status = "completed"
+            job.completed_at = datetime.now()
+            db.session.commit()
+            return jsonify({"success": True, "message": f"Job {job.job_number} completed"})
+            
+        else:
+            return jsonify({"success": False, "message": "Invalid action"})
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)})
+

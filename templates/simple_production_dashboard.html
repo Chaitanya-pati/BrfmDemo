@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block title %}Simple Production Control{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1"><i class="fas fa-play-circle text-primary me-2"></i>Production Control</h2>
+                    <p class="text-muted mb-0">Simple and intuitive production management</p>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-success fs-6 me-2">
+                        <i class="fas fa-clock me-1"></i><span id="currentTime">--:--:--</span>
+                    </span>
+                    <span class="badge bg-info fs-6">
+                        <i class="fas fa-cogs me-1"></i><span id="activeJobs">0</span> Active Jobs
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Action Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <i class="fas fa-truck fa-2x text-primary mb-2"></i>
+                    <h6>Transfer Ready</h6>
+                    <h4 class="text-primary" id="transferCount">0</h4>
+                    <small class="text-muted">Jobs waiting</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                    <h6>24h Cleaning</h6>
+                    <h4 class="text-warning" id="cleaning24Count">0</h4>
+                    <small class="text-muted">Jobs waiting</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <i class="fas fa-cog fa-2x text-success mb-2"></i>
+                    <h6>Grinding</h6>
+                    <h4 class="text-success" id="grindingCount">0</h4>
+                    <small class="text-muted">Jobs waiting</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <i class="fas fa-box fa-2x text-info mb-2"></i>
+                    <h6>Packing</h6>
+                    <h4 class="text-info" id="packingCount">0</h4>
+                    <small class="text-muted">Jobs waiting</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Production Jobs</h5>
+                    <button class="btn btn-outline-primary btn-sm" onclick="refreshJobs()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Job Number</th>
+                                    <th>Order</th>
+                                    <th>Stage</th>
+                                    <th>Status</th>
+                                    <th>Started At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="jobsTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 text-muted">Loading jobs...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Start Modal -->
+<div class="modal fade" id="quickStartModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Start Job</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Operator Name</label>
+                    <input type="text" class="form-control" id="operatorName" placeholder="Enter operator name">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notes (Optional)</label>
+                    <textarea class="form-control" id="jobNotes" rows="2" placeholder="Any special notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="startQuickJob()">
+                    <i class="fas fa-play me-1"></i>Start Job
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentJobs = [];
+let selectedJobId = null;
+
+// Update current time
+function updateTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString();
+    const timeElement = document.getElementById('currentTime');
+    if (timeElement) {
+        timeElement.textContent = timeString;
+    }
+}
+
+// Load all jobs
+function loadJobs() {
+    fetch('/api/production_jobs_by_stage')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentJobs = [];
+                
+                // Flatten all jobs into one array
+                Object.keys(data.data).forEach(stage => {
+                    data.data[stage].forEach(job => {
+                        currentJobs.push(job);
+                    });
+                });
+                
+                updateJobCounts(data.data);
+                updateJobsTable();
+                updateActiveJobsCount();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading jobs:', error);
+            showNotification('Failed to load jobs', 'error');
+        });
+}
+
+// Update job counts in cards
+function updateJobCounts(jobsData) {
+    document.getElementById('transferCount').textContent = 
+        jobsData.transfer ? jobsData.transfer.filter(j => j.status === 'pending').length : 0;
+    document.getElementById('cleaning24Count').textContent = 
+        jobsData.cleaning_24h ? jobsData.cleaning_24h.filter(j => j.status === 'pending').length : 0;
+    document.getElementById('grindingCount').textContent = 
+        jobsData.grinding ? jobsData.grinding.filter(j => j.status === 'pending').length : 0;
+    document.getElementById('packingCount').textContent = 
+        jobsData.packing ? jobsData.packing.filter(j => j.status === 'pending').length : 0;
+}
+
+// Update jobs table
+function updateJobsTable() {
+    const tbody = document.getElementById('jobsTableBody');
+    tbody.innerHTML = '';
+    
+    currentJobs.forEach(job => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <strong>${job.job_number}</strong>
+                <br><small class="text-muted">#${job.id}</small>
+            </td>
+            <td>${job.order_number}</td>
+            <td>
+                <span class="badge bg-secondary">${formatStage(job.stage)}</span>
+            </td>
+            <td>
+                <span class="badge ${getStatusBadgeClass(job.status)}">${formatStatus(job.status)}</span>
+            </td>
+            <td>
+                ${job.started_at ? new Date(job.started_at).toLocaleString() : 
+                  '<span class="text-muted">Not started</span>'}
+            </td>
+            <td>
+                ${getActionButtons(job)}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Get status badge class
+function getStatusBadgeClass(status) {
+    switch(status) {
+        case 'pending': return 'bg-warning text-dark';
+        case 'in_progress': return 'bg-primary';
+        case 'paused': return 'bg-info';
+        case 'completed': return 'bg-success';
+        default: return 'bg-secondary';
+    }
+}
+
+// Format stage name
+function formatStage(stage) {
+    return stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+// Format status
+function formatStatus(status) {
+    return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+// Get action buttons for job
+function getActionButtons(job) {
+    if (job.status === 'completed') {
+        return '<span class="text-success"><i class="fas fa-check me-1"></i>Done</span>';
+    }
+    
+    if (job.status === 'in_progress') {
+        return `
+            <button class="btn btn-warning btn-sm me-1" onclick="pauseJob(${job.id})">
+                <i class="fas fa-pause"></i> Pause
+            </button>
+            <button class="btn btn-success btn-sm" onclick="completeJob(${job.id})">
+                <i class="fas fa-check"></i> Complete
+            </button>
+        `;
+    }
+    
+    if (job.status === 'paused') {
+        return `
+            <button class="btn btn-primary btn-sm me-1" onclick="resumeJob(${job.id})">
+                <i class="fas fa-play"></i> Resume
+            </button>
+            <button class="btn btn-success btn-sm" onclick="completeJob(${job.id})">
+                <i class="fas fa-check"></i> Complete
+            </button>
+        `;
+    }
+    
+    return `
+        <button class="btn btn-primary btn-sm" onclick="quickStart(${job.id})">
+            <i class="fas fa-play me-1"></i>Start
+        </button>
+    `;
+}
+
+// Quick start job
+function quickStart(jobId) {
+    selectedJobId = jobId;
+    const modal = new bootstrap.Modal(document.getElementById('quickStartModal'));
+    modal.show();
+}
+
+// Start job with details
+function startQuickJob() {
+    const operatorName = document.getElementById('operatorName').value.trim();
+    const notes = document.getElementById('jobNotes').value.trim();
+    
+    if (!operatorName) {
+        showNotification('Please enter operator name', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'quick_start');
+    formData.append('operator_name', operatorName);
+    formData.append('notes', notes);
+    
+    fetch(`/api/simple_job_control/${selectedJobId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Job started successfully!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('quickStartModal')).hide();
+            document.getElementById('operatorName').value = '';
+            document.getElementById('jobNotes').value = '';
+            loadJobs(); // Refresh
+        } else {
+            showNotification(data.message || 'Failed to start job', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Error starting job', 'error');
+    });
+}
+
+// Control job functions
+function pauseJob(jobId) {
+    controlJob(jobId, 'pause');
+}
+
+function resumeJob(jobId) {
+    controlJob(jobId, 'resume');
+}
+
+function completeJob(jobId) {
+    if (confirm('Are you sure you want to complete this job?')) {
+        controlJob(jobId, 'complete');
+    }
+}
+
+// Generic job control
+function controlJob(jobId, action) {
+    const formData = new FormData();
+    formData.append('action', action);
+    
+    fetch(`/api/simple_job_control/${jobId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(`Job ${action}d successfully!`, 'success');
+            loadJobs(); // Refresh
+        } else {
+            showNotification(data.message || `Failed to ${action} job`, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification(`Error ${action}ing job`, 'error');
+    });
+}
+
+// Update active jobs count
+function updateActiveJobsCount() {
+    const activeCount = currentJobs.filter(job => 
+        job.status === 'in_progress' || job.status === 'paused'
+    ).length;
+    
+    const element = document.getElementById('activeJobs');
+    if (element) {
+        element.textContent = activeCount;
+    }
+}
+
+// Show notifications
+function showNotification(message, type) {
+    const alertClass = type === 'error' ? 'alert-danger' : 'alert-success';
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.parentNode.removeChild(alertDiv);
+        }
+    }, 5000);
+}
+
+// Refresh jobs
+function refreshJobs() {
+    loadJobs();
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    updateTime();
+    loadJobs();
+    
+    // Update time every second
+    setInterval(updateTime, 1000);
+    
+    // Auto-refresh jobs every 30 seconds
+    setInterval(loadJobs, 30000);
+});
+</script>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+</style>
+{% endblock %}
