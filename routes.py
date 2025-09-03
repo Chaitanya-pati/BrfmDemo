@@ -718,12 +718,27 @@ def init_data():
             for product in products:
                 db.session.add(product)
 
+        # Try to create a production machine to test the table structure
+        try:
+            test_machine = ProductionMachine.query.first()
+            if not test_machine:
+                test_machine = ProductionMachine(
+                    name='Test Grinding Machine',
+                    machine_type='grinding',
+                    process_step='grinding',
+                    cleaning_frequency_hours=3.0,
+                    cleaning_frequency_minutes=180
+                )
+                db.session.add(test_machine)
+        except Exception as machine_error:
+            print(f"Column might already exist or error: {machine_error}")
+
         db.session.commit()
         flash('Sample data initialized successfully!', 'success')
 
     except Exception as e:
         db.session.rollback()
-        flash(f'Error initializing data: {str(e)}', 'error')
+        flash(f'Error initializing sample data: {str(e)}', 'error')
 
     return redirect(url_for('index'))
 
@@ -1451,7 +1466,32 @@ def b1_scale_process(job_id):
     # Check if grinding process exists
     existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
     
-    return render_template('b1_scale_process.html', job=job, existing_grinding=existing_grinding)
+    # Get or create B1 machine for template
+    b1_machine = B1ScaleCleaning.query.first()
+    if not b1_machine:
+        b1_machine = B1ScaleCleaning(
+            machine_name='B1 Scale',
+            cleaning_frequency_minutes=60,
+            last_cleaned=datetime.now(),
+            status='due'
+        )
+        db.session.add(b1_machine)
+        db.session.commit()
+    
+    # Check if cleaning is required
+    cleaning_required = False
+    if b1_machine.last_cleaned:
+        time_since_cleaned = datetime.now() - b1_machine.last_cleaned
+        if time_since_cleaned.total_seconds() > (b1_machine.cleaning_frequency_minutes * 60):
+            cleaning_required = True
+    else:
+        cleaning_required = True
+    
+    return render_template('b1_scale_process.html', 
+                         job=job, 
+                         existing_grinding=existing_grinding,
+                         b1_machine=b1_machine,
+                         cleaning_required=cleaning_required)
 
 @app.route('/grinding_execution/<int:job_id>', methods=['GET', 'POST'])
 def grinding_execution(job_id):
