@@ -1407,11 +1407,51 @@ def cleaning_12h_setup(job_id):
     cleaning_bins_12h = CleaningBin.query.filter_by(status='available').all()
     return render_template('cleaning_12h_setup.html', job=job, cleaning_bins_12h=cleaning_bins_12h)
 
-@app.route('/production_execution/b1_scale/<int:job_id>')
+@app.route('/production_execution/b1_scale/<int:job_id>', methods=['GET', 'POST'])
 def b1_scale_process(job_id):
     """B1 scale and grinding process"""
     job = ProductionJobNew.query.get_or_404(job_id)
-    return render_template('b1_scale_process.html', job=job)
+    
+    if request.method == 'POST':
+        try:
+            action = request.form.get('action')
+            
+            if action == 'start_b1_scale':
+                # Update grinding process with B1 scale info
+                grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
+                if not grinding_process:
+                    # Create new grinding process
+                    grinding_process = GrindingProcess()
+                    grinding_process.job_id = job_id
+                    grinding_process.machine_name = 'B1 Scale + Grinding Machine'
+                    grinding_process.start_time = datetime.now()
+                    grinding_process.status = 'in_progress'
+                    db.session.add(grinding_process)
+                
+                # Update B1 scale specific fields
+                grinding_process.b1_scale_operator = request.form['operator_name']
+                grinding_process.b1_scale_start_time = datetime.now()
+                grinding_process.b1_scale_weight_kg = float(request.form['input_weight'])
+                grinding_process.input_quantity_kg = float(request.form['input_weight'])
+                grinding_process.operator_name = request.form['operator_name']
+                
+                # Update job status
+                job.status = 'in_progress'
+                job.started_at = datetime.now()
+                job.started_by = request.form['operator_name']
+                
+                db.session.commit()
+                flash('B1 Scale process started successfully!', 'success')
+                return redirect(url_for('grinding_execution', job_id=job_id))
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting B1 scale process: {str(e)}', 'error')
+    
+    # Check if grinding process exists
+    existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
+    
+    return render_template('b1_scale_process.html', job=job, existing_grinding=existing_grinding)
 
 @app.route('/grinding_execution/<int:job_id>', methods=['GET', 'POST'])
 def grinding_execution(job_id):
