@@ -324,7 +324,7 @@ def production_planning(order_id=None):
 @app.route('/edit_production_order/<int:order_id>', methods=['GET', 'POST'])
 def edit_production_order(order_id):
     order = ProductionOrder.query.get_or_404(order_id)
-
+    
     if request.method == 'POST':
         try:
             order.quantity = float(request.form['quantity'])
@@ -334,15 +334,15 @@ def edit_production_order(order_id):
             order.priority = request.form.get('priority', 'normal')
             order.description = request.form.get('notes')
             order.target_completion = datetime.strptime(request.form['target_completion'], '%Y-%m-%d') if request.form.get('target_completion') else None
-
+            
             db.session.commit()
             flash('Production order updated successfully!', 'success')
             return redirect(url_for('production_orders'))
-
+            
         except Exception as e:
             db.session.rollback()
             flash(f'Error updating production order: {str(e)}', 'error')
-
+    
     customers = Customer.query.all()
     products = Product.query.filter_by(category='Main Product').all()
     return render_template('edit_production_order.html', order=order, customers=customers, products=products)
@@ -384,7 +384,7 @@ def masters():
     if request.method == 'POST':
         try:
             form_type = request.form.get('form_type')
-
+            
             if form_type == 'supplier':
                 supplier = Supplier()
                 supplier.company_name = request.form['company_name']
@@ -396,7 +396,7 @@ def masters():
                 supplier.postal_code = request.form.get('postal_code')
                 db.session.add(supplier)
                 flash('Supplier added successfully!', 'success')
-
+                
             elif form_type == 'customer':
                 customer = Customer()
                 customer.company_name = request.form['company_name']
@@ -409,7 +409,7 @@ def masters():
                 customer.postal_code = request.form.get('postal_code')
                 db.session.add(customer)
                 flash('Customer added successfully!', 'success')
-
+                
             elif form_type == 'product':
                 product = Product()
                 product.name = request.form['name']
@@ -417,20 +417,20 @@ def masters():
                 product.description = request.form.get('description')
                 db.session.add(product)
                 flash('Product added successfully!', 'success')
-
+                
             elif form_type == 'godown_type':
                 godown_type = GodownType()
                 godown_type.name = request.form['name']
                 godown_type.description = request.form.get('description')
                 db.session.add(godown_type)
                 flash('Godown type added successfully!', 'success')
-
+                
             db.session.commit()
-
+            
         except Exception as e:
             db.session.rollback()
             flash(f'Error adding record: {str(e)}', 'error')
-
+            
         return redirect(url_for('masters'))
 
     suppliers = Supplier.query.all()
@@ -453,15 +453,15 @@ def godown_management():
             godown.type_id = int(request.form['type_id'])
             godown.capacity = float(request.form.get('capacity', 0))
             godown.current_stock = float(request.form.get('current_stock', 0))
-
+            
             db.session.add(godown)
             db.session.commit()
             flash('Godown added successfully!', 'success')
-
+            
         except Exception as e:
             db.session.rollback()
             flash(f'Error adding godown: {str(e)}', 'error')
-
+            
         return redirect(url_for('godown_management'))
 
     godowns = Godown.query.join(GodownType).all()
@@ -598,7 +598,7 @@ def production_dashboard():
             ProductionJobNew.status.in_(['in_progress', 'pending'])
         ).count()
         pending_plans = ProductionPlan.query.filter_by(status='draft').count()
-
+        
         # Get today's completed orders
         from datetime import date
         today = date.today()
@@ -606,7 +606,7 @@ def production_dashboard():
             ProductionOrder.status == 'completed',
             db.func.date(ProductionOrder.created_at) == today
         ).count()
-
+        
         return render_template('production_dashboard.html',
                              total_orders=total_orders,
                              active_productions=active_productions,
@@ -668,60 +668,11 @@ def machine_cleaning():
                          in_progress=in_progress, 
                          due_machines=due_machines)
 
-@app.route('/storage_management', methods=['GET', 'POST'])
+@app.route('/storage_management')
 def storage_management():
     """Storage and finished goods management"""
-    if request.method == 'POST':
-        try:
-            action = request.form.get('action')
-            
-            if action == 'transfer_storage':
-                from_storage_id = int(request.form['from_storage_id'])
-                to_storage_id = int(request.form['to_storage_id'])
-                product_id = int(request.form['product_id'])
-                quantity = float(request.form['quantity'])
-                operator_name = request.form['operator_name']
-                reason = request.form.get('reason', '')
-                
-                # Validate transfer
-                from_storage = StorageArea.query.get_or_404(from_storage_id)
-                to_storage = StorageArea.query.get_or_404(to_storage_id)
-                
-                if from_storage.current_stock_kg < quantity:
-                    flash(f'Insufficient stock in {from_storage.name}!', 'error')
-                    return redirect(url_for('storage_management'))
-                
-                if (to_storage.current_stock_kg + quantity) > to_storage.capacity_kg:
-                    flash(f'Transfer would exceed capacity of {to_storage.name}!', 'warning')
-                
-                # Create transfer record
-                transfer = StorageTransfer()
-                transfer.from_storage_id = from_storage_id
-                transfer.to_storage_id = to_storage_id
-                transfer.product_id = product_id
-                transfer.quantity_kg = quantity
-                transfer.operator_name = operator_name
-                transfer.reason = reason
-                
-                # Update storage stocks
-                from_storage.current_stock_kg -= quantity
-                to_storage.current_stock_kg += quantity
-                
-                db.session.add(transfer)
-                db.session.commit()
-                
-                flash(f'Storage transfer completed: {quantity}kg from {from_storage.name} to {to_storage.name}', 'success')
-                
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error in storage transfer: {str(e)}', 'error')
-        
-        return redirect(url_for('storage_management'))
-    
     storage_areas = StorageArea.query.all()
     finished_goods = FinishedGoods.query.order_by(FinishedGoods.created_at.desc()).limit(50).all()
-    products = Product.query.all()
-    recent_transfers = StorageTransfer.query.order_by(StorageTransfer.transfer_time.desc()).limit(20).all()
 
     # Calculate storage utilization
     total_capacity = sum([area.capacity_kg for area in storage_areas])
@@ -731,8 +682,6 @@ def storage_management():
     return render_template('storage_management.html', 
                          storage_areas=storage_areas,
                          finished_goods=finished_goods,
-                         products=products,
-                         recent_transfers=recent_transfers,
                          total_capacity=total_capacity,
                          total_current=total_current,
                          utilization_percent=utilization_percent)
@@ -844,29 +793,23 @@ def production_execution():
 def packing_execution(job_id):
     job = ProductionJobNew.query.get_or_404(job_id)
 
-    # Check if grinding job is completed for this order
-    grinding_job = ProductionJobNew.query.filter_by(
-        order_id=job.order_id, 
-        stage='grinding', 
-        status='completed'
-    ).first()
-    
-    if not grinding_job:
+    # Check for grinding process in this job or related grinding jobs
+    grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
+    if not grinding_process:
+        # Look for grinding process in other jobs with the same order_id
+        related_jobs = ProductionJobNew.query.filter_by(order_id=job.order_id, stage='grinding').all()
+        for related_job in related_jobs:
+            grinding_process = GrindingProcess.query.filter_by(job_id=related_job.id).first()
+            if grinding_process:
+                break
+
+    if not grinding_process:
         flash('Grinding process must be completed before packing!', 'error')
         return redirect(url_for('production_execution'))
-    
-    # Get grinding process for reference
-    grinding_process = GrindingProcess.query.filter_by(job_id=grinding_job.id).first()
-    
-    # Check if current job can proceed (prerequisites)
-    prerequisite_info = {
-        'grinding_completed': bool(grinding_job),
-        'can_start_packing': bool(grinding_job) and job.status == 'pending'
-    }
 
     if request.method == 'POST':
         try:
-            if request.form.get('action') == 'complete_packing':
+            if request.form.get('action') == 'pack_products':
                 operator = request.form['operator_name']
 
                 # Handle photo upload
@@ -887,7 +830,6 @@ def packing_execution(job_id):
                 shallow_storages = request.form.getlist('shallow_storage')
 
                 total_packed_count = 0
-                total_packed_weight = 0
 
                 for i in range(len(product_ids)):
                     if product_ids[i] and bag_weights[i] and bag_counts[i]:
@@ -896,8 +838,6 @@ def packing_execution(job_id):
                         number_of_bags = int(bag_counts[i])
                         storage_area_id = storage_area_ids[i] if i < len(storage_area_ids) and storage_area_ids[i] else None
                         stored_in_shallow = float(shallow_storages[i]) if i < len(shallow_storages) and shallow_storages[i] else 0
-
-                        total_weight = bag_weight * number_of_bags + stored_in_shallow
 
                         # Create packing process
                         packing = PackingProcess()
@@ -915,44 +855,31 @@ def packing_execution(job_id):
                         if storage_area_id:
                             storage_area = StorageArea.query.get(int(storage_area_id))
                             if storage_area:
-                                # Add both bagged and shallow storage quantities
-                                storage_area.current_stock_kg += total_weight
-                                
-                                # Check capacity
-                                if storage_area.current_stock_kg > storage_area.capacity_kg:
-                                    flash(f'Warning: Storage area {storage_area.name} is over capacity!', 'warning')
+                                storage_area.current_stock_kg += packing.total_packed_kg
 
                         db.session.add(packing)
 
-                        # Create finished goods entry
+                        # Create finished goods entry - THIS IS THE FIX FOR FINISHED GOODS DATA
                         finished_goods = FinishedGoods()
                         finished_goods.order_id = job.order_id
                         finished_goods.product_id = product_id
-                        finished_goods.quantity = total_weight
-                        finished_goods.storage_type = 'mixed' if stored_in_shallow > 0 else 'bags'
+                        finished_goods.quantity = packing.total_packed_kg
+                        finished_goods.storage_type = 'bags'
                         finished_goods.bag_weight = bag_weight
                         finished_goods.bag_count = number_of_bags
-                        finished_goods.storage_id = int(storage_area_id) if storage_area_id else None
                         finished_goods.batch_number = f"BATCH-{job.order.order_number}-{datetime.now().strftime('%Y%m%d')}"
 
                         db.session.add(finished_goods)
                         total_packed_count += 1
-                        total_packed_weight += total_weight
 
                 # Mark job as completed
                 job.status = 'completed'
                 job.completed_at = datetime.now()
                 job.completed_by = operator
 
-                # Update order status if all jobs are completed
-                all_jobs = ProductionJobNew.query.filter_by(order_id=job.order_id).all()
-                completed_jobs = [j for j in all_jobs if j.status == 'completed']
-                if len(completed_jobs) == len(all_jobs):
-                    job.order.status = 'completed'
-
                 db.session.commit()
 
-                flash(f'Packing process completed successfully! Processed {total_packed_count} products ({total_packed_weight:.2f} kg total).', 'success')
+                flash(f'Packing process completed successfully! Processed {total_packed_count} products.', 'success')
                 return redirect(url_for('production_execution'))
 
         except Exception as e:
@@ -963,7 +890,7 @@ def packing_execution(job_id):
     storage_areas = StorageArea.query.all()
     existing_packing = PackingProcess.query.filter_by(job_id=job_id).all()
 
-    # Get finished goods for this order
+    # Get finished goods for this order - THIS FIXES THE DATA DISPLAY
     finished_goods = FinishedGoods.query.filter_by(order_id=job.order_id).all()
 
     return render_template('packing_execution.html', 
@@ -972,8 +899,7 @@ def packing_execution(job_id):
                          products=products,
                          storage_areas=storage_areas,
                          existing_packing=existing_packing,
-                         finished_goods=finished_goods,
-                         prerequisite_info=prerequisite_info)
+                         finished_goods=finished_goods)
 
 # LIVE PRODUCTION DASHBOARD FOR CONCURRENT OPERATIONS
 @app.route('/live_production_dashboard')
@@ -1237,9 +1163,9 @@ def api_order_tracking(order_number):
         order = ProductionOrder.query.filter_by(order_number=order_number).first()
         if not order:
             return jsonify({'success': False, 'error': 'Order not found'}), 404
-
+            
         jobs = ProductionJobNew.query.filter_by(order_id=order.id).order_by(ProductionJobNew.created_at).all()
-
+        
         # Build job data
         jobs_data = []
         for job in jobs:
@@ -1255,7 +1181,7 @@ def api_order_tracking(order_number):
                 'machines_active': job.status == 'in_progress'
             }
             jobs_data.append(job_data)
-
+        
         order_data = {
             'id': order.id,
             'order_number': order.order_number,
@@ -1266,13 +1192,13 @@ def api_order_tracking(order_number):
             'created_at': order.created_at.isoformat() if order.created_at else None,
             'deadline': order.deadline.isoformat() if order.deadline else None
         }
-
+        
         return jsonify({
             'success': True,
             'order': order_data,
             'jobs': jobs_data
         })
-
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1342,8 +1268,7 @@ def api_production_jobs_by_stage():
 
         return jsonify({
             'success': True,
-            'jobs_by_stage': jobs_by_stage,  # Match frontend expectation
-            'data': jobs_by_stage,  # Keep both for compatibility
+            'data': jobs_by_stage,  # Fix API response format
             'total_jobs': len(active_jobs)
         })
 
@@ -1446,7 +1371,7 @@ def cleaning_setup(job_id):
 def cleaning_12h_setup(job_id):
     """Set up 12-hour cleaning process"""
     job = ProductionJobNew.query.get_or_404(job_id)
-
+    
     if request.method == 'POST':
         try:
             # Get duration from form
@@ -1492,7 +1417,7 @@ def cleaning_12h_setup(job_id):
             db.session.rollback()
             flash(f'Error starting 12-hour cleaning process: {str(e)}', 'error')
             return redirect(url_for('cleaning_12h_setup', job_id=job_id))
-
+    
     # GET request - show the form
     cleaning_bins_12h = CleaningBin.query.filter_by(status='available').all()
     return render_template('cleaning_12h_setup.html', job=job, cleaning_bins_12h=cleaning_bins_12h)
@@ -1501,11 +1426,11 @@ def cleaning_12h_setup(job_id):
 def b1_scale_process(job_id):
     """B1 scale and grinding process"""
     job = ProductionJobNew.query.get_or_404(job_id)
-
+    
     if request.method == 'POST':
         try:
             action = request.form.get('action')
-
+            
             if action == 'start_b1_scale':
                 # Update grinding process with B1 scale info
                 grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
@@ -1517,30 +1442,30 @@ def b1_scale_process(job_id):
                     grinding_process.start_time = datetime.now()
                     grinding_process.status = 'in_progress'
                     db.session.add(grinding_process)
-
+                
                 # Update B1 scale specific fields
                 grinding_process.b1_scale_operator = request.form['operator_name']
                 grinding_process.b1_scale_start_time = datetime.now()
                 grinding_process.b1_scale_weight_kg = float(request.form['input_weight'])
                 grinding_process.input_quantity_kg = float(request.form['input_weight'])
                 grinding_process.operator_name = request.form['operator_name']
-
+                
                 # Update job status
                 job.status = 'in_progress'
                 job.started_at = datetime.now()
                 job.started_by = request.form['operator_name']
-
+                
                 db.session.commit()
                 flash('B1 Scale process started successfully!', 'success')
                 return redirect(url_for('grinding_execution', job_id=job_id))
-
+                
         except Exception as e:
             db.session.rollback()
             flash(f'Error starting B1 scale process: {str(e)}', 'error')
-
+    
     # Check if grinding process exists
     existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
-
+    
     # Get or create B1 machine for template
     b1_machine = B1ScaleCleaning.query.first()
     if not b1_machine:
@@ -1552,7 +1477,7 @@ def b1_scale_process(job_id):
         )
         db.session.add(b1_machine)
         db.session.commit()
-
+    
     # Check if cleaning is required
     cleaning_required = False
     if b1_machine.last_cleaned:
@@ -1561,7 +1486,7 @@ def b1_scale_process(job_id):
             cleaning_required = True
     else:
         cleaning_required = True
-
+    
     # Calculate time until cleaning
     time_until_cleaning = 0
     cleaning_urgent = False
@@ -1570,7 +1495,7 @@ def b1_scale_process(job_id):
         time_until_cleaning = (b1_machine.cleaning_frequency_minutes * 60) - time_since_cleaned.total_seconds()
         time_until_cleaning = max(0, time_until_cleaning / 60)  # Convert to minutes
         cleaning_urgent = time_until_cleaning <= 5
-
+    
     return render_template('b1_scale_process.html', 
                          job=job, 
                          existing_grinding=existing_grinding,
@@ -1583,11 +1508,11 @@ def b1_scale_process(job_id):
 def grinding_execution(job_id):
     """Handle grinding process execution"""
     job = ProductionJobNew.query.get_or_404(job_id)
-
+    
     if request.method == 'POST':
         try:
             action = request.form.get('action')
-
+            
             if action == 'start_grinding':
                 # Handle photo uploads
                 start_photo = None
@@ -1598,7 +1523,7 @@ def grinding_execution(job_id):
                         filename = f"grinding_start_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         start_photo = filename
-
+                
                 # Create grinding process
                 grinding = GrindingProcess()
                 grinding.job_id = job_id
@@ -1608,46 +1533,25 @@ def grinding_execution(job_id):
                 grinding.start_time = datetime.now()
                 grinding.start_photo = start_photo
                 grinding.status = 'in_progress'
-
-                # Create start parameters record
-                from models import ProductionStageParameters
-                start_params = ProductionStageParameters()
-                start_params.job_id = job_id
-                start_params.stage = 'grinding'
-                start_params.parameter_type = 'start'
-                start_params.operator_name = request.form['operator_name']
-                start_params.machine_name = request.form['machine_name']
-                start_params.input_weight_kg = float(request.form['input_quantity'])
-                start_params.process_photo = start_photo
-                start_params.notes = request.form.get('start_notes', '')
                 
-                # Optional start parameters
-                if request.form.get('start_temperature'):
-                    start_params.temperature = float(request.form['start_temperature'])
-                if request.form.get('start_humidity'):
-                    start_params.humidity = float(request.form['start_humidity'])
-                if request.form.get('start_moisture'):
-                    start_params.moisture_content_start = float(request.form['start_moisture'])
-
                 # Update job status
                 job.status = 'in_progress'
                 job.started_at = datetime.now()
                 job.started_by = request.form['operator_name']
-
+                
                 db.session.add(grinding)
-                db.session.add(start_params)
                 db.session.commit()
-
+                
                 flash('Grinding process started successfully!', 'success')
                 return redirect(url_for('grinding_execution', job_id=job_id))
-
+                
             elif action == 'complete_grinding':
                 # Complete the grinding process
                 grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
                 if not grinding:
                     flash('No grinding process found for this job!', 'error')
                     return redirect(url_for('grinding_execution', job_id=job_id))
-
+                
                 # Handle end photo upload
                 end_photo = None
                 if 'end_photo' in request.files:
@@ -1657,7 +1561,7 @@ def grinding_execution(job_id):
                         filename = f"grinding_end_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         end_photo = filename
-
+                
                 # Update grinding process with completion data
                 grinding.total_output_kg = float(request.form['total_output'])
                 grinding.main_products_kg = float(request.form['main_products'])
@@ -1668,75 +1572,32 @@ def grinding_execution(job_id):
                 grinding.end_photo = end_photo
                 grinding.status = 'completed'
                 grinding.notes = request.form.get('notes', '')
-
+                
                 # Check bran percentage (should be 23-25%)
                 if grinding.bran_percentage > 25:
                     grinding.bran_percentage_alert = True
                     flash(f'Warning: Bran percentage ({grinding.bran_percentage:.1f}%) is higher than expected (23-25%)', 'warning')
-
-                # Create end parameters record
-                from models import ProductionStageParameters
-                end_params = ProductionStageParameters()
-                end_params.job_id = job_id
-                end_params.stage = 'grinding'
-                end_params.parameter_type = 'end'
-                end_params.operator_name = request.form['operator_name']
-                end_params.machine_name = grinding.machine_name
-                end_params.output_weight_kg = grinding.total_output_kg
-                end_params.process_photo = end_photo
-                end_params.notes = request.form.get('notes', '')
                 
-                # Quality parameters
-                end_params.quality_approved = True  # Default to approved
-                end_params.quality_notes = f'Bran %: {grinding.bran_percentage:.1f}%, Main Products %: {grinding.main_products_percentage:.1f}%'
-                
-                # Optional end parameters
-                if request.form.get('end_temperature'):
-                    end_params.temperature = float(request.form['end_temperature'])
-                if request.form.get('end_humidity'):
-                    end_params.humidity = float(request.form['end_humidity'])
-                if request.form.get('end_moisture'):
-                    end_params.moisture_content_end = float(request.form['end_moisture'])
-                if request.form.get('machine_speed'):
-                    end_params.machine_speed_rpm = float(request.form['machine_speed'])
-                if request.form.get('screen_size'):
-                    end_params.screen_size_mm = float(request.form['screen_size'])
-
                 # Update job status
                 job.status = 'completed'
                 job.completed_at = datetime.now()
                 job.completed_by = request.form['operator_name']
-
-                db.session.add(end_params)
+                
                 db.session.commit()
-
+                
                 flash('Grinding process completed successfully!', 'success')
                 return redirect(url_for('production_execution'))
-
+                
         except Exception as e:
             db.session.rollback()
             flash(f'Error processing grinding: {str(e)}', 'error')
-
+    
     # Check if grinding process exists
     existing_grinding = GrindingProcess.query.filter_by(job_id=job_id).first()
     
-    # Get job prerequisites for validation
-    prerequisite_info = None
-    if job.stage == 'grinding':
-        cleaning_12h_job = ProductionJobNew.query.filter_by(
-            order_id=job.order_id, 
-            stage='cleaning_12h', 
-            status='completed'
-        ).first()
-        prerequisite_info = {
-            'cleaning_12h_completed': bool(cleaning_12h_job),
-            'can_start_grinding': bool(cleaning_12h_job) and job.status == 'pending'
-        }
-
     return render_template('grinding_execution.html', 
                          job=job, 
-                         existing_grinding=existing_grinding,
-                         prerequisite_info=prerequisite_info)
+                         existing_grinding=existing_grinding)
 
 @app.route('/production_execution/packing/<int:job_id>')
 def packing_execution_route(job_id):
@@ -1825,30 +1686,30 @@ def api_start_grinding(job_id):
     """API endpoint to start grinding process"""
     try:
         job = ProductionJobNew.query.get_or_404(job_id)
-
+        
         if job.stage != 'grinding':
             return jsonify({'success': False, 'message': 'This job is not a grinding job'})
-
+        
         if job.status != 'pending':
             return jsonify({'success': False, 'message': 'Job must be in pending status to start'})
-
+        
         # Check if previous stage (12h cleaning) is completed
         cleaning_12h_job = ProductionJobNew.query.filter_by(
             order_id=job.order_id, 
             stage='cleaning_12h', 
             status='completed'
         ).first()
-
+        
         if not cleaning_12h_job:
             return jsonify({'success': False, 'message': '12-hour cleaning must be completed before starting grinding'})
-
+        
         # Redirect to grinding execution page
         return jsonify({
             'success': True, 
             'redirect_url': url_for('grinding_execution', job_id=job_id),
             'message': 'Redirecting to grinding execution...'
         })
-
+        
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -1861,7 +1722,7 @@ def job_control(job_id, action):
         operator = data.get('operator_name', 'System')
         notes = data.get('notes', '')
         auto_move_next = data.get('auto_move_next', False)
-
+        
         if action == 'pause':
             if job.status == 'in_progress':
                 job.status = 'paused'
@@ -1870,12 +1731,12 @@ def job_control(job_id, action):
                     cleaning_process = CleaningProcess.query.filter_by(job_id=job_id, status='running').first()
                     if cleaning_process:
                         cleaning_process.status = 'paused'
-
+                
                 db.session.commit()
                 return jsonify({'success': True, 'message': f'Job {job.job_number} paused successfully'})
             else:
                 return jsonify({'success': False, 'message': 'Can only pause jobs that are in progress'})
-
+                
         elif action == 'resume':
             if job.status == 'paused':
                 job.status = 'in_progress'
@@ -1884,12 +1745,12 @@ def job_control(job_id, action):
                     cleaning_process = CleaningProcess.query.filter_by(job_id=job_id, status='paused').first()
                     if cleaning_process:
                         cleaning_process.status = 'running'
-
+                
                 db.session.commit()
                 return jsonify({'success': True, 'message': f'Job {job.job_number} resumed successfully'})
             else:
                 return jsonify({'success': False, 'message': 'Can only resume paused jobs'})
-
+                
         elif action == 'complete':
             if job.status in ['in_progress', 'paused']:
                 job.status = 'completed'
@@ -1897,7 +1758,7 @@ def job_control(job_id, action):
                 job.completed_by = operator
                 if notes:
                     job.notes = (job.notes or '') + f'\nCompletion notes: {notes}'
-
+                
                 # Complete related processes
                 if job.stage in ['cleaning_24h', 'cleaning_12h']:
                     cleaning_process = CleaningProcess.query.filter_by(job_id=job_id).first()
@@ -1909,13 +1770,13 @@ def job_control(job_id, action):
                             cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
                             if cleaning_bin:
                                 cleaning_bin.status = 'available'
-
+                                
                 elif job.stage == 'grinding':
                     grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
                     if grinding_process:
                         grinding_process.status = 'completed'
                         grinding_process.end_time = datetime.now()
-
+                
                 # Auto-progression to next step
                 if auto_move_next:
                     next_stage = get_next_production_stage(job.stage)
@@ -1925,21 +1786,21 @@ def job_control(job_id, action):
                             stage=next_stage, 
                             status='pending'
                         ).first()
-
+                        
                         if next_job:
                             next_job.status = 'pending'  # Ready to start
                             db.session.add(next_job)
-
+                
                 db.session.commit()
-
+                
                 message = f'Job {job.job_number} completed successfully'
                 if auto_move_next and next_stage:
                     message += f'. Next stage ({next_stage}) is now ready to start.'
-
+                
                 return jsonify({'success': True, 'message': message})
             else:
                 return jsonify({'success': False, 'message': 'Can only complete jobs that are in progress or paused'})
-
+                
         elif action == 'cancel':
             if job.status in ['pending', 'in_progress', 'paused']:
                 job.status = 'cancelled'
@@ -1947,7 +1808,7 @@ def job_control(job_id, action):
                 job.completed_by = operator
                 if notes:
                     job.notes = (job.notes or '') + f'\nCancellation notes: {notes}'
-
+                
                 # Cancel related processes
                 if job.stage in ['cleaning_24h', 'cleaning_12h']:
                     cleaning_process = CleaningProcess.query.filter_by(job_id=job_id).filter(
@@ -1959,15 +1820,15 @@ def job_control(job_id, action):
                             cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
                             if cleaning_bin:
                                 cleaning_bin.status = 'available'
-
+                
                 db.session.commit()
                 return jsonify({'success': True, 'message': f'Job {job.job_number} cancelled successfully'})
             else:
                 return jsonify({'success': False, 'message': 'Can only cancel jobs that are pending, in progress, or paused'})
-
+        
         else:
             return jsonify({'success': False, 'message': 'Invalid action'}), 400
-
+            
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1975,14 +1836,14 @@ def job_control(job_id, action):
 def get_next_production_stage(current_stage):
     """Get the next production stage in sequence"""
     stage_sequence = ['transfer', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing']
-
+    
     try:
         current_index = stage_sequence.index(current_stage)
         if current_index < len(stage_sequence) - 1:
             return stage_sequence[current_index + 1]
     except ValueError:
         pass
-
+    
     return None
 
 @app.route('/api/job_progress/<int:job_id>')
@@ -1990,7 +1851,7 @@ def job_progress_api(job_id):
     """Get real-time progress for a specific job"""
     try:
         job = ProductionJobNew.query.get_or_404(job_id)
-
+        
         progress_data = {
             'job_id': job.id,
             'job_number': job.job_number,
@@ -2003,7 +1864,7 @@ def job_progress_api(job_id):
             'operator': job.started_by,
             'can_control': job.status in ['pending', 'in_progress', 'paused']
         }
-
+        
         # Add stage-specific details
         if job.stage in ['cleaning_24h', 'cleaning_12h']:
             cleaning_process = CleaningProcess.query.filter_by(job_id=job_id).first()
@@ -2012,7 +1873,7 @@ def job_progress_api(job_id):
                 progress_data['estimated_completion'] = cleaning_process.end_time.isoformat()
                 progress_data['machine'] = cleaning_process.machine_name
                 progress_data['operator'] = cleaning_process.operator_name
-
+                
                 # Calculate remaining time
                 if cleaning_process.status == 'running':
                     remaining = cleaning_process.end_time - datetime.now()
@@ -2020,7 +1881,7 @@ def job_progress_api(job_id):
                         progress_data['time_remaining'] = str(remaining).split('.')[0]  # Remove microseconds
                     else:
                         progress_data['time_remaining'] = 'Overdue'
-
+                        
         elif job.stage == 'grinding':
             grinding_process = GrindingProcess.query.filter_by(job_id=job_id).first()
             if grinding_process:
@@ -2031,9 +1892,9 @@ def job_progress_api(job_id):
                     progress_data['input_quantity'] = grinding_process.input_quantity_kg
                 if grinding_process.total_output_kg:
                     progress_data['output_quantity'] = grinding_process.total_output_kg
-
+                    
         return jsonify({'success': True, 'progress': progress_data})
-
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -2046,7 +1907,7 @@ def api_dashboard_stats():
             ProductionJobNew.status.in_(['in_progress', 'pending'])
         ).count()
         pending_plans = ProductionPlan.query.filter_by(status='draft').count()
-
+        
         # Get today's completed orders
         from datetime import date
         today = date.today()
@@ -2054,7 +1915,7 @@ def api_dashboard_stats():
             ProductionOrder.status == 'completed',
             db.func.date(ProductionOrder.created_at) == today
         ).count()
-
+        
         return jsonify({
             'success': True,
             'stats': {
@@ -2074,7 +1935,7 @@ def api_recent_orders():
         orders = ProductionOrder.query.order_by(
             ProductionOrder.created_at.desc()
         ).limit(10).all()
-
+        
         orders_data = []
         for order in orders:
             orders_data.append({
@@ -2084,7 +1945,7 @@ def api_recent_orders():
                 'status': order.status,
                 'created_at': order.created_at.isoformat() if order.created_at else None
             })
-
+        
         return jsonify({
             'success': True,
             'orders': orders_data
@@ -2099,7 +1960,7 @@ def api_approved_plans():
         plans = db.session.query(ProductionPlan, ProductionOrder).join(
             ProductionOrder, ProductionPlan.order_id == ProductionOrder.id
         ).filter(ProductionPlan.status == 'approved').all()
-
+        
         plans_data = []
         for plan, order in plans:
             plans_data.append({
@@ -2109,7 +1970,7 @@ def api_approved_plans():
                 'product': order.product,
                 'quantity': order.quantity
             })
-
+        
         return jsonify({
             'success': True,
             'plans': plans_data
@@ -2124,7 +1985,7 @@ def active_processes_api():
         active_jobs = ProductionJobNew.query.filter(
             ProductionJobNew.status.in_(['in_progress', 'paused'])
         ).all()
-
+        
         processes = []
         for job in active_jobs:
             process_data = {
@@ -2137,23 +1998,23 @@ def active_processes_api():
                 'operator': job.started_by,
                 'started_at': job.started_at.isoformat() if job.started_at else None
             }
-
+            
             # Add process-specific details
             if job.stage in ['cleaning_24h', 'cleaning_12h']:
                 cleaning_process = CleaningProcess.query.filter_by(job_id=job.id).first()
                 if cleaning_process:
                     process_data['end_time'] = cleaning_process.end_time.isoformat()
                     process_data['machine'] = cleaning_process.machine_name
-
+                    
             elif job.stage == 'grinding':
                 grinding_process = GrindingProcess.query.filter_by(job_id=job.id).first()
                 if grinding_process:
                     process_data['machine'] = grinding_process.machine_name
-
+                    
             processes.append(process_data)
-
+            
         return jsonify({'success': True, 'processes': processes})
-
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -2163,30 +2024,30 @@ def api_production_pipeline_status():
     try:
         stages = ['transfer', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing']
         pipeline_status = {}
-
+        
         for stage in stages:
             active_count = ProductionJobNew.query.filter_by(
                 stage=stage, 
                 status='in_progress'
             ).count()
-
+            
             total_count = ProductionJobNew.query.filter_by(stage=stage).filter(
                 ProductionJobNew.status.in_(['pending', 'in_progress', 'paused'])
             ).count()
-
+            
             completed_count = ProductionJobNew.query.filter_by(
                 stage=stage, 
                 status='completed'
             ).count()
-
+            
             pipeline_status[stage] = {
                 'active': active_count,
                 'total': total_count,
                 'completed': completed_count
             }
-
+        
         return jsonify({'success': True, 'pipeline': pipeline_status})
-
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -2195,16 +2056,16 @@ def api_job_timer(job_id):
     """Get real-time timer data for a specific job"""
     try:
         job = ProductionJobNew.query.get_or_404(job_id)
-
+        
         response_data = {
             'success': True,
             'job_id': job.id,
             'status': job.status,
             'elapsed_time': '--:--:--',
-            'cleaning_reminder': None,
-            'countdown_info': None
+            'start_time': job.started_at.isoformat() if job.started_at else None,
+            'cleaning_reminder': None
         }
-
+        
         if job.started_at and job.status == 'in_progress':
             # Calculate elapsed time
             elapsed = datetime.now() - job.started_at
@@ -2212,56 +2073,31 @@ def api_job_timer(job_id):
             minutes = int((elapsed.total_seconds() % 3600) // 60)
             seconds = int(elapsed.total_seconds() % 60)
             response_data['elapsed_time'] = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-
-            # Handle countdown for cleaning processes
+            
+            # Check for machine cleaning reminders
             if job.stage in ['cleaning_24h', 'cleaning_12h']:
-                cleaning_process = CleaningProcess.query.filter_by(job_id=job_id).first()
-                if cleaning_process and cleaning_process.end_time:
-                    remaining = cleaning_process.end_time - datetime.now()
-                    if remaining.total_seconds() > 0:
-                        remaining_hours = int(remaining.total_seconds() // 3600)
-                        remaining_minutes = int((remaining.total_seconds() % 3600) // 60)
-                        remaining_seconds = int(remaining.total_seconds() % 60)
-
-                        response_data['countdown_info'] = {
-                            'show_countdown': True,
-                            'remaining_time': f"{remaining_hours:02d}:{remaining_minutes:02d}:{remaining_seconds:02d}",
-                            'is_urgent': remaining.total_seconds() <= 1800,  # Less than 30 minutes
-                            'total_seconds': remaining.total_seconds()
-                        }
-                    else:
-                        response_data['countdown_info'] = {
-                            'show_countdown': True,
-                            'remaining_time': "COMPLETED",
-                            'is_urgent': True,
-                            'total_seconds': 0
-                        }
-
-                # Check for machine cleaning reminders
                 cleaning_frequency_minutes = 5 if job.stage == 'cleaning_24h' else 2
                 elapsed_minutes = elapsed.total_seconds() / 60
-
+                
                 # Calculate reminder count (how many cleaning cycles have passed)
                 reminder_count = int(elapsed_minutes // cleaning_frequency_minutes)
-
-                if reminder_count >= 0:
+                
+                if reminder_count > 0:
                     # Check if we should show a reminder
                     time_since_last_reminder = elapsed_minutes % cleaning_frequency_minutes
-
+                    
                     # Show reminder in the last 30 seconds of each cycle
                     should_show = time_since_last_reminder >= (cleaning_frequency_minutes - 0.5)
-                    next_cleaning_in = cleaning_frequency_minutes - time_since_last_reminder
-
+                    
                     response_data['cleaning_reminder'] = {
                         'reminder_count': reminder_count,
                         'should_show': should_show,
                         'frequency_minutes': cleaning_frequency_minutes,
-                        'next_cleaning_in': next_cleaning_in,
-                        'is_overdue': next_cleaning_in <= 0
+                        'next_cleaning_in': cleaning_frequency_minutes - time_since_last_reminder
                     }
-
+        
         return jsonify(response_data)
-
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -2270,30 +2106,30 @@ def api_cleaning_alerts():
     """Get current machine cleaning alerts"""
     try:
         alerts = []
-
+        
         # Get all active cleaning processes
         active_jobs = ProductionJobNew.query.filter(
             ProductionJobNew.status == 'in_progress',
             ProductionJobNew.stage.in_(['cleaning_24h', 'cleaning_12h'])
         ).all()
-
+        
         for job in active_jobs:
             if job.started_at:
                 elapsed = datetime.now() - job.started_at
                 elapsed_minutes = elapsed.total_seconds() / 60
-
+                
                 # Determine cleaning frequency
                 frequency_minutes = 5 if job.stage == 'cleaning_24h' else 2
-
+                
                 # Check if cleaning is due
                 if elapsed_minutes >= frequency_minutes:
                     cycles_completed = int(elapsed_minutes // frequency_minutes)
                     time_since_last = elapsed_minutes % frequency_minutes
-
+                    
                     # If more than 30 seconds overdue, show alert
                     if time_since_last >= 0.5:
                         next_due = job.started_at + timedelta(minutes=(cycles_completed + 1) * frequency_minutes)
-
+                        
                         alerts.append({
                             'job_id': job.id,
                             'job_number': job.job_number,
@@ -2303,9 +2139,9 @@ def api_cleaning_alerts():
                             'overdue_minutes': time_since_last,
                             'cycles_completed': cycles_completed
                         })
-
+        
         return jsonify({'success': True, 'alerts': alerts})
-
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -2314,30 +2150,30 @@ def api_cleaning_reminders():
     """Get machine cleaning reminders for active jobs"""
     try:
         reminders = []
-
+        
         # Get all active jobs
         active_jobs = ProductionJobNew.query.filter(
             ProductionJobNew.status.in_(['in_progress'])
         ).all()
-
+        
         for job in active_jobs:
             if job.started_at and job.stage in ['cleaning_24h', 'cleaning_12h']:
                 elapsed = datetime.now() - job.started_at
                 elapsed_minutes = elapsed.total_seconds() / 60
-
+                
                 # Determine cleaning frequency (5 min for 24h, 2 min for 12h)
                 frequency_minutes = 5 if job.stage == 'cleaning_24h' else 2
-
+                
                 # Calculate next cleaning time
                 cycles_completed = int(elapsed_minutes // frequency_minutes)
                 next_cleaning_minutes = (cycles_completed + 1) * frequency_minutes
                 next_cleaning_time = job.started_at + timedelta(minutes=next_cleaning_minutes)
                 time_until_cleaning = (next_cleaning_time - datetime.now()).total_seconds() / 60
-
+                
                 # Show reminder if cleaning is due soon or overdue
                 if time_until_cleaning <= 1:  # Within 1 minute or overdue
                     urgent = time_until_cleaning <= 0
-
+                    
                     reminders.append({
                         'job_id': job.id,
                         'job_number': job.job_number,
@@ -2348,108 +2184,8 @@ def api_cleaning_reminders():
                         'urgent': urgent,
                         'cycles_completed': cycles_completed
                     })
-
+        
         return jsonify({'success': True, 'reminders': reminders})
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/storage_details/<int:storage_area_id>')
-def api_storage_details(storage_area_id):
-    """Get detailed storage area information"""
-    try:
-        storage_area = StorageArea.query.get_or_404(storage_area_id)
-        
-        # Get all packed goods in this storage area
-        packed_goods = PackingProcess.query.filter_by(storage_area_id=storage_area_id).all()
-        
-        # Calculate totals
-        total_quantity = 0
-        total_bags = 0
-        total_shallow = 0
-        
-        # Group by product
-        products_dict = {}
-        
-        for packing in packed_goods:
-            if packing.product:
-                product_name = packing.product.name
-                if product_name not in products_dict:
-                    products_dict[product_name] = {
-                        'name': product_name,
-                        'category': packing.product.category or 'Main Product',
-                        'total_quantity': 0,
-                        'shallow_storage': 0,
-                        'bag_details': [],
-                        'last_updated': '',
-                        'operators': set()
-                    }
-                
-                products_dict[product_name]['total_quantity'] += packing.total_packed_kg
-                products_dict[product_name]['shallow_storage'] += packing.stored_in_shallow_kg or 0
-                products_dict[product_name]['bag_details'].append({
-                    'bag_weight_kg': packing.bag_weight_kg,
-                    'number_of_bags': packing.number_of_bags,
-                    'total_packed_kg': packing.total_packed_kg
-                })
-                products_dict[product_name]['operators'].add(packing.operator_name)
-                
-                if not products_dict[product_name]['last_updated'] or packing.packed_time > datetime.strptime(products_dict[product_name]['last_updated'], '%Y-%m-%d %H:%M'):
-                    products_dict[product_name]['last_updated'] = packing.packed_time.strftime('%Y-%m-%d %H:%M')
-                
-                total_quantity += packing.total_packed_kg
-                total_bags += packing.number_of_bags
-                total_shallow += packing.stored_in_shallow_kg or 0
-        
-        # Convert to list and clean up
-        products_list = []
-        for product_data in products_dict.values():
-            product_data['operators'] = list(product_data['operators'])
-            products_list.append(product_data)
-        
-        # Calculate utilization
-        utilization = (storage_area.current_stock_kg / storage_area.capacity_kg * 100) if storage_area.capacity_kg > 0 else 0
-        
-        # Get recent activities (storage transfers)
-        recent_activities = []
-        transfers_in = StorageTransfer.query.filter_by(to_storage_id=storage_area_id).order_by(StorageTransfer.transfer_time.desc()).limit(10).all()
-        transfers_out = StorageTransfer.query.filter_by(from_storage_id=storage_area_id).order_by(StorageTransfer.transfer_time.desc()).limit(10).all()
-        
-        for transfer in transfers_in:
-            recent_activities.append({
-                'date_time': transfer.transfer_time.strftime('%Y-%m-%d %H:%M'),
-                'activity_type': f'Transfer IN from {transfer.from_storage.name}',
-                'quantity': f'{transfer.quantity_kg:.2f}',
-                'operator': transfer.operator_name
-            })
-        
-        for transfer in transfers_out:
-            recent_activities.append({
-                'date_time': transfer.transfer_time.strftime('%Y-%m-%d %H:%M'),
-                'activity_type': f'Transfer OUT to {transfer.to_storage.name}',
-                'quantity': f'{transfer.quantity_kg:.2f}',
-                'operator': transfer.operator_name
-            })
-        
-        # Sort by date
-        recent_activities.sort(key=lambda x: x['date_time'], reverse=True)
-        recent_activities = recent_activities[:10]  # Keep only 10 most recent
-        
-        return jsonify({
-            'success': True,
-            'storage_area': {
-                'id': storage_area.id,
-                'name': storage_area.name,
-                'capacity': storage_area.capacity_kg,
-                'current_stock': storage_area.current_stock_kg
-            },
-            'total_quantity': total_quantity,
-            'total_bags': total_bags,
-            'total_shallow': total_shallow,
-            'utilization': utilization,
-            'products': products_list,
-            'recent_activities': recent_activities
-        })
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -2463,11 +2199,11 @@ def api_submit_machine_cleaning():
         cleaned_by = request.form.get('cleaned_by')
         waste_collected = float(request.form.get('waste_collected', 0))
         notes = request.form.get('notes', '')
-
+        
         # Handle photo uploads
         photo_before = None
         photo_after = None
-
+        
         if 'photo_before' in request.files:
             file = request.files['photo_before']
             if file and file.filename and allowed_file(file.filename):
@@ -2475,7 +2211,7 @@ def api_submit_machine_cleaning():
                 filename = f"machine_before_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 photo_before = filename
-
+        
         if 'photo_after' in request.files:
             file = request.files['photo_after']
             if file and file.filename and allowed_file(file.filename):
@@ -2483,13 +2219,13 @@ def api_submit_machine_cleaning():
                 filename = f"machine_after_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 photo_after = filename
-
+        
         # Get or create production machine
         machine = ProductionMachine.query.filter_by(
             process_step=process_type,
             name=f"{process_type.replace('_', ' ').title()} Machine"
         ).first()
-
+        
         if not machine:
             machine = ProductionMachine(
                 name=f"{process_type.replace('_', ' ').title()} Machine",
@@ -2499,7 +2235,7 @@ def api_submit_machine_cleaning():
             )
             db.session.add(machine)
             db.session.flush()
-
+        
         # Create cleaning log
         cleaning_log = MachineCleaningLog(
             machine_id=machine.id,
@@ -2513,22 +2249,22 @@ def api_submit_machine_cleaning():
             status='completed',
             cleaning_end_time=datetime.now()
         )
-
+        
         # Calculate duration (assume 5 minutes standard)
         cleaning_log.cleaning_duration_minutes = 5
-
+        
         # Update machine last cleaned time
         machine.last_cleaned = datetime.now()
-
+        
         db.session.add(cleaning_log)
         db.session.commit()
-
+        
         return jsonify({
             'success': True, 
             'message': 'Machine cleaning completed successfully!',
             'cleaning_id': cleaning_log.id
         })
-
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -2583,44 +2319,45 @@ def simple_job_control(job_id):
     """Simple job control API"""
     from flask import request, jsonify
     from datetime import datetime
-
+    
     job = ProductionJobNew.query.get_or_404(job_id)
     action = request.form.get("action")
-
+    
     try:
         if action == "quick_start":
             operator_name = request.form.get("operator_name")
             notes = request.form.get("notes", "")
-
+            
             job.status = "in_progress"
             job.started_at = datetime.now()
             job.started_by = operator_name
-
+            
             if notes:
                 job.notes = notes
-
+            
             db.session.commit()
             return jsonify({"success": True, "message": f"Job {job.job_number} started successfully"})
-
+            
         elif action == "pause":
             job.status = "paused"
             db.session.commit()
             return jsonify({"success": True, "message": f"Job {job.job_number} paused"})
-
+            
         elif action == "resume":
             job.status = "in_progress"
             db.session.commit()
             return jsonify({"success": True, "message": f"Job {job.job_number} resumed"})
-
+            
         elif action == "complete":
             job.status = "completed"
             job.completed_at = datetime.now()
             db.session.commit()
             return jsonify({"success": True, "message": f"Job {job.job_number} completed"})
-
+            
         else:
             return jsonify({"success": False, "message": "Invalid action"})
-
+            
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)})
+
