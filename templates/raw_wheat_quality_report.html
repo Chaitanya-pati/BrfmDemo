@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+
+{% block title %}Raw Wheat Quality Report - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-clipboard-check me-2"></i>Raw Wheat Quality Report
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary" onclick="location.reload()">
+                                <i class="fas fa-refresh me-1"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Quality Test Form -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-flask me-2"></i>Raw Wheat Quality Report
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if vehicles %}
+                    <form method="POST" enctype="multipart/form-data" id="rawWheatQualityForm">
+                        <!-- Document Header -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="border border-dark p-3">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-2">
+                                            <div class="border border-dark text-center p-3">
+                                                <strong>B R<br>F M</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-8 text-center">
+                                            <h4><strong>Raw Wheat Quality Report</strong></h4>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="border border-dark p-2 small">
+                                                <div>Document No - 001</div>
+                                                <div>Issue No: 01</div>
+                                                <div>Issue Date: 4/8/2022</div>
+                                                <div>Dept - QA</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Basic Information -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="wheat_variety" class="form-label">Wheat Variety *</label>
+                                    <input type="text" class="form-control" id="wheat_variety" name="wheat_variety" 
+                                           placeholder="e.g., HD" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="test_date" class="form-label">Test Date *</label>
+                                    <input type="date" class="form-control" id="test_date" name="test_date" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="vehicle_id" class="form-label">Select Vehicle *</label>
+                                    <select class="form-select" id="vehicle_id" name="vehicle_id" required onchange="loadVehicleInfo()">
+                                        <option value="">Choose vehicle for testing</option>
+                                        {% for vehicle in vehicles %}
+                                        <option value="{{ vehicle.id }}" 
+                                                data-number="{{ vehicle.vehicle_number }}" 
+                                                data-supplier="{{ vehicle.supplier.company_name if vehicle.supplier else 'Unknown' }}">
+                                            {{ vehicle.vehicle_number }} - {{ vehicle.supplier.company_name if vehicle.supplier else 'Unknown Supplier' }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="bill_number" class="form-label">Bill Number</label>
+                                    <input type="text" class="form-control" id="bill_number" name="bill_number" 
+                                           placeholder="e.g., 168">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vehicle Info Display -->
+                        <div class="row" id="vehicleInfoSection" style="display: none;">
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <h6><i class="fas fa-info-circle me-1"></i>Vehicle Information</h6>
+                                    <div id="vehicleInfoContent"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="arrival_datetime" class="form-label">Vehicle Arrival Date & Time</label>
+                                    <input type="datetime-local" class="form-control" id="arrival_datetime" name="arrival_datetime">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="lab_chemist" class="form-label">Lab Chemist *</label>
+                                    <input type="text" class="form-control" id="lab_chemist" name="lab_chemist" 
+                                           placeholder="Name of lab chemist" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Testing Parameters Table -->
+                        <div class="table-responsive mb-4">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Sr.</th>
+                                        <th>TEST</th>
+                                        <th>UOM</th>
+                                        <th>STANDARD</th>
+                                        <th>ACTUAL REPORT</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>1</td>
+                                        <td>Moisture</td>
+                                        <td>%</td>
+                                        <td>8-10.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="moisture" placeholder="10.71" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>2</td>
+                                        <td>Hectoliter weight</td>
+                                        <td>Kg/hl</td>
+                                        <td>>75</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="hectoliter_weight" placeholder="73.14" step="0.01"></td>
+                                    </tr>
+                                    <tr class="table-secondary">
+                                        <td>3</td>
+                                        <td><strong>Gluten</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>a</td>
+                                        <td>&nbsp;&nbsp;Wet Gluten</td>
+                                        <td>%</td>
+                                        <td>32-33</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="wet_gluten" placeholder="24.08" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>b</td>
+                                        <td>&nbsp;&nbsp;Dry Gluten</td>
+                                        <td></td>
+                                        <td>10.5-11.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="dry_gluten" placeholder="8.97" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>4</td>
+                                        <td>Sedimentation Value</td>
+                                        <td>ml</td>
+                                        <td>24-25 ml</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="sedimentation_value" placeholder="18" step="0.1"></td>
+                                    </tr>
+                                    <tr class="table-secondary">
+                                        <td>5</td>
+                                        <td><strong>Refractions</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>a</td>
+                                        <td>&nbsp;&nbsp;Chaff/Husk</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td><input type="number" class="form-control form-control-sm" name="chaff_husk" placeholder="0.19" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>b</td>
+                                        <td>&nbsp;&nbsp;Straws/Sticks</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td><input type="number" class="form-control form-control-sm" name="straws_sticks" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>c</td>
+                                        <td>&nbsp;&nbsp;Other Foreign Matter (OFM)</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td><input type="number" class="form-control form-control-sm" name="other_foreign_matter" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>d</td>
+                                        <td>&nbsp;&nbsp;Mudballs</td>
+                                        <td>%</td>
+                                        <td><3</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="mudballs" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>e</td>
+                                        <td>&nbsp;&nbsp;Stones</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td><input type="number" class="form-control form-control-sm" name="stones" placeholder="0.65" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>f</td>
+                                        <td>&nbsp;&nbsp;Dust/Sand</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td><input type="number" class="form-control form-control-sm" name="dust_sand" step="0.01"></td>
+                                    </tr>
+                                    <tr class="table-secondary">
+                                        <td></td>
+                                        <td><strong>Total Impurities (%)</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td><input type="number" class="form-control form-control-sm" name="total_impurities" step="0.01" readonly></td>
+                                    </tr>
+                                    <tr class="table-secondary">
+                                        <td></td>
+                                        <td><strong>Grain Dockage</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>1</td>
+                                        <td>&nbsp;&nbsp;Shriveled wheat</td>
+                                        <td></td>
+                                        <td>0.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="shriveled_wheat" placeholder="0.76" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>2</td>
+                                        <td>&nbsp;&nbsp;Insect Bored damage</td>
+                                        <td></td>
+                                        <td>0.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="insect_damage" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>3</td>
+                                        <td>&nbsp;&nbsp;Blackened wheat</td>
+                                        <td></td>
+                                        <td>0.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="blackened_wheat" placeholder="0.19" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>4</td>
+                                        <td>&nbsp;&nbsp;Other Grains</td>
+                                        <td>%</td>
+                                        <td>0.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="other_grains" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>5</td>
+                                        <td>&nbsp;&nbsp;Soft Wheat</td>
+                                        <td></td>
+                                        <td>0.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="soft_wheat" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>6</td>
+                                        <td>&nbsp;&nbsp;Heat Damaged wheat</td>
+                                        <td></td>
+                                        <td>0.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="heat_damaged" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>7</td>
+                                        <td>&nbsp;&nbsp;Immature wheat</td>
+                                        <td></td>
+                                        <td>0.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="immature_wheat" placeholder="0.05" step="0.01"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>8</td>
+                                        <td>&nbsp;&nbsp;Broken wheat</td>
+                                        <td></td>
+                                        <td>0.5</td>
+                                        <td><input type="number" class="form-control form-control-sm" name="broken_wheat" placeholder="9.52" step="0.01"></td>
+                                    </tr>
+                                    <tr class="table-secondary">
+                                        <td></td>
+                                        <td><strong>Total Dockage (%)</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td><input type="number" class="form-control form-control-sm" name="total_dockage" step="0.01" readonly></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Comments Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="comments_action" class="form-label">Comments & Action</label>
+                                    <textarea class="form-control" id="comments_action" name="comments_action" rows="4" 
+                                              placeholder="Enter comments and actions here..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quality Category Assignment -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="category_assigned" class="form-label">Quality Category *</label>
+                                    <select class="form-select" id="category_assigned" name="category_assigned" required>
+                                        <option value="">Assign quality category</option>
+                                        <option value="Mill">Mill Grade (Premium)</option>
+                                        <option value="Low Mill">Low Mill Grade</option>
+                                        <option value="HD">Heavy Density (HD)</option>
+                                        <option value="Rejected">Rejected</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Approval Section -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card border-success">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-check-circle me-1"></i>Final Approval
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="approved" name="approved">
+                                            <label class="form-check-label" for="approved">
+                                                <strong>Approve this vehicle for unloading</strong>
+                                                <br><small class="text-muted">Check only if quality meets standards</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="reset" class="btn btn-outline-secondary">
+                                <i class="fas fa-undo me-1"></i>Reset Form
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Save Quality Report
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                        <h5>No Vehicles Available for Testing</h5>
+                        <p class="text-muted">All vehicles have been processed or no vehicles are pending quality check.</p>
+                        <a href="{{ url_for('vehicle_entry') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Add New Vehicle
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Quality Reports -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Reports
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if raw_wheat_reports %}
+                        <div class="list-group list-group-flush">
+                            {% for report in raw_wheat_reports[:10] %}
+                            <div class="list-group-item border-0 px-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ report.vehicle.vehicle_number }}</h6>
+                                        <p class="mb-1 text-muted small">
+                                            {{ report.lab_chemist }}
+                                        </p>
+                                        <small class="text-muted">
+                                            {{ report.test_date.strftime('%d/%m/%Y') }}
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-{{ 'success' if report.approved else 'warning' if report.category_assigned != 'Rejected' else 'danger' }}">
+                                        {{ report.category_assigned }}
+                                    </span>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        {% if report.moisture %}
+                                            <i class="fas fa-tint me-1"></i>{{ report.moisture }}%
+                                        {% endif %}
+                                        {% if report.wet_gluten %}
+                                            <i class="fas fa-seedling ms-2 me-1"></i>{{ report.wet_gluten }}% gluten
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-clipboard-check fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No recent quality reports</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-calculate total impurities and dockage
+document.addEventListener('input', function(e) {
+    if (e.target.matches('input[name^="chaff_husk"], input[name^="straws_sticks"], input[name^="other_foreign_matter"], input[name^="mudballs"], input[name^="stones"], input[name^="dust_sand"]')) {
+        calculateTotalImpurities();
+    }
+    if (e.target.matches('input[name^="shriveled_wheat"], input[name^="insect_damage"], input[name^="blackened_wheat"], input[name^="other_grains"], input[name^="soft_wheat"], input[name^="heat_damaged"], input[name^="immature_wheat"], input[name^="broken_wheat"]')) {
+        calculateTotalDockage();
+    }
+});
+
+function calculateTotalImpurities() {
+    const fields = ['chaff_husk', 'straws_sticks', 'other_foreign_matter', 'mudballs', 'stones', 'dust_sand'];
+    let total = 0;
+    fields.forEach(field => {
+        const value = parseFloat(document.getElementsByName(field)[0].value) || 0;
+        total += value;
+    });
+    document.getElementsByName('total_impurities')[0].value = total.toFixed(2);
+}
+
+function calculateTotalDockage() {
+    const fields = ['shriveled_wheat', 'insect_damage', 'blackened_wheat', 'other_grains', 'soft_wheat', 'heat_damaged', 'immature_wheat', 'broken_wheat'];
+    let total = 0;
+    fields.forEach(field => {
+        const value = parseFloat(document.getElementsByName(field)[0].value) || 0;
+        total += value;
+    });
+    document.getElementsByName('total_dockage')[0].value = total.toFixed(2);
+}
+
+function loadVehicleInfo() {
+    const vehicleSelect = document.getElementById('vehicle_id');
+    const selectedOption = vehicleSelect.options[vehicleSelect.selectedIndex];
+    
+    if (selectedOption.value) {
+        const vehicleNumber = selectedOption.getAttribute('data-number');
+        const supplier = selectedOption.getAttribute('data-supplier');
+        
+        document.getElementById('vehicleInfoContent').innerHTML = 
+            `<strong>Vehicle:</strong> ${vehicleNumber}<br>
+             <strong>Supplier:</strong> ${supplier}`;
+        document.getElementById('vehicleInfoSection').style.display = 'block';
+    } else {
+        document.getElementById('vehicleInfoSection').style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

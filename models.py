@@ -594,3 +594,48 @@ class ProductionOrderTracking(db.Model):
     grinding_bran_percentage = db.Column(db.Float)
     packing_total_bags = db.Column(db.Integer)
     packing_total_weight_kg = db.Column(db.Float)
+
+class RawWheatQualityReport(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicle.id'), nullable=False)
+    wheat_variety = db.Column(db.String(50), nullable=False)
+    test_date = db.Column(db.Date, nullable=False)
+    bill_number = db.Column(db.String(50))
+    arrival_datetime = db.Column(db.DateTime)
+    lab_chemist = db.Column(db.String(100), nullable=False)
+    
+    # Test parameters
+    moisture = db.Column(db.Float)
+    hectoliter_weight = db.Column(db.Float)
+    wet_gluten = db.Column(db.Float)
+    dry_gluten = db.Column(db.Float)
+    sedimentation_value = db.Column(db.Float)
+    
+    # Refractions/Impurities
+    chaff_husk = db.Column(db.Float)
+    straws_sticks = db.Column(db.Float)
+    other_foreign_matter = db.Column(db.Float)
+    mudballs = db.Column(db.Float)
+    stones = db.Column(db.Float)
+    dust_sand = db.Column(db.Float)
+    total_impurities = db.Column(db.Float)
+    
+    # Grain dockage
+    shriveled_wheat = db.Column(db.Float)
+    insect_damage = db.Column(db.Float)
+    blackened_wheat = db.Column(db.Float)
+    other_grains = db.Column(db.Float)
+    soft_wheat = db.Column(db.Float)
+    heat_damaged = db.Column(db.Float)
+    immature_wheat = db.Column(db.Float)
+    broken_wheat = db.Column(db.Float)
+    total_dockage = db.Column(db.Float)
+    
+    # Final assessment
+    comments_action = db.Column(db.Text)
+    category_assigned = db.Column(db.String(50), nullable=False)
+    approved = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    vehicle = db.relationship('Vehicle', backref='raw_wheat_reports')

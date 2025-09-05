@@ -114,6 +114,82 @@ def quality_control():
 
     return render_template('quality_control.html', vehicles=pending_vehicles, quality_tests=quality_tests)
 
+@app.route('/raw_wheat_quality_report', methods=['GET', 'POST'])
+def raw_wheat_quality_report():
+    if request.method == 'POST':
+        try:
+            vehicle_id = request.form['vehicle_id']
+            vehicle = Vehicle.query.get_or_404(vehicle_id)
+
+            # Parse test date
+            test_date = datetime.strptime(request.form['test_date'], '%Y-%m-%d').date()
+
+            report = RawWheatQualityReport()
+            report.vehicle_id = int(vehicle_id)
+            report.wheat_variety = request.form['wheat_variety']
+            report.test_date = test_date
+            report.bill_number = request.form.get('bill_number')
+            
+            # Parse arrival datetime if provided
+            if request.form.get('arrival_datetime'):
+                report.arrival_datetime = datetime.strptime(request.form['arrival_datetime'], '%Y-%m-%dT%H:%M')
+            
+            report.lab_chemist = request.form['lab_chemist']
+            
+            # Test parameters
+            report.moisture = float(request.form.get('moisture', 0)) if request.form.get('moisture') else None
+            report.hectoliter_weight = float(request.form.get('hectoliter_weight', 0)) if request.form.get('hectoliter_weight') else None
+            report.wet_gluten = float(request.form.get('wet_gluten', 0)) if request.form.get('wet_gluten') else None
+            report.dry_gluten = float(request.form.get('dry_gluten', 0)) if request.form.get('dry_gluten') else None
+            report.sedimentation_value = float(request.form.get('sedimentation_value', 0)) if request.form.get('sedimentation_value') else None
+            
+            # Refractions/Impurities
+            report.chaff_husk = float(request.form.get('chaff_husk', 0)) if request.form.get('chaff_husk') else None
+            report.straws_sticks = float(request.form.get('straws_sticks', 0)) if request.form.get('straws_sticks') else None
+            report.other_foreign_matter = float(request.form.get('other_foreign_matter', 0)) if request.form.get('other_foreign_matter') else None
+            report.mudballs = float(request.form.get('mudballs', 0)) if request.form.get('mudballs') else None
+            report.stones = float(request.form.get('stones', 0)) if request.form.get('stones') else None
+            report.dust_sand = float(request.form.get('dust_sand', 0)) if request.form.get('dust_sand') else None
+            report.total_impurities = float(request.form.get('total_impurities', 0)) if request.form.get('total_impurities') else None
+            
+            # Grain dockage
+            report.shriveled_wheat = float(request.form.get('shriveled_wheat', 0)) if request.form.get('shriveled_wheat') else None
+            report.insect_damage = float(request.form.get('insect_damage', 0)) if request.form.get('insect_damage') else None
+            report.blackened_wheat = float(request.form.get('blackened_wheat', 0)) if request.form.get('blackened_wheat') else None
+            report.other_grains = float(request.form.get('other_grains', 0)) if request.form.get('other_grains') else None
+            report.soft_wheat = float(request.form.get('soft_wheat', 0)) if request.form.get('soft_wheat') else None
+            report.heat_damaged = float(request.form.get('heat_damaged', 0)) if request.form.get('heat_damaged') else None
+            report.immature_wheat = float(request.form.get('immature_wheat', 0)) if request.form.get('immature_wheat') else None
+            report.broken_wheat = float(request.form.get('broken_wheat', 0)) if request.form.get('broken_wheat') else None
+            report.total_dockage = float(request.form.get('total_dockage', 0)) if request.form.get('total_dockage') else None
+            
+            # Final assessment
+            report.comments_action = request.form.get('comments_action')
+            report.category_assigned = request.form['category_assigned']
+            report.approved = request.form.get('approved') == 'on'
+
+            # Update vehicle status if approved
+            if report.approved:
+                vehicle.status = 'approved'
+                vehicle.quality_category = request.form['category_assigned']
+                vehicle.owner_approved = True
+            else:
+                vehicle.status = 'quality_check'
+                vehicle.quality_category = request.form['category_assigned']
+
+            db.session.add(report)
+            db.session.commit()
+            flash('Raw wheat quality report saved successfully!', 'success')
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error saving quality report: {str(e)}', 'error')
+
+    pending_vehicles = Vehicle.query.filter_by(status='pending').all()
+    raw_wheat_reports = RawWheatQualityReport.query.join(Vehicle).order_by(RawWheatQualityReport.created_at.desc()).all()
+
+    return render_template('raw_wheat_quality_report.html', vehicles=pending_vehicles, raw_wheat_reports=raw_wheat_reports)
+
 @app.route('/weight_entry', methods=['GET', 'POST'])
 def weight_entry():
     if request.method == 'POST':
