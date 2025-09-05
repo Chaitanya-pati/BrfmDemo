@@ -962,6 +962,7 @@ def api_production_jobs_by_stage():
     """API endpoint to get production jobs grouped by stage"""
     try:
         jobs_by_stage = {
+            'transfer': [],
             'cleaning_24h': [],
             'cleaning_12h': [],
             'grinding': [],
@@ -1006,6 +1007,7 @@ def api_production_jobs_by_stage():
             'success': False,
             'error': str(e),
             'jobs': {
+                'transfer': [],
                 'cleaning_24h': [],
                 'cleaning_12h': [],
                 'grinding': [],
@@ -1089,6 +1091,12 @@ def start_production_execution(order_id):
         db.session.rollback()
         flash(f'Error starting production execution: {str(e)}', 'error')
         return redirect(url_for('production_planning', order_id=order_id))
+
+@app.route('/production_execution/transfer_setup/<int:job_id>')
+def transfer_setup(job_id):
+    """Set up transfer process"""
+    job = ProductionJobNew.query.get_or_404(job_id)
+    return render_template('transfer_execution_setup.html', job=job)
 
 @app.route('/production_execution/cleaning_setup/<int:job_id>')
 def cleaning_setup(job_id):

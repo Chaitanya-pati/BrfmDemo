@@ -39,7 +39,14 @@
                     <!-- Tab Navigation -->
                     <ul class="nav nav-tabs" id="productionTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="cleaning-24h-tab" data-bs-toggle="tab"
+                            <button class="nav-link active" id="transfer-tab" data-bs-toggle="tab"
+                                    data-bs-target="#transfer" type="button" role="tab">
+                                <i class="fas fa-truck me-2"></i>Transfer
+                                <span class="badge bg-secondary ms-2" id="transfer-count">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="cleaning-24h-tab" data-bs-toggle="tab"
                                     data-bs-target="#cleaning-24h" type="button" role="tab">
                                 <i class="fas fa-hourglass-half me-2"></i>24-Hour Cleaning
                                 <span class="badge bg-primary ms-2" id="cleaning-24h-count">0</span>
@@ -70,8 +77,37 @@
 
                     <!-- Tab Content -->
                     <div class="tab-content mt-4" id="productionTabContent">
+                        <!-- Transfer Tab -->
+                        <div class="tab-pane fade show active" id="transfer" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="text-secondary mb-3">
+                                        <i class="fas fa-truck me-2"></i>Transfer Process
+                                    </h6>
+                                    <div id="transfer-jobs">
+                                        <!-- Jobs will be loaded here -->
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-secondary">
+                                        <div class="card-header bg-secondary text-white">
+                                            <h6 class="mb-0">Process Information</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-unstyled mb-0">
+                                                <li><i class="fas fa-check text-success me-2"></i>Move wheat from pre-cleaning bins</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Setup cleaning machines</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Quality check before cleaning</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Initialize production workflow</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 24-Hour Cleaning Tab -->
-                        <div class="tab-pane fade show active" id="cleaning-24h" role="tabpanel">
+                        <div class="tab-pane fade" id="cleaning-24h" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-8">
                                     <h6 class="text-primary mb-3">
@@ -413,6 +449,11 @@ function getActionButtons(job, stage) {
     let actionIcon = '';
 
     switch(stage) {
+        case 'transfer':
+            actionUrl = `/production_execution/transfer_setup/${job.id}`;
+            actionText = 'Start Transfer';
+            actionIcon = 'fas fa-truck';
+            break;
         case 'cleaning_24h':
             actionUrl = `/production_execution/cleaning_setup/${job.id}`;
             actionText = 'Start 24h Cleaning';
