@@ -299,7 +299,7 @@ function loadProductionJobs() {
         })
         .then(result => {
             if (result.success) {
-                const data = result.data;
+                const data = result.jobs;  // Changed from result.data to result.jobs
                 console.log('Jobs loaded:', data);
 
                 // Update each stage

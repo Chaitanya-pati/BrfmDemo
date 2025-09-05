@@ -726,6 +726,9 @@ def packing_execution(job_id):
                 job.completed_by = operator
 
                 db.session.commit()
+                
+                # Check if all jobs for this order are completed
+                check_and_update_order_completion(job.order_id)
 
                 flash(f'Packing process completed successfully! Processed {total_packed_count} products.', 'success')
                 return redirect(url_for('production_execution'))
@@ -1075,6 +1078,9 @@ def start_production_execution(order_id):
         # Update order status
         order.status = 'in_progress'
 
+        # Update plan status to executed
+        plan.status = 'executed'
+        
         db.session.commit()
         flash('Production execution started! All jobs have been created.', 'success')
         return redirect(url_for('production_execution'))
@@ -1108,6 +1114,30 @@ def b1_scale_process(job_id):
 def packing_execution_route(job_id):
     """Redirect to existing packing execution"""
     return redirect(url_for('packing_execution', job_id=job_id))
+
+def check_and_update_order_completion(order_id):
+    """Check if all jobs for an order are completed and update order status"""
+    try:
+        order = ProductionOrder.query.get(order_id)
+        if not order:
+            return
+        
+        # Get all jobs for this order
+        all_jobs = ProductionJobNew.query.filter_by(order_id=order_id).all()
+        
+        if not all_jobs:
+            return
+        
+        # Check if all jobs are completed
+        completed_jobs = [job for job in all_jobs if job.status == 'completed']
+        
+        if len(completed_jobs) == len(all_jobs):
+            # All jobs completed - mark order as completed
+            order.status = 'completed'
+            db.session.commit()
+            print(f"Order {order.order_number} marked as completed - all {len(all_jobs)} jobs finished")
+    except Exception as e:
+        print(f"Error checking order completion: {str(e)}")
 
 @app.route('/process_cleaning_24h/<int:job_id>', methods=['POST'])
 def process_cleaning_24h(job_id):
