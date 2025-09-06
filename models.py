@@ -199,16 +199,18 @@ class CleaningLog(db.Model):
 class ProductionOrder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(50), unique=True, nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    product = db.Column(db.String(100))  # Changed from product_id to product string
+    customer = db.Column(db.String(100))  # Added customer field
     quantity = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed
     priority = db.Column(db.String(20), default='normal')  # low, normal, high
     created_by = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     target_completion_date = db.Column(db.DateTime)
+    deadline = db.Column(db.DateTime)  # Added deadline field
+    notes = db.Column(db.Text)  # Added notes field
     
     # Relationships
-    product = db.relationship('Product', backref='production_orders')
     production_plans = db.relationship('ProductionPlan', backref='order', lazy=True)
     production_jobs = db.relationship('ProductionJobNew', back_populates='order', lazy=True)
 

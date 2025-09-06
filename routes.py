@@ -1737,6 +1737,103 @@ def check_cleaning_reminders():
         print(f"Error checking cleaning reminders: {str(e)}")
 
 # Initialize sample cleaning reminders for existing machines
+@app.route('/production_orders', methods=['GET', 'POST'])
+def production_orders():
+    if request.method == 'POST':
+        try:
+            production_order = ProductionOrder()
+            production_order.order_number = generate_order_number('PO')
+            production_order.quantity = float(request.form['quantity'])
+            production_order.product = request.form['product']
+            production_order.customer = request.form['customer']
+            production_order.deadline = datetime.strptime(request.form['deadline'], '%Y-%m-%d')
+            production_order.priority = request.form.get('priority', 'normal')
+            production_order.notes = request.form.get('notes')
+            production_order.created_by = request.form['created_by']
+            
+            db.session.add(production_order)
+            db.session.commit()
+            flash('Production order created successfully!', 'success')
+            return redirect(url_for('production_orders'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating production order: {str(e)}', 'error')
+    
+    orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
+    customers = Customer.query.all()
+    products = Product.query.filter_by(category='Main Product').all()
+    
+    return render_template('production_orders.html', orders=orders, customers=customers, products=products)
+
+@app.route('/production_planning/<int:order_id>', methods=['GET', 'POST'])
+def production_planning(order_id):
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    if request.method == 'POST':
+        try:
+            # Create production plan
+            plan = ProductionPlan()
+            plan.order_id = order_id
+            plan.planned_by = request.form['planned_by']
+            plan.status = 'approved'
+            
+            db.session.add(plan)
+            db.session.flush()  # Get plan ID
+            
+            # Create plan items
+            bin_ids = request.form.getlist('bin_id')
+            percentages = request.form.getlist('percentage')
+            
+            total_percentage = 0
+            for i, bin_id in enumerate(bin_ids):
+                if bin_id and percentages[i]:
+                    percentage = float(percentages[i])
+                    quantity = (order.quantity * percentage) / 100
+                    
+                    plan_item = ProductionPlanItem()
+                    plan_item.plan_id = plan.id
+                    plan_item.precleaning_bin_id = int(bin_id)
+                    plan_item.percentage = percentage
+                    plan_item.quantity = quantity
+                    
+                    db.session.add(plan_item)
+                    total_percentage += percentage
+            
+            plan.total_percentage = total_percentage
+            order.status = 'planned'
+            
+            db.session.commit()
+            flash('Production plan created successfully!', 'success')
+            return redirect(url_for('production_orders'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating production plan: {str(e)}', 'error')
+    
+    precleaning_bins = PrecleaningBin.query.filter(PrecleaningBin.current_stock > 0).all()
+    existing_plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+    
+    return render_template('production_planning.html', order=order, bins=precleaning_bins, plan=existing_plan)
+
+@app.route('/production_execution')
+def production_execution():
+    # Get all active production jobs
+    active_jobs = ProductionJobNew.query.filter(
+        ProductionJobNew.status.in_(['pending', 'in_progress'])
+    ).order_by(ProductionJobNew.created_at.desc()).all()
+    
+    # Get orders ready for execution (planned but no jobs created yet)
+    ready_orders = db.session.query(ProductionOrder).join(ProductionPlan).filter(
+        ProductionPlan.status == 'approved',
+        ProductionOrder.status == 'planned',
+        ~ProductionOrder.id.in_(
+            db.session.query(ProductionJobNew.order_id).distinct()
+        )
+    ).all()
+    
+    return render_template('production_execution.html', jobs=active_jobs, ready_orders=ready_orders)
+
 @app.route('/init_cleaning_reminders')
 def init_cleaning_reminders():
     """Initialize sample cleaning reminders for existing machines"""
