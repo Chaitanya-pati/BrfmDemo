@@ -294,7 +294,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Deadline</label>
-                                <input type="date" name="deadline" class="form-control" min="{{ moment().format('YYYY-MM-DD') }}">
+                                <input type="date" name="deadline" class="form-control" id="deadlineInput">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -332,7 +332,7 @@
 <script>
 // Set minimum date to today
 document.addEventListener('DOMContentLoaded', function() {
-    const dateInput = document.querySelector('input[name="deadline"]');
+    const dateInput = document.getElementById('deadlineInput');
     if (dateInput) {
         const today = new Date().toISOString().split('T')[0];
         dateInput.setAttribute('min', today);
