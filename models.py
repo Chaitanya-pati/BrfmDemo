@@ -143,6 +143,12 @@ class Transfer(db.Model):
 
 # Enhanced Models for Production Stage Tracking
 class StageParameters(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    stage_name = db.Column(db.String(50), nullable=False)
+    parameter_name = db.Column(db.String(100), nullable=False)
+    parameter_value = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class MachineCleaningReminder(db.Model):
     """Configurable cleaning reminders for production machines"""
     id = db.Column(db.Integer, primary_key=True)
