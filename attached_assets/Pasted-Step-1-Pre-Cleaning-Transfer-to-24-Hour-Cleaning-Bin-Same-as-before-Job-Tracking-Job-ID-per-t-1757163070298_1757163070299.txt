@@ -1,0 +1,113 @@
+Step 1 – Pre-Cleaning Transfer to 24-Hour Cleaning Bin
+
+(Same as before)
+
+Job Tracking
+
+Job ID per transfer linked to Order ID.
+
+Capture start time, end time, duration.
+
+Countdown & Duration Options
+
+User selects duration: 24 hrs / 12 hrs / custom.
+
+Countdown starts.
+
+Block further process until countdown completes.
+
+Machine Cleaning
+
+Cleaning reminder: every 5 minutes.
+
+Record cleaning time + before/after photos linked to Order ID.
+
+After Process
+
+Capture moisture, waste, machine name, water added.
+
+Step 2 – Transfer to 12-Hour Cleaning Process
+
+(Same as before)
+
+Capture incoming moisture + target moisture.
+
+Duration options (24/12/custom), start countdown.
+
+Reminders before process ends.
+
+Machine Cleaning: every 2 minutes; record cleaning time + before/after photos.
+
+Capture outgoing moisture after process completes.
+
+Step 3 – B1 Scale to Grinding Process (Updated)
+
+This stage is different:
+
+Start/Stop Timer Instead of Countdown
+
+When user clicks Start Process, record start time and start running timer display.
+
+Show timer live on screen (no countdown).
+
+Send cleaning reminders every 1 minute.
+
+When user clicks Stop Process, record end time automatically.
+
+Data Captured
+
+Start time
+
+End time
+
+Duration (calculated automatically)
+
+Cleaning logs:
+
+Time of each cleaning
+
+Before/after cleaning photos
+
+Product Output Tracking:
+
+Percentage of Main Products (configurable: Maida, Suji, Chakki Atta, etc.) – expected 75–77%.
+
+Percentage of Bran – expected 23–25%.
+
+Flag if Bran > 25%.
+
+Step 4 – Packing & Storage of Finished Goods
+
+(Same as before)
+
+Capture number of bags, weights, product types.
+
+Track finished goods in each storage area.
+
+Record product shifts between storage/godowns (from-to, date/time, quantity).
+
+Enhanced Features Summary
+
+Order ID linkage across all stages.
+
+Cleaning reminders per stage:
+
+5 min – 24-hour cleaning
+
+2 min – 12-hour cleaning
+
+1 min – grinding process
+
+Mandatory before-and-after cleaning pictures at every cleaning.
+
+Grinding Phase Special Behavior:
+
+Start/Stop button triggers timer (no countdown).
+
+Capture start time, end time, duration.
+
+Cleaning reminders still active every 1 minute during the process.
+
+Automatic yield calculation of main products vs bran, with alerts.
+
+Complete packing & storage traceability, including inter-storage shifts.
