@@ -32,8 +32,8 @@ class Godown(db.Model):
     current_stock = db.Column(db.Float, default=0)  # in tons
 
     # Relationship
-    transfers_from = db.relationship('Transfer', foreign_keys='Transfer.from_godown_id', backref='from_godown', lazy=True)
-    transfers_to = db.relationship('Transfer', foreign_keys='Transfer.to_godown_id', backref='to_godown', lazy=True)
+    transfers_from = db.relationship('Transfer', foreign_keys='Transfer.from_godown_id', lazy=True)
+    transfers_to = db.relationship('Transfer', foreign_keys='Transfer.to_godown_id', lazy=True)
 
 class PrecleaningBin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -136,10 +136,10 @@ class Transfer(db.Model):
     evidence_photo = db.Column(db.String(255))
 
     # Relationships
-    from_godown = db.relationship('Godown', foreign_keys=[from_godown_id], backref='outgoing_transfers')
-    to_godown = db.relationship('Godown', foreign_keys=[to_godown_id], backref='incoming_transfers')
-    from_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[from_precleaning_bin_id], backref='outgoing_transfers')
-    to_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[to_precleaning_bin_id], backref='incoming_transfers')
+    from_godown = db.relationship('Godown', foreign_keys=[from_godown_id])
+    to_godown = db.relationship('Godown', foreign_keys=[to_godown_id])
+    from_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[from_precleaning_bin_id])
+    to_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[to_precleaning_bin_id])
 
 class CleaningMachine(db.Model):
     id = db.Column(db.Integer, primary_key=True)
