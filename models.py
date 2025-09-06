@@ -143,35 +143,6 @@ class Transfer(db.Model):
 
 # Enhanced Models for Production Stage Tracking
 class StageParameters(db.Model):
-    """Tracks all parameters captured during production stages"""
-    id = db.Column(db.Integer, primary_key=True)
-    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
-    stage = db.Column(db.String(50), nullable=False)  # cleaning_24h, cleaning_12h, grinding, packing
-    parameter_type = db.Column(db.String(50), nullable=False)  # start, end, buffer
-    
-    # 24-hour cleaning end parameters
-    moisture_content = db.Column(db.Float)
-    water_added_liters = db.Column(db.Float)
-    waste_collected_kg = db.Column(db.Float)
-    
-    # 12-hour cleaning start parameters
-    initial_moisture = db.Column(db.Float)
-    target_moisture = db.Column(db.Float)
-    
-    # 12-hour cleaning end parameters
-    final_moisture = db.Column(db.Float)
-    
-    # Buffer timing
-    buffer_duration_minutes = db.Column(db.Float)
-    buffer_reason = db.Column(db.String(200))
-    
-    # General tracking
-    captured_by = db.Column(db.String(100), nullable=False)
-    captured_at = db.Column(db.DateTime, default=datetime.utcnow)
-    notes = db.Column(db.Text)
-    
-    job = db.relationship('ProductionJobNew', backref=db.backref('stage_parameters', lazy=True))
-
 class MachineCleaningReminder(db.Model):
     """Configurable cleaning reminders for production machines"""
     id = db.Column(db.Integer, primary_key=True)
@@ -220,24 +191,6 @@ class CleaningLog(db.Model):
     notes = db.Column(db.Text)
 
 class ProductionOrder(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    order_number = db.Column(db.String(50), unique=True, nullable=False)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
-    quantity = db.Column(db.Float, nullable=False)  # in tons
-    product = db.Column(db.String(100))  # Change to string field instead of foreign key
-    finished_good_type = db.Column(db.String(100))  # Type of finished good
-    deadline = db.Column(db.DateTime)
-    priority = db.Column(db.String(20), default='normal')
-    description = db.Column(db.Text)
-    status = db.Column(db.String(20), default='pending')  # pending, planned, in_progress, completed
-    created_by = db.Column(db.String(100))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    target_completion = db.Column(db.DateTime)
-
-    # Relationships
-    production_plan = db.relationship('ProductionPlan', backref='order', uselist=False)
-    production_jobs = db.relationship('ProductionJobNew', back_populates='order', lazy=True)
-
 class ProductionPlan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
@@ -651,29 +604,6 @@ class CleaningSchedule(db.Model):
 
 # Production Order comprehensive tracking
 class ProductionOrderTracking(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    production_order_id = db.Column(db.String(50), unique=True, nullable=False)
-    total_stages = db.Column(db.Integer, default=5)  # precleaning, 24h, 12h, grinding, packing
-    current_stage = db.Column(db.String(50))
-    overall_status = db.Column(db.String(20), default='pending')
-    start_time = db.Column(db.DateTime)
-    end_time = db.Column(db.DateTime)
-    total_duration_hours = db.Column(db.Float)
-    total_cleanings_performed = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Process parameters tracking
-    precleaning_moisture = db.Column(db.Float)
-    cleaning_24h_start_moisture = db.Column(db.Float)
-    cleaning_24h_end_moisture = db.Column(db.Float)
-    cleaning_12h_start_moisture = db.Column(db.Float)
-    cleaning_12h_end_moisture = db.Column(db.Float)
-    grinding_input_kg = db.Column(db.Float)
-    grinding_output_kg = db.Column(db.Float)
-    grinding_bran_percentage = db.Column(db.Float)
-    packing_total_bags = db.Column(db.Integer)
-    packing_total_weight_kg = db.Column(db.Float)
-
 class RawWheatQualityReport(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicle.id'), nullable=False)

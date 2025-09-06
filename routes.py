@@ -274,128 +274,7 @@ def precleaning():
 
     return render_template('precleaning.html', godowns=godowns, precleaning_bins=precleaning_bins, transfers=recent_transfers)
 
-@app.route('/production_orders', methods=['GET', 'POST'])
-def production_orders():
-    if request.method == 'POST':
-        try:
-            order = ProductionOrder()
-            order.order_number = generate_order_number('PO')
 
-            # Handle customer field - check if it's customer_id or customer name
-            if request.form.get('customer_id'):
-                order.customer_id = int(request.form['customer_id'])
-            elif request.form.get('customer'):
-                # If customer name is provided, find or create customer
-                customer_name = request.form['customer']
-                customer = Customer.query.filter_by(company_name=customer_name).first()
-                if customer:
-                    order.customer_id = customer.id
-                else:
-                    # Create new customer with minimal info
-                    new_customer = Customer(company_name=customer_name)
-                    db.session.add(new_customer)
-                    db.session.flush()
-                    order.customer_id = new_customer.id
-
-            order.quantity = float(request.form['quantity'])
-
-            # Handle product field - check if it's product_id or product name
-            if request.form.get('product_id'):
-                product = Product.query.get(int(request.form['product_id']))
-                order.product = product.name if product else 'Unknown Product'
-            elif request.form.get('product'):
-                order.product = request.form['product']
-
-            order.finished_good_type = request.form.get('finished_good_type')
-            order.deadline = datetime.strptime(request.form['deadline'], '%Y-%m-%d') if request.form.get('deadline') else None
-            order.priority = request.form.get('priority', 'normal')
-            order.description = request.form.get('notes')  # Map notes to description
-            order.created_by = request.form.get('created_by', 'System')
-            order.target_completion = datetime.strptime(request.form['target_completion'], '%Y-%m-%d') if request.form.get('target_completion') else None
-
-            db.session.add(order)
-            db.session.commit()
-            flash('Production order created successfully!', 'success')
-
-        except Exception as e:
-            db.session.rollback()
-            print(f"Production order creation error: {str(e)}")  # Debug print
-            flash(f'Error creating production order: {str(e)}', 'error')
-
-    orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
-    customers = Customer.query.all()
-    products = Product.query.filter_by(category='Main Product').all()
-
-    return render_template('production_orders.html', orders=orders, customers=customers, products=products)
-
-@app.route('/production_planning')
-@app.route('/production_planning/<int:order_id>', methods=['GET', 'POST'])
-def production_planning(order_id=None):
-    order = None
-    existing_plan = None
-
-    if order_id:
-        order = ProductionOrder.query.get_or_404(order_id)
-        existing_plan = ProductionPlan.query.filter_by(order_id=order_id).first()
-
-    if request.method == 'POST' and order:
-        try:
-            # Create production plan
-            plan = ProductionPlan()
-            plan.order_id = order_id
-            plan.planned_by = request.form['planned_by']
-            db.session.add(plan)
-            db.session.flush()  # Get the plan ID
-
-            total_percentage = 0
-            precleaning_bins = request.form.getlist('precleaning_bin_id')
-            percentages = request.form.getlist('percentage')
-
-            for i, bin_id in enumerate(precleaning_bins):
-                if bin_id and percentages[i]:
-                    percentage = float(percentages[i])
-                    quantity = (percentage / 100) * order.quantity
-
-                    plan_item = ProductionPlanItem()
-                    plan_item.plan_id = plan.id
-                    plan_item.precleaning_bin_id = int(bin_id)
-                    plan_item.percentage = percentage
-                    plan_item.quantity = quantity
-                    db.session.add(plan_item)
-                    total_percentage += percentage
-
-            if abs(total_percentage - 100) > 0.1:
-                flash('Total percentage must equal 100%!', 'error')
-                db.session.rollback()
-                return redirect(url_for('production_planning', order_id=order_id))
-
-            plan.total_percentage = total_percentage
-            plan.status = 'approved'
-            order.status = 'planned'
-
-            db.session.commit()
-            flash('Production plan created successfully!', 'success')
-            return redirect(url_for('production_orders'))
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error creating production plan: {str(e)}', 'error')
-
-    # Data for template
-    orders = ProductionOrder.query.filter_by(status='pending').all()
-    precleaning_bins = PrecleaningBin.query.filter(PrecleaningBin.current_stock > 0).all()
-    bins = precleaning_bins  # For sidebar display
-    plans = ProductionPlan.query.order_by(ProductionPlan.planning_date.desc()).limit(10).all()
-    products = Product.query.filter_by(category='Main Product').all()
-
-    return render_template('production_planning.html', 
-                         order=order, 
-                         orders=orders, 
-                         precleaning_bins=precleaning_bins,
-                         bins=bins, 
-                         plans=plans, 
-                         products=products,
-                         existing_plan=existing_plan)
 
 @app.route('/reports')
 def reports():
@@ -556,29 +435,6 @@ def reject_vehicle(vehicle_id):
         flash(f'Error rejecting vehicle: {str(e)}', 'error')
     return redirect(url_for('quality_control'))
 
-@app.route('/production_tracking')
-def production_tracking():
-    """General production tracking overview with links to detailed views"""
-    orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).limit(20).all()
-
-    # Build tracking data for each order
-    tracking_data = []
-    for order in orders:
-        jobs = ProductionJobNew.query.filter_by(order_id=order.id).all()
-        plan = ProductionPlan.query.filter_by(order_id=order.id).first()
-
-        order_data = {
-            'order': order,
-            'plan': plan,
-            'jobs': jobs,
-            'total_jobs': len(jobs),
-            'completed_jobs': len([j for j in jobs if j.status == 'completed']),
-            'in_progress_jobs': len([j for j in jobs if j.status == 'in_progress']),
-            'pending_jobs': len([j for j in jobs if j.status == 'pending'])
-        }
-        tracking_data.append(order_data)
-
-    return render_template('production_tracking.html', tracking_data=tracking_data)
 
 @app.route('/machine_cleaning')
 def machine_cleaning():
@@ -666,52 +522,6 @@ def init_data():
 
     return redirect(url_for('index'))
 
-@app.route('/production_execution', methods=['GET', 'POST'])
-def production_execution():
-    if request.method == 'POST':
-        try:
-            action = request.form.get('action')
-
-            if action == 'start_job':
-                # Start a new production job
-                plan_id = int(request.form['plan_id'])
-                stage = request.form['stage']
-                operator_name = request.form['operator_name']
-                notes = request.form.get('notes', '')
-
-                plan = ProductionPlan.query.get_or_404(plan_id)
-
-                # Generate unique job number
-                job_number = f"JOB{datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-                job = ProductionJobNew()
-                job.job_number = job_number
-                job.order_id = plan.order_id
-                job.plan_id = plan_id
-                job.stage = stage
-                job.status = 'pending'
-                job.started_by = operator_name
-                job.notes = notes
-                job.created_at = datetime.now()
-
-                db.session.add(job)
-                db.session.commit()
-
-                flash(f'Production job {job_number} started successfully!', 'success')
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error processing request: {str(e)}', 'error')
-
-    # Get data for template
-    active_jobs = ProductionJobNew.query.filter(ProductionJobNew.status.in_(['pending', 'in_progress'])).all()
-    approved_plans = ProductionPlan.query.filter_by(status='approved').all()
-    precleaning_bins = PrecleaningBin.query.filter(PrecleaningBin.current_stock > 0).all()
-
-    return render_template('production_execution.html',
-                         active_jobs=active_jobs,
-                         approved_plans=approved_plans,
-                         precleaning_bins=precleaning_bins)
 
 @app.route('/packing_execution/<int:job_id>', methods=['GET', 'POST'])
 def packing_execution(job_id):
@@ -828,53 +638,6 @@ def packing_execution(job_id):
                          existing_packing=existing_packing,
                          finished_goods=finished_goods)
 
-# LIVE PRODUCTION DASHBOARD FOR CONCURRENT OPERATIONS
-@app.route('/live_production_dashboard')
-def live_production_dashboard():
-    """Dashboard showing all concurrent live production operations"""
-
-    # Get all active production jobs
-    active_jobs = ProductionJobNew.query.filter(
-        ProductionJobNew.status.in_(['in_progress', 'pending'])
-    ).order_by(ProductionJobNew.created_at.desc()).all()
-
-    # Get all running cleaning processes
-    running_cleanings = CleaningProcess.query.filter_by(status='running').all()
-
-    # Get all active grinding processes
-    active_grindings = GrindingProcess.query.filter_by(status='pending').all()
-
-    # Get all in-progress machine cleanings
-    active_machine_cleanings = MachineCleaningLog.query.filter_by(status='in_progress').all()
-
-    # Build live operations data
-    live_operations = []
-
-    for job in active_jobs:
-        operation = {
-            'job': job,
-            'type': 'production_job',
-            'order': job.order,
-            'cleaning_processes': CleaningProcess.query.filter_by(job_id=job.id).all(),
-            'grinding_processes': GrindingProcess.query.filter_by(job_id=job.id).all(),
-            'packing_processes': PackingProcess.query.filter_by(job_id=job.id).all(),
-            'machine_cleanings': MachineCleaningLog.query.filter_by(job_id=job.id).all()
-        }
-        live_operations.append(operation)
-
-    # Get concurrent bin operations (multiple bins being used simultaneously)
-    concurrent_bins = CleaningBin.query.filter(
-        CleaningBin.status.in_(['cleaning', 'occupied'])
-    ).all()
-
-    return render_template('live_production_dashboard.html',
-                         live_operations=live_operations,
-                         running_cleanings=running_cleanings,
-                         active_grindings=active_grindings,
-                         active_machine_cleanings=active_machine_cleanings,
-                         concurrent_bins=concurrent_bins)
-
-# PRODUCTION ORDER DETAILS WITH MACHINE CLEANING RECORDS
 @app.route('/order_tracking/<order_number>')
 def order_tracking_detail(order_number):
     """Display detailed tracking for a specific order"""
@@ -1033,26 +796,6 @@ def complete_process_machine_cleaning(log_id):
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/api/production_jobs_by_stage')
-def api_production_jobs_by_stage():
-    """API endpoint to get production jobs grouped by stage"""
-    try:
-        jobs_by_stage = {
-            'transfer': [],
-            'cleaning_24h': [],
-            'cleaning_12h': [],
-            'grinding': [],
-            'packing': []
-        }
-
-        # Get all active jobs with proper error handling
-        try:
-            active_jobs = ProductionJobNew.query.filter(
-                ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
-            ).all()
-        except Exception as db_error:
-            app.logger.error(f"Database error in production_jobs_by_stage: {str(db_error)}")
-            return jsonify({
                 'success': False,
                 'error': 'Database connection error',
                 'jobs': jobs_by_stage
