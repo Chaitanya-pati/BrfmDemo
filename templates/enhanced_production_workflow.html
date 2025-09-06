@@ -487,11 +487,20 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Duration (Hours)</label>
-                                <select name="duration_hours" class="form-select" required>
+                                <select name="duration_hours" id="durationSelect" class="form-select" required>
                                     <option value="24">24 Hours (Standard)</option>
                                     <option value="12">12 Hours (Fast)</option>
                                     <option value="1">1 Hour (Demo)</option>
+                                    <option value="custom">Custom</option>
                                 </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="customDurationDiv" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Custom Duration (Hours)</label>
+                                <input type="number" name="duration_hours" id="customDurationInput" class="form-control" step="0.1">
                             </div>
                         </div>
                     </div>
@@ -548,11 +557,20 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Duration (Hours)</label>
-                                <select name="duration_hours" class="form-select" required>
+                                <select name="duration_hours" id="durationSelect" class="form-select" required>
                                     <option value="12">12 Hours (Standard)</option>
                                     <option value="8">8 Hours (Fast)</option>
                                     <option value="0.5">30 Minutes (Demo)</option>
+                                    <option value="custom">Custom</option>
                                 </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="customDurationDiv" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Custom Duration (Hours)</label>
+                                <input type="number" name="duration_hours" id="customDurationInput" class="form-control" step="0.1">
                             </div>
                         </div>
                     </div>
@@ -731,27 +749,27 @@
                 <form id="formCleaningRecord" enctype="multipart/form-data">
                     <input type="hidden" name="process_id" id="cleaningProcessId">
                     <input type="hidden" name="process_type" id="cleaningProcessTypeInput">
-                    
+
                     <div class="mb-3">
                         <label class="form-label">Cleaned By</label>
                         <input type="text" name="cleaned_by" class="form-control" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">Before Cleaning Photo</label>
                         <input type="file" name="before_photo" class="form-control" accept="image/*" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">After Cleaning Photo</label>
                         <input type="file" name="after_photo" class="form-control" accept="image/*" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">Cleaning Duration (minutes)</label>
                         <input type="number" name="cleaning_duration" class="form-control" min="1" value="5">
                     </div>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">Notes</label>
                         <textarea name="notes" class="form-control" rows="3"></textarea>
@@ -770,6 +788,77 @@
 
 {% block scripts %}
 <script>
+// Auto-refresh timer for real-time updates
+function refreshJobStatus() {
+    // In a real implementation, this would make an AJAX call to update job statuses
+    console.log('Refreshing job statuses...');
+}
+
+// Set up auto-refresh every 30 seconds
+setInterval(refreshJobStatus, 30000);
+
+// Handle custom duration selection
+document.addEventListener('DOMContentLoaded', function() {
+    const durationSelect = document.getElementById('durationSelect');
+    const customDurationDiv = document.getElementById('customDurationDiv');
+    const customDurationInput = document.getElementById('customDurationInput');
+
+    if (durationSelect) {
+        durationSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customDurationDiv.style.display = 'block';
+                customDurationInput.required = true;
+                this.removeAttribute('name'); // Remove name from select when custom is chosen
+                customDurationInput.setAttribute('name', 'duration_hours'); // Add name to input
+            } else {
+                customDurationDiv.style.display = 'none';
+                customDurationInput.required = false;
+                this.setAttribute('name', 'duration_hours'); // Add name back to select
+                customDurationInput.removeAttribute('name'); // Remove name from input
+            }
+        });
+    }
+
+    // Form validation
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const requiredFields = form.querySelectorAll('[required]');
+            let isValid = true;
+
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    isValid = false;
+                    field.classList.add('is-invalid');
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+
+            // Additional validation for custom duration
+            if (durationSelect && durationSelect.value === 'custom') {
+                const customValue = customDurationInput.value;
+                if (!customValue || parseFloat(customValue) <= 0) {
+                    isValid = false;
+                    customDurationInput.classList.add('is-invalid');
+                    alert('Please enter a valid custom duration greater than 0');
+                } else {
+                    customDurationInput.classList.remove('is-invalid');
+                }
+            }
+
+            if (!isValid) {
+                e.preventDefault();
+                if (!alert.shown) {
+                    alert('Please fill in all required fields');
+                    alert.shown = true;
+                }
+            }
+        });
+    });
+});
+
+
 // Global variables
 let cleaningReminderIntervals = {};
 let timerUpdateInterval;
@@ -793,7 +882,7 @@ function initializeTimers() {
     document.querySelectorAll('.countdown-timer[data-end-time]').forEach(function(timer) {
         updateCountdownTimer(timer);
     });
-    
+
     // Update upcount timers for grinding processes
     document.querySelectorAll('.upcount-timer[data-start-time]').forEach(function(timer) {
         updateUpcountTimer(timer);
@@ -813,17 +902,17 @@ function updateCountdownTimer(timerElement) {
     const endTime = new Date(timerElement.dataset.endTime);
     const now = new Date();
     const diff = endTime - now;
-    
+
     if (diff <= 0) {
         timerElement.textContent = "COMPLETED";
         timerElement.classList.add('pulse-animation');
         return;
     }
-    
+
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-    
+
     timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
@@ -832,11 +921,11 @@ function updateUpcountTimer(timerElement) {
     const startTime = new Date(timerElement.dataset.startTime);
     const now = new Date();
     const diff = now - startTime;
-    
+
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-    
+
     timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
@@ -864,7 +953,7 @@ function start24hCleaning() {
     const form = document.getElementById('form24hCleaning');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    
+
     fetch('/api/start_24h_cleaning_process', {
         method: 'POST',
         headers: {
@@ -893,7 +982,7 @@ function start12hCleaning() {
     const form = document.getElementById('form12hCleaning');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    
+
     fetch('/api/start_12h_cleaning_process', {
         method: 'POST',
         headers: {
@@ -922,7 +1011,7 @@ function startGrinding() {
     const form = document.getElementById('formGrinding');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    
+
     fetch('/api/start_grinding_process', {
         method: 'POST',
         headers: {
@@ -950,24 +1039,24 @@ function startGrinding() {
 function stopGrindingProcess(processId) {
     document.getElementById('stopGrindingProcessId').value = processId;
     new bootstrap.Modal(document.getElementById('modalStopGrinding')).show();
-    
+
     // Setup percentage calculation
     const totalOutput = document.querySelector('input[name="total_output_kg"]');
     const mainProducts = document.querySelector('input[name="main_products_kg"]');
     const bran = document.querySelector('input[name="bran_kg"]');
-    
+
     function calculatePercentages() {
         const total = parseFloat(totalOutput.value) || 0;
         const main = parseFloat(mainProducts.value) || 0;
         const branKg = parseFloat(bran.value) || 0;
-        
+
         if (total > 0) {
             const mainPercent = (main / total * 100).toFixed(1);
             const branPercent = (branKg / total * 100).toFixed(1);
-            
+
             document.getElementById('mainProductsPercent').value = mainPercent + '%';
             document.getElementById('branPercent').value = branPercent + '%';
-            
+
             // Show warning if bran > 25%
             if (parseFloat(branPercent) > 25) {
                 document.getElementById('branAlert').style.display = 'block';
@@ -976,7 +1065,7 @@ function stopGrindingProcess(processId) {
             }
         }
     }
-    
+
     totalOutput.addEventListener('input', calculatePercentages);
     mainProducts.addEventListener('input', calculatePercentages);
     bran.addEventListener('input', calculatePercentages);
@@ -987,7 +1076,7 @@ function completeStopGrinding() {
     const form = document.getElementById('formStopGrinding');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    
+
     fetch('/api/stop_grinding_process', {
         method: 'POST',
         headers: {
@@ -1020,7 +1109,7 @@ function showCleaningReminder(processType, jobId) {
     document.getElementById('cleaningProcessType').textContent = processType.replace('_', '-');
     document.getElementById('cleaningProcessId').value = jobId;
     document.getElementById('cleaningProcessTypeInput').value = processType;
-    
+
     new bootstrap.Modal(document.getElementById('modalCleaningReminder')).show();
 }
 
@@ -1028,7 +1117,7 @@ function showCleaningReminder(processType, jobId) {
 function recordCleaning() {
     const form = document.getElementById('formCleaningRecord');
     const formData = new FormData(form);
-    
+
     fetch('/api/record_cleaning', {
         method: 'POST',
         body: formData
@@ -1063,7 +1152,7 @@ window.addEventListener('beforeunload', function() {
     if (timerUpdateInterval) {
         clearInterval(timerUpdateInterval);
     }
-    
+
     Object.values(cleaningReminderIntervals).forEach(interval => {
         clearInterval(interval);
     });
