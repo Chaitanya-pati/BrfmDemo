@@ -2091,7 +2091,7 @@ def production_orders():
             production_order.order_number = generate_order_number('PO')
             production_order.quantity = float(request.form['quantity'])
             production_order.product_id = int(request.form['product_id']) if request.form.get('product_id') else None
-            production_order.customer_id = int(request.form['customer_id']) if request.form.get('customer_id') else None
+            
             production_order.deadline = datetime.strptime(request.form['deadline'], '%Y-%m-%d')
             production_order.priority = request.form.get('priority', 'normal')
             production_order.notes = request.form.get('notes')
@@ -2107,10 +2107,9 @@ def production_orders():
             flash(f'Error creating production order: {str(e)}', 'error')
     
     orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
-    customers = Customer.query.all()
     products = Product.query.filter_by(category='Main Product').all()
     
-    return render_template('production_orders.html', orders=orders, customers=customers, products=products)
+    return render_template('production_orders.html', orders=orders, products=products)
 
 @app.route('/production_planning/<int:order_id>', methods=['GET', 'POST'])
 def production_planning(order_id):
