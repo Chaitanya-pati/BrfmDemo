@@ -1116,6 +1116,58 @@ def api_job_details(job_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/available_production_orders')
+def api_available_production_orders():
+    """API endpoint to get orders ready for production execution"""
+    try:
+        # Get orders that have approved plans but no jobs created yet
+        orders_with_plans = db.session.query(ProductionOrder).join(ProductionPlan).filter(
+            ProductionPlan.status == 'approved',
+            ProductionOrder.status == 'planned'
+        ).all()
+
+        orders_data = []
+        for order in orders_with_plans:
+            # Check if jobs already exist for this order
+            existing_jobs = ProductionJobNew.query.filter_by(order_id=order.id).count()
+            if existing_jobs == 0:  # Only include orders without existing jobs
+                order_data = {
+                    'id': order.id,
+                    'order_number': order.order_number,
+                    'product': order.product,
+                    'quantity': order.quantity,
+                    'priority': order.priority,
+                    'created_at': order.created_at.strftime('%Y-%m-%d') if order.created_at else ''
+                }
+                orders_data.append(order_data)
+
+        return jsonify({'success': True, 'orders': orders_data})
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'orders': []}), 200
+
+@app.route('/api/process_control/<int:job_id>/<stage>')
+def api_process_control(job_id, stage):
+    """API endpoint to get process control information"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+
+        job_data = {
+            'id': job.id,
+            'job_number': job.job_number,
+            'order_number': job.order.order_number if job.order else 'N/A',
+            'status': job.status,
+            'stage': job.stage,
+            'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '',
+            'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '',
+            'started_by': job.started_by
+        }
+
+        return jsonify({'success': True, 'job': job_data, 'stage': stage})
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/start_production_execution/<int:order_id>')
 def start_production_execution(order_id):
     """Start production execution by creating jobs for all stages"""
