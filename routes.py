@@ -1333,6 +1333,352 @@ def debug_production_order():
         return f"Debug error: {str(e)}"
 
 # Comprehensive Production View Routes
+@app.route('/enhanced_production_workflow')
+def enhanced_production_workflow():
+    """Enhanced Production Workflow View - 4-Step Process Implementation"""
+    try:
+        # Get active production orders that are ready for the enhanced workflow
+        active_orders = ProductionOrder.query.filter(
+            ProductionOrder.status.in_(['planned', 'in_progress'])
+        ).order_by(ProductionOrder.created_at.desc()).all()
+        
+        # Get all production jobs grouped by stage for the enhanced workflow
+        jobs_by_stage = {
+            'transfer': ProductionJobNew.query.filter_by(stage='transfer').filter(
+                ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+            ).order_by(ProductionJobNew.created_at.desc()).all(),
+            
+            'cleaning_24h': ProductionJobNew.query.filter_by(stage='cleaning_24h').filter(
+                ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+            ).order_by(ProductionJobNew.created_at.desc()).all(),
+            
+            'cleaning_12h': ProductionJobNew.query.filter_by(stage='cleaning_12h').filter(
+                ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+            ).order_by(ProductionJobNew.created_at.desc()).all(),
+            
+            'grinding': ProductionJobNew.query.filter_by(stage='grinding').filter(
+                ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+            ).order_by(ProductionJobNew.created_at.desc()).all(),
+            
+            'packing': ProductionJobNew.query.filter_by(stage='packing').filter(
+                ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+            ).order_by(ProductionJobNew.created_at.desc()).all()
+        }
+        
+        # Get active cleaning processes with countdown timers
+        active_24h_processes = CleaningProcess.query.filter_by(
+            process_type='24_hour', status='running'
+        ).all()
+        
+        active_12h_processes = CleaningProcess.query.filter_by(
+            process_type='12_hour', status='running'
+        ).all()
+        
+        # Get active grinding processes with timer display
+        active_grinding_processes = GrindingProcess.query.filter_by(status='in_progress').all()
+        
+        # Get recent cleaning reminders and logs
+        recent_cleaning_logs = CleaningLog.query.order_by(
+            CleaningLog.cleaning_time.desc()
+        ).limit(10).all()
+        
+        return render_template('enhanced_production_workflow.html',
+                             active_orders=active_orders,
+                             jobs_by_stage=jobs_by_stage,
+                             active_24h_processes=active_24h_processes,
+                             active_12h_processes=active_12h_processes,
+                             active_grinding_processes=active_grinding_processes,
+                             recent_cleaning_logs=recent_cleaning_logs)
+                             
+    except Exception as e:
+        flash(f'Error loading enhanced production workflow: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+# Enhanced Production Workflow API Endpoints
+@app.route('/api/start_24h_cleaning_process', methods=['POST'])
+def api_start_24h_cleaning_process():
+    """API endpoint to start 24-hour cleaning process with countdown timer"""
+    try:
+        job_id = request.json.get('job_id')
+        duration_hours = float(request.json.get('duration_hours', 24))
+        start_moisture = float(request.json.get('start_moisture'))
+        operator_name = request.json.get('operator_name')
+        water_added = float(request.json.get('water_added', 0))
+        
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Create new cleaning process
+        cleaning_process = CleaningProcess()
+        cleaning_process.job_id = job_id
+        cleaning_process.process_type = '24_hour'
+        cleaning_process.duration_hours = duration_hours
+        cleaning_process.start_time = datetime.now()
+        cleaning_process.end_time = datetime.now() + timedelta(hours=duration_hours)
+        cleaning_process.start_moisture = start_moisture
+        cleaning_process.water_added_liters = water_added
+        cleaning_process.operator_name = operator_name
+        cleaning_process.status = 'running'
+        cleaning_process.is_locked = True
+        
+        # Update job status
+        job.status = 'in_progress'
+        job.started_at = datetime.now()
+        job.started_by = operator_name
+        
+        db.session.add(cleaning_process)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '24-hour cleaning process started successfully',
+            'process_id': cleaning_process.id,
+            'end_time': cleaning_process.end_time.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/start_12h_cleaning_process', methods=['POST'])
+def api_start_12h_cleaning_process():
+    """API endpoint to start 12-hour cleaning process with countdown timer"""
+    try:
+        job_id = request.json.get('job_id')
+        duration_hours = float(request.json.get('duration_hours', 12))
+        start_moisture = float(request.json.get('start_moisture'))
+        target_moisture = float(request.json.get('target_moisture'))
+        operator_name = request.json.get('operator_name')
+        
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Create new cleaning process
+        cleaning_process = CleaningProcess()
+        cleaning_process.job_id = job_id
+        cleaning_process.process_type = '12_hour'
+        cleaning_process.duration_hours = duration_hours
+        cleaning_process.start_time = datetime.now()
+        cleaning_process.end_time = datetime.now() + timedelta(hours=duration_hours)
+        cleaning_process.start_moisture = start_moisture
+        cleaning_process.target_moisture = target_moisture
+        cleaning_process.operator_name = operator_name
+        cleaning_process.status = 'running'
+        cleaning_process.is_locked = True
+        
+        # Update job status
+        job.status = 'in_progress'
+        job.started_at = datetime.now()
+        job.started_by = operator_name
+        
+        db.session.add(cleaning_process)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '12-hour cleaning process started successfully',
+            'process_id': cleaning_process.id,
+            'end_time': cleaning_process.end_time.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/start_grinding_process', methods=['POST'])
+def api_start_grinding_process():
+    """API endpoint to start grinding process with start/stop timer"""
+    try:
+        job_id = request.json.get('job_id')
+        machine_name = request.json.get('machine_name')
+        input_quantity = float(request.json.get('input_quantity'))
+        operator_name = request.json.get('operator_name')
+        b1_scale_operator = request.json.get('b1_scale_operator')
+        b1_scale_weight = float(request.json.get('b1_scale_weight'))
+        
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Create new grinding process
+        grinding_process = GrindingProcess()
+        grinding_process.job_id = job_id
+        grinding_process.machine_name = machine_name
+        grinding_process.start_time = datetime.now()
+        grinding_process.input_quantity_kg = input_quantity
+        grinding_process.operator_name = operator_name
+        grinding_process.b1_scale_operator = b1_scale_operator
+        grinding_process.b1_scale_start_time = datetime.now()
+        grinding_process.b1_scale_weight_kg = b1_scale_weight
+        grinding_process.status = 'in_progress'
+        
+        # Update job status
+        job.status = 'in_progress'
+        job.started_at = datetime.now()
+        job.started_by = operator_name
+        
+        db.session.add(grinding_process)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Grinding process started successfully',
+            'process_id': grinding_process.id,
+            'start_time': grinding_process.start_time.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/stop_grinding_process', methods=['POST'])
+def api_stop_grinding_process():
+    """API endpoint to stop grinding process and capture output"""
+    try:
+        process_id = request.json.get('process_id')
+        total_output_kg = float(request.json.get('total_output_kg'))
+        main_products_kg = float(request.json.get('main_products_kg'))
+        bran_kg = float(request.json.get('bran_kg'))
+        
+        grinding_process = GrindingProcess.query.get_or_404(process_id)
+        
+        # Update process with completion data
+        grinding_process.end_time = datetime.now()
+        grinding_process.total_output_kg = total_output_kg
+        grinding_process.main_products_kg = main_products_kg
+        grinding_process.bran_kg = bran_kg
+        grinding_process.status = 'completed'
+        
+        # Calculate percentages
+        if total_output_kg > 0:
+            grinding_process.bran_percentage = (bran_kg / total_output_kg) * 100
+            grinding_process.main_products_percentage = (main_products_kg / total_output_kg) * 100
+            
+            # Flag if bran percentage > 25%
+            if grinding_process.bran_percentage > 25:
+                grinding_process.bran_percentage_alert = True
+        
+        # Update job status
+        job = grinding_process.job
+        job.status = 'completed'
+        job.completed_at = datetime.now()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Grinding process completed successfully',
+            'bran_percentage': grinding_process.bran_percentage,
+            'main_products_percentage': grinding_process.main_products_percentage,
+            'bran_alert': grinding_process.bran_percentage_alert
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/record_cleaning', methods=['POST'])
+def api_record_cleaning():
+    """API endpoint to record cleaning with before/after photos"""
+    try:
+        process_id = request.form.get('process_id')
+        process_type = request.form.get('process_type')
+        cleaned_by = request.form.get('cleaned_by')
+        cleaning_duration = request.form.get('cleaning_duration', 0)
+        notes = request.form.get('notes', '')
+        
+        # Handle file uploads for photos
+        before_photo = None
+        after_photo = None
+        
+        if 'before_photo' in request.files:
+            file = request.files['before_photo']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filename = f"cleaning_before_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                before_photo = filename
+        
+        if 'after_photo' in request.files:
+            file = request.files['after_photo']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filename = f"cleaning_after_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                after_photo = filename
+        
+        # Create cleaning log entry
+        cleaning_log = CleaningLog()
+        cleaning_log.machine_id = 1  # Default machine ID
+        cleaning_log.cleaned_by = cleaned_by
+        cleaning_log.photo_before = before_photo
+        cleaning_log.photo_after = after_photo
+        cleaning_log.notes = notes
+        cleaning_log.cleaning_time = datetime.now()
+        
+        db.session.add(cleaning_log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cleaning record saved successfully',
+            'log_id': cleaning_log.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/get_active_timers')
+def api_get_active_timers():
+    """API endpoint to get all active timers and countdowns"""
+    try:
+        # Get active cleaning processes
+        active_24h = CleaningProcess.query.filter_by(
+            process_type='24_hour', status='running'
+        ).all()
+        
+        active_12h = CleaningProcess.query.filter_by(
+            process_type='12_hour', status='running'
+        ).all()
+        
+        # Get active grinding processes
+        active_grinding = GrindingProcess.query.filter_by(status='in_progress').all()
+        
+        timers = {
+            'cleaning_24h': [
+                {
+                    'id': process.id,
+                    'job_id': process.job_id,
+                    'start_time': process.start_time.isoformat(),
+                    'end_time': process.end_time.isoformat(),
+                    'operator': process.operator_name
+                } for process in active_24h
+            ],
+            'cleaning_12h': [
+                {
+                    'id': process.id,
+                    'job_id': process.job_id,
+                    'start_time': process.start_time.isoformat(),
+                    'end_time': process.end_time.isoformat(),
+                    'operator': process.operator_name
+                } for process in active_12h
+            ],
+            'grinding': [
+                {
+                    'id': process.id,
+                    'job_id': process.job_id,
+                    'start_time': process.start_time.isoformat(),
+                    'machine_name': process.machine_name,
+                    'operator': process.operator_name
+                } for process in active_grinding
+            ]
+        }
+        
+        return jsonify({
+            'success': True,
+            'timers': timers
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/comprehensive_production_view')
 def comprehensive_production_view():
     """Comprehensive production view with stage tracking and parameter capture"""

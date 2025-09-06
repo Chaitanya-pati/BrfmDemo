@@ -1,0 +1,1072 @@
+{% extends "base.html" %}
+
+{% block title %}Enhanced Production Workflow{% endblock %}
+
+{% block page_title %}Enhanced Production Workflow{% endblock %}
+{% block page_subtitle %}4-Step Process with Real-time Tracking & Cleaning Management{% endblock %}
+
+{% block content %}
+<style>
+.timer-display {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.countdown-timer {
+    color: #ff6b35;
+}
+
+.upcount-timer {
+    color: #28a745;
+}
+
+.pulse-animation {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.process-step {
+    position: relative;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+}
+
+.process-step.active {
+    border-color: #007bff;
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.1);
+}
+
+.process-step.completed {
+    border-color: #28a745;
+    background-color: rgba(40, 167, 69, 0.05);
+}
+
+.step-header {
+    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+    padding: 1rem 1.5rem;
+    border-radius: 10px 10px 0 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #6c757d;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 1rem;
+}
+
+.step-number.active {
+    background: #007bff;
+}
+
+.step-number.completed {
+    background: #28a745;
+}
+
+.cleaning-reminder {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    min-width: 300px;
+}
+
+.job-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.job-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.job-card.in-progress {
+    border-left: 4px solid #ffc107;
+    background-color: rgba(255, 193, 7, 0.05);
+}
+
+.job-card.completed {
+    border-left: 4px solid #28a745;
+    background-color: rgba(40, 167, 69, 0.05);
+}
+
+.modal-xl {
+    max-width: 90%;
+}
+</style>
+
+<!-- Global Timer Display -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-dark text-white">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <h6>Active 24h Processes</h6>
+                        <div id="active24hCount" class="timer-display countdown-timer">{{ active_24h_processes|length }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Active 12h Processes</h6>
+                        <div id="active12hCount" class="timer-display countdown-timer">{{ active_12h_processes|length }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Active Grinding</h6>
+                        <div id="activeGrindingCount" class="timer-display upcount-timer">{{ active_grinding_processes|length }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>System Time</h6>
+                        <div id="systemTime" class="timer-display">--:--:--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4-Step Production Process -->
+<div class="row">
+    <div class="col-12">
+        <!-- Step 1: Pre-Cleaning Transfer to 24-Hour Cleaning Bin -->
+        <div class="process-step" id="step1">
+            <div class="step-header">
+                <div class="d-flex align-items-center">
+                    <div class="step-number" id="step1-number">1</div>
+                    <div>
+                        <h5 class="mb-1">Pre-Cleaning Transfer to 24-Hour Cleaning Bin</h5>
+                        <p class="mb-0 text-muted">Job tracking with countdown & duration options</p>
+                    </div>
+                    <div class="ms-auto">
+                        <button class="btn btn-primary btn-sm" onclick="openProcessModal('24h_cleaning')">
+                            <i class="fas fa-plus me-1"></i>Start Process
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div id="jobs24h">
+                            {% for job in jobs_by_stage.cleaning_24h %}
+                            <div class="job-card {{ 'in-progress' if job.status == 'in_progress' else 'completed' if job.status == 'completed' else '' }}">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">{{ job.job_number }}</h6>
+                                            <small class="text-muted">Order: {{ job.order.order_number if job.order else 'N/A' }}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-{{ 'warning' if job.status == 'in_progress' else 'success' if job.status == 'completed' else 'secondary' }}">
+                                                {{ job.status.replace('_', ' ').title() }}
+                                            </span>
+                                            {% if job.status == 'in_progress' %}
+                                            <div class="mt-2">
+                                                <button class="btn btn-sm btn-outline-warning" onclick="showCleaningReminder('24h', {{ job.id }})">
+                                                    <i class="fas fa-broom me-1"></i>Clean (5min)
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-header">
+                                <h6 class="mb-0">Active 24h Processes</h6>
+                            </div>
+                            <div class="card-body" id="active24hProcesses">
+                                {% for process in active_24h_processes %}
+                                <div class="mb-3 p-3 border rounded" data-process-id="{{ process.id }}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>Job {{ process.job_id }}</strong>
+                                            <div class="countdown-timer" data-end-time="{{ process.end_time.isoformat() }}">
+                                                Calculating...
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-sm btn-warning" onclick="completeCleaningProcess({{ process.id }})">
+                                            Complete
+                                        </button>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-muted text-center">No active 24h processes</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Transfer to 12-Hour Cleaning Process -->
+        <div class="process-step" id="step2">
+            <div class="step-header">
+                <div class="d-flex align-items-center">
+                    <div class="step-number" id="step2-number">2</div>
+                    <div>
+                        <h5 class="mb-1">Transfer to 12-Hour Cleaning Process</h5>
+                        <p class="mb-0 text-muted">Capture incoming & target moisture with countdown</p>
+                    </div>
+                    <div class="ms-auto">
+                        <button class="btn btn-info btn-sm" onclick="openProcessModal('12h_cleaning')">
+                            <i class="fas fa-plus me-1"></i>Start Process
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div id="jobs12h">
+                            {% for job in jobs_by_stage.cleaning_12h %}
+                            <div class="job-card {{ 'in-progress' if job.status == 'in_progress' else 'completed' if job.status == 'completed' else '' }}">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">{{ job.job_number }}</h6>
+                                            <small class="text-muted">Order: {{ job.order.order_number if job.order else 'N/A' }}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-{{ 'info' if job.status == 'in_progress' else 'success' if job.status == 'completed' else 'secondary' }}">
+                                                {{ job.status.replace('_', ' ').title() }}
+                                            </span>
+                                            {% if job.status == 'in_progress' %}
+                                            <div class="mt-2">
+                                                <button class="btn btn-sm btn-outline-info" onclick="showCleaningReminder('12h', {{ job.id }})">
+                                                    <i class="fas fa-broom me-1"></i>Clean (2min)
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-header">
+                                <h6 class="mb-0">Active 12h Processes</h6>
+                            </div>
+                            <div class="card-body" id="active12hProcesses">
+                                {% for process in active_12h_processes %}
+                                <div class="mb-3 p-3 border rounded" data-process-id="{{ process.id }}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>Job {{ process.job_id }}</strong>
+                                            <div class="countdown-timer" data-end-time="{{ process.end_time.isoformat() }}">
+                                                Calculating...
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-sm btn-info" onclick="completeCleaningProcess({{ process.id }})">
+                                            Complete
+                                        </button>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-muted text-center">No active 12h processes</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: B1 Scale to Grinding Process -->
+        <div class="process-step" id="step3">
+            <div class="step-header">
+                <div class="d-flex align-items-center">
+                    <div class="step-number" id="step3-number">3</div>
+                    <div>
+                        <h5 class="mb-1">B1 Scale to Grinding Process</h5>
+                        <p class="mb-0 text-muted">Start/Stop Timer with product output tracking</p>
+                    </div>
+                    <div class="ms-auto">
+                        <button class="btn btn-success btn-sm" onclick="openProcessModal('grinding')">
+                            <i class="fas fa-play me-1"></i>Start Process
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div id="jobsGrinding">
+                            {% for job in jobs_by_stage.grinding %}
+                            <div class="job-card {{ 'in-progress' if job.status == 'in_progress' else 'completed' if job.status == 'completed' else '' }}">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">{{ job.job_number }}</h6>
+                                            <small class="text-muted">Order: {{ job.order.order_number if job.order else 'N/A' }}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-{{ 'success' if job.status == 'in_progress' else 'success' if job.status == 'completed' else 'secondary' }}">
+                                                {{ job.status.replace('_', ' ').title() }}
+                                            </span>
+                                            {% if job.status == 'in_progress' %}
+                                            <div class="mt-2">
+                                                <button class="btn btn-sm btn-outline-success" onclick="showCleaningReminder('grinding', {{ job.id }})">
+                                                    <i class="fas fa-broom me-1"></i>Clean (1min)
+                                                </button>
+                                                <button class="btn btn-sm btn-danger ms-1" onclick="stopGrindingProcess({{ job.id }})">
+                                                    <i class="fas fa-stop me-1"></i>Stop
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-header">
+                                <h6 class="mb-0">Active Grinding Processes</h6>
+                            </div>
+                            <div class="card-body" id="activeGrindingProcesses">
+                                {% for process in active_grinding_processes %}
+                                <div class="mb-3 p-3 border rounded" data-process-id="{{ process.id }}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ process.machine_name }}</strong>
+                                            <div class="upcount-timer" data-start-time="{{ process.start_time.isoformat() }}">
+                                                Calculating...
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-sm btn-danger" onclick="stopGrindingProcess({{ process.id }})">
+                                            <i class="fas fa-stop me-1"></i>Stop
+                                        </button>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-muted text-center">No active grinding processes</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Packing & Storage -->
+        <div class="process-step" id="step4">
+            <div class="step-header">
+                <div class="d-flex align-items-center">
+                    <div class="step-number" id="step4-number">4</div>
+                    <div>
+                        <h5 class="mb-1">Packing & Storage of Finished Goods</h5>
+                        <p class="mb-0 text-muted">Capture bags, weights, and storage tracking</p>
+                    </div>
+                    <div class="ms-auto">
+                        <button class="btn btn-warning btn-sm" onclick="openProcessModal('packing')">
+                            <i class="fas fa-box me-1"></i>Start Packing
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="jobsPacking">
+                    {% for job in jobs_by_stage.packing %}
+                    <div class="job-card {{ 'in-progress' if job.status == 'in_progress' else 'completed' if job.status == 'completed' else '' }}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ job.job_number }}</h6>
+                                    <small class="text-muted">Order: {{ job.order.order_number if job.order else 'N/A' }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-{{ 'warning' if job.status == 'in_progress' else 'success' if job.status == 'completed' else 'secondary' }}">
+                                        {{ job.status.replace('_', ' ').title() }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Cleaning Logs -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-broom me-2"></i>Recent Cleaning Activities
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Cleaned By</th>
+                                <th>Machine</th>
+                                <th>Photos</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_cleaning_logs %}
+                            <tr>
+                                <td>{{ log.cleaning_time.strftime('%H:%M:%S') }}</td>
+                                <td>{{ log.cleaned_by }}</td>
+                                <td>{{ log.machine.name if log.machine else 'N/A' }}</td>
+                                <td>
+                                    {% if log.photo_before %}
+                                    <span class="badge bg-success">Before</span>
+                                    {% endif %}
+                                    {% if log.photo_after %}
+                                    <span class="badge bg-info">After</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ log.notes[:50] }}{{ '...' if log.notes and log.notes|length > 50 else '' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Process Modals -->
+
+<!-- 24h Cleaning Process Modal -->
+<div class="modal fade" id="modal24hCleaning" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start 24-Hour Cleaning Process</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="form24hCleaning">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Job ID</label>
+                                <select name="job_id" class="form-select" required>
+                                    <option value="">Select Job</option>
+                                    {% for job in jobs_by_stage.transfer if job.status == 'completed' %}
+                                    <option value="{{ job.id }}">{{ job.job_number }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Duration (Hours)</label>
+                                <select name="duration_hours" class="form-select" required>
+                                    <option value="24">24 Hours (Standard)</option>
+                                    <option value="12">12 Hours (Fast)</option>
+                                    <option value="1">1 Hour (Demo)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Start Moisture (%)</label>
+                                <input type="number" name="start_moisture" class="form-control" step="0.1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Water Added (Liters)</label>
+                                <input type="number" name="water_added" class="form-control" step="0.1" value="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Operator Name</label>
+                        <input type="text" name="operator_name" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="start24hCleaning()">Start Process</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 12h Cleaning Process Modal -->
+<div class="modal fade" id="modal12hCleaning" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start 12-Hour Cleaning Process</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="form12hCleaning">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Job ID</label>
+                                <select name="job_id" class="form-select" required>
+                                    <option value="">Select Job</option>
+                                    {% for job in jobs_by_stage.cleaning_24h if job.status == 'completed' %}
+                                    <option value="{{ job.id }}">{{ job.job_number }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Duration (Hours)</label>
+                                <select name="duration_hours" class="form-select" required>
+                                    <option value="12">12 Hours (Standard)</option>
+                                    <option value="8">8 Hours (Fast)</option>
+                                    <option value="0.5">30 Minutes (Demo)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Start Moisture (%)</label>
+                                <input type="number" name="start_moisture" class="form-control" step="0.1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Target Moisture (%)</label>
+                                <input type="number" name="target_moisture" class="form-control" step="0.1" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Operator Name</label>
+                        <input type="text" name="operator_name" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" onclick="start12hCleaning()">Start Process</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Grinding Process Modal -->
+<div class="modal fade" id="modalGrinding" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start Grinding Process</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formGrinding">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Job ID</label>
+                                <select name="job_id" class="form-select" required>
+                                    <option value="">Select Job</option>
+                                    {% for job in jobs_by_stage.cleaning_12h if job.status == 'completed' %}
+                                    <option value="{{ job.id }}">{{ job.job_number }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Machine Name</label>
+                                <input type="text" name="machine_name" class="form-control" required placeholder="Grinding Machine #1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Input Quantity (kg)</label>
+                                <input type="number" name="input_quantity" class="form-control" step="0.1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">B1 Scale Weight (kg)</label>
+                                <input type="number" name="b1_scale_weight" class="form-control" step="0.1" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Operator Name</label>
+                                <input type="text" name="operator_name" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">B1 Scale Operator</label>
+                                <input type="text" name="b1_scale_operator" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="startGrinding()">Start Process</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stop Grinding Modal -->
+<div class="modal fade" id="modalStopGrinding" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Stop Grinding Process - Output Tracking</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formStopGrinding">
+                    <input type="hidden" name="process_id" id="stopGrindingProcessId">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Expected Output:</strong> Main Products 75-77%, Bran 23-25%
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Total Output (kg)</label>
+                                <input type="number" name="total_output_kg" class="form-control" step="0.1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Main Products (kg)</label>
+                                <input type="number" name="main_products_kg" class="form-control" step="0.1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Bran (kg)</label>
+                                <input type="number" name="bran_kg" class="form-control" step="0.1" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Main Products %</label>
+                                <input type="text" id="mainProductsPercent" class="form-control" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Bran %</label>
+                                <input type="text" id="branPercent" class="form-control" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="branAlert" class="alert alert-warning" style="display: none;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> Bran percentage exceeds 25%!
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="completeStopGrinding()">Stop & Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cleaning Reminder Modal -->
+<div class="modal fade" id="modalCleaningReminder" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Machine Cleaning Required</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-broom fa-2x me-3"></i>
+                    <strong>Cleaning reminder for <span id="cleaningProcessType"></span> process</strong>
+                    <p class="mb-0 mt-2">Please clean the machine and upload before/after photos.</p>
+                </div>
+                <form id="formCleaningRecord" enctype="multipart/form-data">
+                    <input type="hidden" name="process_id" id="cleaningProcessId">
+                    <input type="hidden" name="process_type" id="cleaningProcessTypeInput">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Cleaned By</label>
+                        <input type="text" name="cleaned_by" class="form-control" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Before Cleaning Photo</label>
+                        <input type="file" name="before_photo" class="form-control" accept="image/*" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">After Cleaning Photo</label>
+                        <input type="file" name="after_photo" class="form-control" accept="image/*" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Cleaning Duration (minutes)</label>
+                        <input type="number" name="cleaning_duration" class="form-control" min="1" value="5">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="recordCleaning()">Save Cleaning Record</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+let cleaningReminderIntervals = {};
+let timerUpdateInterval;
+
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    updateSystemTime();
+    initializeTimers();
+    startTimerUpdates();
+});
+
+// System time update
+function updateSystemTime() {
+    const now = new Date();
+    document.getElementById('systemTime').textContent = now.toLocaleTimeString();
+}
+
+// Initialize all timers
+function initializeTimers() {
+    // Update countdown timers for cleaning processes
+    document.querySelectorAll('.countdown-timer[data-end-time]').forEach(function(timer) {
+        updateCountdownTimer(timer);
+    });
+    
+    // Update upcount timers for grinding processes
+    document.querySelectorAll('.upcount-timer[data-start-time]').forEach(function(timer) {
+        updateUpcountTimer(timer);
+    });
+}
+
+// Start timer update intervals
+function startTimerUpdates() {
+    timerUpdateInterval = setInterval(function() {
+        updateSystemTime();
+        initializeTimers();
+    }, 1000);
+}
+
+// Update countdown timer display
+function updateCountdownTimer(timerElement) {
+    const endTime = new Date(timerElement.dataset.endTime);
+    const now = new Date();
+    const diff = endTime - now;
+    
+    if (diff <= 0) {
+        timerElement.textContent = "COMPLETED";
+        timerElement.classList.add('pulse-animation');
+        return;
+    }
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+// Update upcount timer display
+function updateUpcountTimer(timerElement) {
+    const startTime = new Date(timerElement.dataset.startTime);
+    const now = new Date();
+    const diff = now - startTime;
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+// Open process modal
+function openProcessModal(processType) {
+    switch(processType) {
+        case '24h_cleaning':
+            new bootstrap.Modal(document.getElementById('modal24hCleaning')).show();
+            break;
+        case '12h_cleaning':
+            new bootstrap.Modal(document.getElementById('modal12hCleaning')).show();
+            break;
+        case 'grinding':
+            new bootstrap.Modal(document.getElementById('modalGrinding')).show();
+            break;
+        case 'packing':
+            // Redirect to existing packing execution
+            window.location.href = '/packing_execution';
+            break;
+    }
+}
+
+// Start 24h cleaning process
+function start24hCleaning() {
+    const form = document.getElementById('form24hCleaning');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/api/start_24h_cleaning_process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert(result.message);
+            bootstrap.Modal.getInstance(document.getElementById('modal24hCleaning')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while starting the process');
+    });
+}
+
+// Start 12h cleaning process
+function start12hCleaning() {
+    const form = document.getElementById('form12hCleaning');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/api/start_12h_cleaning_process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert(result.message);
+            bootstrap.Modal.getInstance(document.getElementById('modal12hCleaning')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while starting the process');
+    });
+}
+
+// Start grinding process
+function startGrinding() {
+    const form = document.getElementById('formGrinding');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/api/start_grinding_process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert(result.message);
+            bootstrap.Modal.getInstance(document.getElementById('modalGrinding')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while starting the process');
+    });
+}
+
+// Stop grinding process
+function stopGrindingProcess(processId) {
+    document.getElementById('stopGrindingProcessId').value = processId;
+    new bootstrap.Modal(document.getElementById('modalStopGrinding')).show();
+    
+    // Setup percentage calculation
+    const totalOutput = document.querySelector('input[name="total_output_kg"]');
+    const mainProducts = document.querySelector('input[name="main_products_kg"]');
+    const bran = document.querySelector('input[name="bran_kg"]');
+    
+    function calculatePercentages() {
+        const total = parseFloat(totalOutput.value) || 0;
+        const main = parseFloat(mainProducts.value) || 0;
+        const branKg = parseFloat(bran.value) || 0;
+        
+        if (total > 0) {
+            const mainPercent = (main / total * 100).toFixed(1);
+            const branPercent = (branKg / total * 100).toFixed(1);
+            
+            document.getElementById('mainProductsPercent').value = mainPercent + '%';
+            document.getElementById('branPercent').value = branPercent + '%';
+            
+            // Show warning if bran > 25%
+            if (parseFloat(branPercent) > 25) {
+                document.getElementById('branAlert').style.display = 'block';
+            } else {
+                document.getElementById('branAlert').style.display = 'none';
+            }
+        }
+    }
+    
+    totalOutput.addEventListener('input', calculatePercentages);
+    mainProducts.addEventListener('input', calculatePercentages);
+    bran.addEventListener('input', calculatePercentages);
+}
+
+// Complete stop grinding
+function completeStopGrinding() {
+    const form = document.getElementById('formStopGrinding');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/api/stop_grinding_process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            let message = result.message;
+            if (result.bran_alert) {
+                message += '\n\nWARNING: Bran percentage (' + result.bran_percentage.toFixed(1) + '%) exceeds 25%!';
+            }
+            alert(message);
+            bootstrap.Modal.getInstance(document.getElementById('modalStopGrinding')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while stopping the process');
+    });
+}
+
+// Show cleaning reminder
+function showCleaningReminder(processType, jobId) {
+    document.getElementById('cleaningProcessType').textContent = processType.replace('_', '-');
+    document.getElementById('cleaningProcessId').value = jobId;
+    document.getElementById('cleaningProcessTypeInput').value = processType;
+    
+    new bootstrap.Modal(document.getElementById('modalCleaningReminder')).show();
+}
+
+// Record cleaning
+function recordCleaning() {
+    const form = document.getElementById('formCleaningRecord');
+    const formData = new FormData(form);
+    
+    fetch('/api/record_cleaning', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert(result.message);
+            bootstrap.Modal.getInstance(document.getElementById('modalCleaningReminder')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while recording cleaning');
+    });
+}
+
+// Complete cleaning process
+function completeCleaningProcess(processId) {
+    if (confirm('Are you sure you want to complete this cleaning process?')) {
+        // This would typically call an API to complete the process
+        // For now, just reload the page
+        location.reload();
+    }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (timerUpdateInterval) {
+        clearInterval(timerUpdateInterval);
+    }
+    
+    Object.values(cleaningReminderIntervals).forEach(interval => {
+        clearInterval(interval);
+    });
+});
+</script>
+{% endblock %}
