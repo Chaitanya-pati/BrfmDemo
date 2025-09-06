@@ -1048,49 +1048,53 @@ def api_production_jobs_by_stage():
         # Get all active jobs with proper error handling
         try:
             active_jobs = ProductionJobNew.query.filter(
-                ProductionJobNew.status.in_(['pending', 'in_progress'])
+                ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
             ).all()
         except Exception as db_error:
-            app.logger.error(f"Database error: {str(db_error)}")
+            app.logger.error(f"Database error in production_jobs_by_stage: {str(db_error)}")
             return jsonify({
                 'success': False,
                 'error': 'Database connection error',
                 'jobs': jobs_by_stage
-            })
+            }), 500
 
         for job in active_jobs:
             try:
                 # Safe attribute access with fallbacks
                 order_number = 'N/A'
-                if hasattr(job, 'order') and job.order:
-                    order_number = getattr(job.order, 'order_number', 'N/A')
+                order = None
+                try:
+                    order = job.order
+                    if order:
+                        order_number = order.order_number
+                except Exception:
+                    pass
 
                 job_data = {
-                    'id': getattr(job, 'id', 0),
-                    'job_number': getattr(job, 'job_number', 'Unknown'),
+                    'id': job.id,
+                    'job_number': job.job_number or 'Unknown',
                     'order_number': order_number,
-                    'status': getattr(job, 'status', 'unknown'),
-                    'stage': getattr(job, 'stage', 'unknown'),
-                    'progress': 0 if job.status == 'pending' else 50 if job.status == 'in_progress' else 100,
+                    'status': job.status or 'unknown',
+                    'stage': job.stage or 'unknown',
+                    'progress': 100 if job.status == 'completed' else 50 if job.status == 'in_progress' else 0,
                     'can_proceed': job.status == 'pending',
                     'is_previous_step': False,
                     'is_running': job.status == 'in_progress',
                     'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '',
                     'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '',
-                    'started_by': getattr(job, 'started_by', '') or '',
+                    'started_by': job.started_by or '',
                     'completed_at': job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else '',
-                    'completed_by': getattr(job, 'completed_by', '') or ''
+                    'completed_by': job.completed_by or ''
                 }
 
-                stage = getattr(job, 'stage', 'unknown')
+                stage = job.stage or 'unknown'
                 if stage in jobs_by_stage:
                     jobs_by_stage[stage].append(job_data)
                 else:
-                    # Log unknown stage
                     app.logger.warning(f"Unknown job stage: {stage}")
 
             except Exception as job_error:
-                app.logger.error(f"Error processing job {getattr(job, 'id', 'unknown')}: {str(job_error)}")
+                app.logger.error(f"Error processing job {job.id}: {str(job_error)}")
                 continue
 
         return jsonify({
@@ -1100,10 +1104,10 @@ def api_production_jobs_by_stage():
         })
 
     except Exception as e:
-        app.logger.error(f"API error in production_jobs_by_stage: {str(e)}")
+        app.logger.error(f"Critical error in production_jobs_by_stage: {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e),
+            'error': 'Internal server error',
             'jobs': {
                 'transfer': [],
                 'cleaning_24h': [],
@@ -1111,7 +1115,7 @@ def api_production_jobs_by_stage():
                 'grinding': [],
                 'packing': []
             }
-        }), 200
+        }), 500
 
 @app.route('/api/job_details/<int:job_id>')
 def api_job_details(job_id):
@@ -1199,7 +1203,7 @@ def api_process_control(job_id, stage):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/start_production_execution/<int:order_id>')
+@app.route('/start_production_execution/<int:order_id>', methods=['GET', 'POST'])
 def start_production_execution(order_id):
     """Start production execution by creating jobs for all stages"""
     try:
@@ -1230,7 +1234,7 @@ def start_production_execution(order_id):
             job.plan_id = plan.id
             job.stage = stage
             job.status = 'pending'
-            job.started_by = 'System'
+            job.started_by = request.form.get('operator_name', 'System')
             job.notes = f'Auto-created job for {stage} stage'
             job.created_at = datetime.now()
 
@@ -1248,6 +1252,7 @@ def start_production_execution(order_id):
 
     except Exception as e:
         db.session.rollback()
+        app.logger.error(f'Error starting production execution: {str(e)}')
         flash(f'Error starting production execution: {str(e)}', 'error')
         return redirect(url_for('production_planning', order_id=order_id))
 

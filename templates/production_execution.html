@@ -500,7 +500,13 @@
         async function loadProductionFlow() {
             try {
                 const response = await fetch('/api/production_jobs_by_stage');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
+                console.log('Jobs loaded:', data.jobs);
                 
                 if (data.success) {
                     jobsData = data.jobs;
@@ -508,10 +514,11 @@
                     updateStatistics(jobsData);
                     updateOrderFilter(jobsData);
                 } else {
+                    console.error('API returned error:', data.error);
                     showErrorMessage('Failed to load production flow: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
-                console.error('Error loading production flow:', error);
+                console.error('Error loading jobs:', error);
                 showErrorMessage('Failed to load production flow. Please refresh the page.');
             }
         }
@@ -667,7 +674,24 @@
 
         // Process control functions
         function startProcess(jobId, stage) {
-            window.location.href = `/production_execution/${stage}_setup/${jobId}`;
+            try {
+                if (stage === 'transfer') {
+                    window.location.href = `/production_execution/transfer_setup/${jobId}`;
+                } else if (stage === 'cleaning_24h') {
+                    window.location.href = `/production_execution/cleaning_setup/${jobId}`;
+                } else if (stage === 'cleaning_12h') {
+                    window.location.href = `/production_execution/cleaning_12h_setup/${jobId}`;
+                } else if (stage === 'grinding') {
+                    window.location.href = `/production_execution/b1_scale/${jobId}`;
+                } else if (stage === 'packing') {
+                    window.location.href = `/production_execution/packing/${jobId}`;
+                } else {
+                    alert(`Process setup for ${stage} is not yet implemented.`);
+                }
+            } catch (error) {
+                console.error('Error starting process:', error);
+                alert('Error starting process. Please try again.');
+            }
         }
 
         function continueProcess(jobId, stage) {
