@@ -1577,3 +1577,328 @@ def debug_production_order():
     except Exception as e:
         db.session.rollback()
         return f"Debug error: {str(e)}"
+
+# Comprehensive Production View Routes
+@app.route('/comprehensive_production_view')
+def comprehensive_production_view():
+    """Comprehensive production view with stage tracking and parameter capture"""
+    try:
+        # Get all active production orders
+        production_orders = ProductionOrder.query.filter(
+            ProductionOrder.status.in_(['pending', 'planned', 'in_progress'])
+        ).order_by(ProductionOrder.created_at.desc()).all()
+        
+        # Get jobs by stage
+        jobs_24h = ProductionJobNew.query.filter_by(stage='cleaning_24h').filter(
+            ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+        ).order_by(ProductionJobNew.created_at.desc()).limit(10).all()
+        
+        jobs_12h = ProductionJobNew.query.filter_by(stage='cleaning_12h').filter(
+            ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+        ).order_by(ProductionJobNew.created_at.desc()).limit(10).all()
+        
+        jobs_grinding = ProductionJobNew.query.filter_by(stage='grinding').filter(
+            ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+        ).order_by(ProductionJobNew.created_at.desc()).limit(10).all()
+        
+        jobs_packing = ProductionJobNew.query.filter_by(stage='packing').filter(
+            ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+        ).order_by(ProductionJobNew.created_at.desc()).limit(10).all()
+        
+        jobs_transfer = ProductionJobNew.query.filter_by(stage='transfer').filter(
+            ProductionJobNew.status.in_(['pending', 'in_progress', 'completed'])
+        ).order_by(ProductionJobNew.created_at.desc()).limit(10).all()
+        
+        return render_template('comprehensive_production_view.html',
+                             production_orders=production_orders,
+                             jobs_24h=jobs_24h,
+                             jobs_12h=jobs_12h,
+                             jobs_grinding=jobs_grinding,
+                             jobs_packing=jobs_packing,
+                             jobs_transfer=jobs_transfer)
+                             
+    except Exception as e:
+        flash(f'Error loading production view: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+def calculate_progress(order):
+    """Calculate production progress percentage for an order"""
+    try:
+        jobs = ProductionJobNew.query.filter_by(order_id=order.id).all()
+        if not jobs:
+            return 0
+        
+        total_stages = 5  # transfer, cleaning_24h, cleaning_12h, grinding, packing
+        completed_stages = len([job for job in jobs if job.status == 'completed'])
+        
+        return min(100, int((completed_stages / total_stages) * 100))
+    except:
+        return 0
+
+def calculate_total_duration(order):
+    """Calculate total duration in hours for an order"""
+    try:
+        jobs = ProductionJobNew.query.filter_by(order_id=order.id).all()
+        total_hours = 0
+        
+        for job in jobs:
+            if job.started_at and job.completed_at:
+                duration = job.completed_at - job.started_at
+                total_hours += duration.total_seconds() / 3600
+                
+                # Add buffer time from stage parameters
+                stage_params = StageParameters.query.filter_by(
+                    job_id=job.id, 
+                    parameter_type='buffer'
+                ).all()
+                
+                for param in stage_params:
+                    if param.buffer_duration_minutes:
+                        total_hours += param.buffer_duration_minutes / 60
+        
+        return total_hours if total_hours > 0 else None
+    except:
+        return None
+
+# Register helper functions for template
+app.jinja_env.globals.update(
+    calculate_progress=calculate_progress,
+    calculate_total_duration=calculate_total_duration
+)
+
+# API Routes for Stage Parameter Management
+@app.route('/api/capture_stage_parameters', methods=['POST'])
+def capture_stage_parameters():
+    """API endpoint to capture stage parameters"""
+    try:
+        job_id = request.form.get('job_id')
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Determine parameter type based on job stage and status
+        if job.stage == 'cleaning_24h':
+            parameter_type = 'end'
+            stage_params = StageParameters(
+                job_id=job_id,
+                stage=job.stage,
+                parameter_type=parameter_type,
+                moisture_content=float(request.form.get('moisture_content', 0)),
+                water_added_liters=float(request.form.get('water_added_liters', 0)),
+                waste_collected_kg=float(request.form.get('waste_collected_kg', 0)),
+                buffer_duration_minutes=float(request.form.get('buffer_duration_minutes', 0)),
+                buffer_reason=request.form.get('buffer_reason', ''),
+                captured_by=request.form.get('captured_by'),
+                notes=request.form.get('notes', '')
+            )
+            
+            # Update job status
+            job.status = 'completed'
+            job.completed_at = datetime.utcnow()
+            job.completed_by = request.form.get('captured_by')
+            
+        elif job.stage == 'cleaning_12h':
+            if job.status == 'pending':
+                # Start parameters
+                parameter_type = 'start'
+                stage_params = StageParameters(
+                    job_id=job_id,
+                    stage=job.stage,
+                    parameter_type=parameter_type,
+                    initial_moisture=float(request.form.get('initial_moisture', 0)),
+                    target_moisture=float(request.form.get('target_moisture', 0)),
+                    captured_by=request.form.get('captured_by'),
+                    notes=request.form.get('notes', '')
+                )
+                
+                # Update job status
+                job.status = 'in_progress'
+                job.started_at = datetime.utcnow()
+                job.started_by = request.form.get('captured_by')
+                
+            else:
+                # End parameters
+                parameter_type = 'end'
+                stage_params = StageParameters(
+                    job_id=job_id,
+                    stage=job.stage,
+                    parameter_type=parameter_type,
+                    final_moisture=float(request.form.get('final_moisture', 0)),
+                    water_added_liters=float(request.form.get('water_added_liters', 0)),
+                    buffer_duration_minutes=float(request.form.get('buffer_duration_minutes', 0)),
+                    buffer_reason=request.form.get('buffer_reason', ''),
+                    captured_by=request.form.get('captured_by'),
+                    notes=request.form.get('notes', '')
+                )
+                
+                # Update job status
+                job.status = 'completed'
+                job.completed_at = datetime.utcnow()
+                job.completed_by = request.form.get('captured_by')
+        
+        db.session.add(stage_params)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Parameters captured successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/stage_parameters/<int:job_id>')
+def get_stage_parameters(job_id):
+    """API endpoint to get captured stage parameters for a job"""
+    try:
+        parameters = StageParameters.query.filter_by(job_id=job_id).all()
+        
+        result = []
+        for param in parameters:
+            param_data = {
+                'captured_by': param.captured_by,
+                'captured_at': param.captured_at.isoformat(),
+                'parameter_type': param.parameter_type,
+                'stage': param.stage
+            }
+            
+            # Add specific parameters based on stage and type
+            if param.stage == 'cleaning_24h' and param.parameter_type == 'end':
+                result.extend([
+                    {'parameter_name': 'Moisture Content', 'value': param.moisture_content, 'unit': '%', **param_data},
+                    {'parameter_name': 'Water Added', 'value': param.water_added_liters, 'unit': 'L', **param_data},
+                    {'parameter_name': 'Waste Collected', 'value': param.waste_collected_kg, 'unit': 'kg', **param_data},
+                    {'parameter_name': 'Buffer Time', 'value': param.buffer_duration_minutes, 'unit': 'min', **param_data}
+                ])
+            elif param.stage == 'cleaning_12h':
+                if param.parameter_type == 'start':
+                    result.extend([
+                        {'parameter_name': 'Initial Moisture', 'value': param.initial_moisture, 'unit': '%', **param_data},
+                        {'parameter_name': 'Target Moisture', 'value': param.target_moisture, 'unit': '%', **param_data}
+                    ])
+                elif param.parameter_type == 'end':
+                    result.extend([
+                        {'parameter_name': 'Final Moisture', 'value': param.final_moisture, 'unit': '%', **param_data},
+                        {'parameter_name': 'Water Added', 'value': param.water_added_liters, 'unit': 'L', **param_data},
+                        {'parameter_name': 'Buffer Time', 'value': param.buffer_duration_minutes, 'unit': 'min', **param_data}
+                    ])
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/cleaning_reminders')
+def get_cleaning_reminders():
+    """API endpoint to get active cleaning reminders"""
+    try:
+        # Get machines that need cleaning
+        reminders = []
+        machines = ProductionMachine.query.all()
+        
+        for machine in machines:
+            # Check if machine has cleaning reminders
+            reminder = MachineCleaningReminder.query.filter_by(
+                machine_id=machine.id, 
+                is_active=True
+            ).first()
+            
+            if reminder:
+                # Calculate if cleaning is due
+                now = datetime.utcnow()
+                if reminder.next_cleaning_due and now >= reminder.next_cleaning_due:
+                    reminders.append({
+                        'id': reminder.id,
+                        'machine_name': machine.name,
+                        'machine_type': machine.machine_type,
+                        'frequency_hours': reminder.frequency_hours,
+                        'last_cleaned': reminder.last_cleaned_at.isoformat() if reminder.last_cleaned_at else None,
+                        'next_due': reminder.next_cleaning_due.isoformat() if reminder.next_cleaning_due else None,
+                        'status': 'overdue' if now > reminder.next_cleaning_due else 'due'
+                    })
+        
+        return jsonify(reminders)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/confirm_cleaning', methods=['POST'])
+def confirm_cleaning():
+    """API endpoint to confirm machine cleaning"""
+    try:
+        data = request.get_json()
+        reminder_id = data.get('reminder_id')
+        confirmed_by = data.get('confirmed_by')
+        
+        reminder = MachineCleaningReminder.query.get_or_404(reminder_id)
+        
+        # Create cleaning confirmation
+        confirmation = CleaningConfirmation(
+            reminder_id=reminder_id,
+            confirmed_by=confirmed_by,
+            confirmed_at=datetime.utcnow()
+        )
+        
+        # Update reminder
+        reminder.last_cleaned_at = datetime.utcnow()
+        reminder.next_cleaning_due = datetime.utcnow() + timedelta(hours=reminder.frequency_hours)
+        reminder.reminder_sent = False
+        
+        db.session.add(confirmation)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Cleaning confirmed successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/production_order_details/<int:order_id>')
+def production_order_details(order_id):
+    """Detailed view of production order with all captured data and durations"""
+    try:
+        order = ProductionOrder.query.get_or_404(order_id)
+        jobs = ProductionJobNew.query.filter_by(order_id=order_id).order_by(ProductionJobNew.created_at).all()
+        
+        # Get all stage parameters for this order
+        stage_data = {}
+        total_duration = 0
+        total_buffer_time = 0
+        
+        for job in jobs:
+            parameters = StageParameters.query.filter_by(job_id=job.id).all()
+            
+            # Calculate job duration
+            job_duration = 0
+            if job.started_at and job.completed_at:
+                job_duration = (job.completed_at - job.started_at).total_seconds() / 3600
+                total_duration += job_duration
+            
+            stage_data[job.stage] = {
+                'job': job,
+                'parameters': parameters,
+                'duration_hours': job_duration
+            }
+            
+            # Add buffer times
+            for param in parameters:
+                if param.buffer_duration_minutes:
+                    total_buffer_time += param.buffer_duration_minutes
+        
+        # Convert buffer time to hours
+        total_buffer_hours = total_buffer_time / 60
+        
+        # Get cleaning compliance
+        cleaning_logs = []
+        for job in jobs:
+            machine_cleanings = CleaningConfirmation.query.join(MachineCleaningReminder).join(ProductionMachine).filter(
+                ProductionMachine.process_step == job.stage
+            ).all()
+            cleaning_logs.extend(machine_cleanings)
+        
+        return render_template('production_order_details.html',
+                             order=order,
+                             stage_data=stage_data,
+                             total_duration=total_duration,
+                             total_buffer_hours=total_buffer_hours,
+                             cleaning_logs=cleaning_logs)
+                             
+    except Exception as e:
+        flash(f'Error loading order details: {str(e)}', 'error')
+        return redirect(url_for('comprehensive_production_view'))
