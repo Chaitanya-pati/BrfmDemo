@@ -42,7 +42,7 @@ class PrecleaningBin(db.Model):
     current_stock = db.Column(db.Float, default=0)
 
     # Relationship
-    transfers_to = db.relationship('Transfer', foreign_keys='Transfer.to_precleaning_bin_id', backref='to_precleaning_bin', lazy=True)
+    transfers_to = db.relationship('Transfer', foreign_keys='Transfer.to_precleaning_bin_id', lazy=True)
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
