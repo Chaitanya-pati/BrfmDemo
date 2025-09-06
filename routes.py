@@ -1902,3 +1902,119 @@ def production_order_details(order_id):
     except Exception as e:
         flash(f'Error loading order details: {str(e)}', 'error')
         return redirect(url_for('comprehensive_production_view'))
+
+# Cleaning Reminder System with Configurable Frequencies
+@app.route('/configure_cleaning_frequencies', methods=['GET', 'POST'])
+def configure_cleaning_frequencies():
+    """Configure cleaning frequencies for production machines"""
+    if request.method == 'POST':
+        try:
+            machine_id = request.form.get('machine_id')
+            frequency_hours = float(request.form.get('frequency_hours'))
+            
+            machine = ProductionMachine.query.get_or_404(machine_id)
+            
+            # Check if reminder already exists
+            existing_reminder = MachineCleaningReminder.query.filter_by(
+                machine_id=machine_id, 
+                is_active=True
+            ).first()
+            
+            if existing_reminder:
+                # Update existing reminder
+                existing_reminder.frequency_hours = frequency_hours
+                existing_reminder.next_cleaning_due = datetime.utcnow() + timedelta(hours=frequency_hours)
+            else:
+                # Create new reminder
+                reminder = MachineCleaningReminder(
+                    machine_id=machine_id,
+                    frequency_hours=frequency_hours,
+                    next_cleaning_due=datetime.utcnow() + timedelta(hours=frequency_hours),
+                    is_active=True
+                )
+                db.session.add(reminder)
+            
+            db.session.commit()
+            flash(f'Cleaning frequency updated for {machine.name}', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating cleaning frequency: {str(e)}', 'error')
+        
+        return redirect(url_for('configure_cleaning_frequencies'))
+    
+    # Get all machines and their current reminders
+    machines = ProductionMachine.query.all()
+    machine_reminders = {}
+    
+    for machine in machines:
+        reminder = MachineCleaningReminder.query.filter_by(
+            machine_id=machine.id, 
+            is_active=True
+        ).first()
+        machine_reminders[machine.id] = reminder
+    
+    return render_template('configure_cleaning_frequencies.html', 
+                         machines=machines, 
+                         machine_reminders=machine_reminders)
+
+def check_cleaning_reminders():
+    """Background function to check and send cleaning reminders"""
+    try:
+        now = datetime.utcnow()
+        overdue_reminders = MachineCleaningReminder.query.filter(
+            MachineCleaningReminder.is_active == True,
+            MachineCleaningReminder.next_cleaning_due <= now,
+            MachineCleaningReminder.reminder_sent == False
+        ).all()
+        
+        for reminder in overdue_reminders:
+            # Mark as reminder sent to avoid duplicate alerts
+            reminder.reminder_sent = True
+            
+            # In a real system, you would send email/SMS notifications here
+            # For now, we'll just log the reminder
+            print(f"CLEANING REMINDER: {reminder.machine.name} is due for cleaning!")
+            
+        if overdue_reminders:
+            db.session.commit()
+            
+    except Exception as e:
+        print(f"Error checking cleaning reminders: {str(e)}")
+
+# Initialize sample cleaning reminders for existing machines
+@app.route('/init_cleaning_reminders')
+def init_cleaning_reminders():
+    """Initialize sample cleaning reminders for existing machines"""
+    try:
+        machines = ProductionMachine.query.all()
+        
+        for machine in machines:
+            # Check if reminder already exists
+            existing = MachineCleaningReminder.query.filter_by(
+                machine_id=machine.id, 
+                is_active=True
+            ).first()
+            
+            if not existing:
+                # Create default reminder based on machine type
+                frequency_hours = 3  # Default 3 hours
+                if machine.machine_type == 'packer':
+                    frequency_hours = 4  # Packing machines every 4 hours
+                
+                reminder = MachineCleaningReminder(
+                    machine_id=machine.id,
+                    frequency_hours=frequency_hours,
+                    next_cleaning_due=datetime.utcnow() + timedelta(hours=frequency_hours),
+                    is_active=True
+                )
+                db.session.add(reminder)
+        
+        db.session.commit()
+        flash('Cleaning reminders initialized successfully!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error initializing cleaning reminders: {str(e)}', 'error')
+    
+    return redirect(url_for('configure_cleaning_frequencies'))
