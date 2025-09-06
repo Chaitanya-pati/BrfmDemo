@@ -1,0 +1,674 @@
+{% extends "base.html" %}
+
+{% block title %}Comprehensive Production View{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-industry"></i> Comprehensive Production View</h2>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="refreshView()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button class="btn btn-success" onclick="showCleaningReminders()">
+                        <i class="fas fa-bell"></i> Cleaning Reminders
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Orders Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list"></i> Active Production Orders</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Customer</th>
+                                    <th>Product</th>
+                                    <th>Quantity</th>
+                                    <th>Current Stage</th>
+                                    <th>Progress</th>
+                                    <th>Total Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in production_orders %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ order.order_number }}</strong>
+                                        <br><small class="text-muted">Priority: {{ order.priority }}</small>
+                                    </td>
+                                    <td>{{ order.customer.company_name if order.customer else 'N/A' }}</td>
+                                    <td>{{ order.product }}</td>
+                                    <td>{{ order.quantity }} tons</td>
+                                    <td>
+                                        <span class="badge badge-info">{{ order.status.replace('_', ' ').title() }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar" role="progressbar" 
+                                                 style="width: {{ calculate_progress(order) }}%;">
+                                                {{ calculate_progress(order) }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% set duration = calculate_total_duration(order) %}
+                                        {% if duration %}
+                                            {{ "%.1f"|format(duration) }} hours
+                                        {% else %}
+                                            Not started
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="viewOrderDetails({{ order.id }})">
+                                            <i class="fas fa-eye"></i> View
+                                        </button>
+                                        <button class="btn btn-sm btn-success" onclick="manageStages({{ order.id }})">
+                                            <i class="fas fa-cogs"></i> Manage
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Stages Tracking -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-project-diagram"></i> Production Stages Tracking</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- 24-Hour Cleaning Process -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6><i class="fas fa-clock"></i> 24-Hour Cleaning Process</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="cleaning24hJobs">
+                                        {% for job in jobs_24h %}
+                                        <div class="stage-job mb-3 p-3 border rounded" data-job-id="{{ job.id }}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ job.job_number }}</strong>
+                                                    <br><small class="text-muted">Order: {{ job.order.order_number }}</small>
+                                                </div>
+                                                <span class="badge badge-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'in_progress' else 'secondary' }}">
+                                                    {{ job.status.replace('_', ' ').title() }}
+                                                </span>
+                                            </div>
+                                            
+                                            {% if job.status == 'in_progress' %}
+                                            <div class="mt-3">
+                                                <button class="btn btn-sm btn-primary" onclick="captureEndParameters({{ job.id }}, '24h')">
+                                                    <i class="fas fa-clipboard-check"></i> Capture End Parameters
+                                                </button>
+                                            </div>
+                                            {% elif job.status == 'completed' %}
+                                            <div class="mt-3">
+                                                <small class="text-success">
+                                                    <i class="fas fa-check"></i> Parameters captured
+                                                </small>
+                                                <button class="btn btn-sm btn-info ml-2" onclick="viewCapturedData({{ job.id }})">
+                                                    <i class="fas fa-eye"></i> View Data
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 12-Hour Cleaning Process -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h6><i class="fas fa-stopwatch"></i> 12-Hour Cleaning Process</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="cleaning12hJobs">
+                                        {% for job in jobs_12h %}
+                                        <div class="stage-job mb-3 p-3 border rounded" data-job-id="{{ job.id }}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ job.job_number }}</strong>
+                                                    <br><small class="text-muted">Order: {{ job.order.order_number }}</small>
+                                                </div>
+                                                <span class="badge badge-{{ 'success' if job.status == 'completed' else 'info' if job.status == 'in_progress' else 'secondary' }}">
+                                                    {{ job.status.replace('_', ' ').title() }}
+                                                </span>
+                                            </div>
+                                            
+                                            {% if job.status == 'pending' %}
+                                            <div class="mt-3">
+                                                <button class="btn btn-sm btn-success" onclick="captureStartParameters({{ job.id }}, '12h')">
+                                                    <i class="fas fa-play"></i> Capture Start Parameters
+                                                </button>
+                                            </div>
+                                            {% elif job.status == 'in_progress' %}
+                                            <div class="mt-3">
+                                                <button class="btn btn-sm btn-primary" onclick="captureEndParameters({{ job.id }}, '12h')">
+                                                    <i class="fas fa-clipboard-check"></i> Capture End Parameters
+                                                </button>
+                                            </div>
+                                            {% elif job.status == 'completed' %}
+                                            <div class="mt-3">
+                                                <small class="text-success">
+                                                    <i class="fas fa-check"></i> Parameters captured
+                                                </small>
+                                                <button class="btn btn-sm btn-info ml-2" onclick="viewCapturedData({{ job.id }})">
+                                                    <i class="fas fa-eye"></i> View Data
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Other Stages -->
+                        <div class="col-md-4 mb-4">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6><i class="fas fa-cog"></i> Grinding</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="grindingJobs">
+                                        {% for job in jobs_grinding %}
+                                        <div class="stage-job mb-2 p-2 border rounded" data-job-id="{{ job.id }}">
+                                            <small><strong>{{ job.job_number }}</strong></small>
+                                            <span class="badge badge-sm badge-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'in_progress' else 'secondary' }} float-right">
+                                                {{ job.status.replace('_', ' ').title() }}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-4">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h6><i class="fas fa-box"></i> Packing</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="packingJobs">
+                                        {% for job in jobs_packing %}
+                                        <div class="stage-job mb-2 p-2 border rounded" data-job-id="{{ job.id }}">
+                                            <small><strong>{{ job.job_number }}</strong></small>
+                                            <span class="badge badge-sm badge-{{ 'success' if job.status == 'completed' else 'primary' if job.status == 'in_progress' else 'secondary' }} float-right">
+                                                {{ job.status.replace('_', ' ').title() }}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-4">
+                            <div class="card border-secondary">
+                                <div class="card-header bg-secondary text-white">
+                                    <h6><i class="fas fa-exchange-alt"></i> Transfer</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="transferJobs">
+                                        {% for job in jobs_transfer %}
+                                        <div class="stage-job mb-2 p-2 border rounded" data-job-id="{{ job.id }}">
+                                            <small><strong>{{ job.job_number }}</strong></small>
+                                            <span class="badge badge-sm badge-{{ 'success' if job.status == 'completed' else 'secondary' if job.status == 'in_progress' else 'light' }} float-right">
+                                                {{ job.status.replace('_', ' ').title() }}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cleaning Reminders Alert Panel -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-danger" id="cleaningRemindersPanel" style="display: none;">
+                <div class="card-header bg-danger text-white">
+                    <h5><i class="fas fa-exclamation-triangle"></i> Cleaning Reminders</h5>
+                </div>
+                <div class="card-body">
+                    <div id="activeReminders">
+                        <!-- Dynamically populated cleaning reminders -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Parameter Capture Modals -->
+<!-- 24-Hour Cleaning End Parameters Modal -->
+<div class="modal fade" id="capture24hEndModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">24-Hour Cleaning - End Parameters</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <form id="capture24hEndForm">
+                <div class="modal-body">
+                    <input type="hidden" id="jobId24hEnd" name="job_id">
+                    
+                    <div class="form-group">
+                        <label for="moisture24hEnd">Final Moisture Content (%)</label>
+                        <input type="number" class="form-control" id="moisture24hEnd" name="moisture_content" 
+                               step="0.1" min="0" max="100" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="waterAdded24h">Water Added (Liters)</label>
+                        <input type="number" class="form-control" id="waterAdded24h" name="water_added_liters" 
+                               step="0.1" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wasteCollected24h">Waste Collected (Kg)</label>
+                        <input type="number" class="form-control" id="wasteCollected24h" name="waste_collected_kg" 
+                               step="0.1" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bufferTime24h">Buffer Time (Minutes)</label>
+                        <input type="number" class="form-control" id="bufferTime24h" name="buffer_duration_minutes" 
+                               step="1" min="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bufferReason24h">Buffer Reason</label>
+                        <input type="text" class="form-control" id="bufferReason24h" name="buffer_reason" 
+                               placeholder="Reason for buffer time">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="operatorName24hEnd">Operator Name</label>
+                        <input type="text" class="form-control" id="operatorName24hEnd" name="captured_by" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes24hEnd">Notes</label>
+                        <textarea class="form-control" id="notes24hEnd" name="notes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Parameters</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 12-Hour Cleaning Start Parameters Modal -->
+<div class="modal fade" id="capture12hStartModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">12-Hour Cleaning - Start Parameters</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <form id="capture12hStartForm">
+                <div class="modal-body">
+                    <input type="hidden" id="jobId12hStart" name="job_id">
+                    
+                    <div class="form-group">
+                        <label for="initialMoisture12h">Initial Moisture Content (%)</label>
+                        <input type="number" class="form-control" id="initialMoisture12h" name="initial_moisture" 
+                               step="0.1" min="0" max="100" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="targetMoisture12h">Target Moisture Content (%)</label>
+                        <input type="number" class="form-control" id="targetMoisture12h" name="target_moisture" 
+                               step="0.1" min="0" max="100" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="operatorName12hStart">Operator Name</label>
+                        <input type="text" class="form-control" id="operatorName12hStart" name="captured_by" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes12hStart">Notes</label>
+                        <textarea class="form-control" id="notes12hStart" name="notes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Start Process & Save Parameters</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 12-Hour Cleaning End Parameters Modal -->
+<div class="modal fade" id="capture12hEndModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">12-Hour Cleaning - End Parameters</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <form id="capture12hEndForm">
+                <div class="modal-body">
+                    <input type="hidden" id="jobId12hEnd" name="job_id">
+                    
+                    <div class="form-group">
+                        <label for="finalMoisture12h">Final Moisture Content (%)</label>
+                        <input type="number" class="form-control" id="finalMoisture12h" name="final_moisture" 
+                               step="0.1" min="0" max="100" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="waterAdded12h">Water Added (Liters)</label>
+                        <input type="number" class="form-control" id="waterAdded12h" name="water_added_liters" 
+                               step="0.1" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bufferTime12h">Buffer Time (Minutes)</label>
+                        <input type="number" class="form-control" id="bufferTime12h" name="buffer_duration_minutes" 
+                               step="1" min="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bufferReason12h">Buffer Reason</label>
+                        <input type="text" class="form-control" id="bufferReason12h" name="buffer_reason" 
+                               placeholder="Reason for buffer time">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="operatorName12hEnd">Operator Name</label>
+                        <input type="text" class="form-control" id="operatorName12hEnd" name="captured_by" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes12hEnd">Notes</label>
+                        <textarea class="form-control" id="notes12hEnd" name="notes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Complete Process & Save Parameters</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Captured Data View Modal -->
+<div class="modal fade" id="capturedDataModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Captured Stage Parameters</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="capturedDataContent">
+                    <!-- Dynamically populated captured data -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// JavaScript functions for handling the comprehensive production view
+function refreshView() {
+    window.location.reload();
+}
+
+function viewOrderDetails(orderId) {
+    window.location.href = `/production_order_details/${orderId}`;
+}
+
+function manageStages(orderId) {
+    // Implementation for stage management
+    alert('Stage management for order ' + orderId + ' - functionality to be implemented');
+}
+
+function captureStartParameters(jobId, stage) {
+    if (stage === '12h') {
+        $('#jobId12hStart').val(jobId);
+        $('#capture12hStartModal').modal('show');
+    }
+}
+
+function captureEndParameters(jobId, stage) {
+    if (stage === '24h') {
+        $('#jobId24hEnd').val(jobId);
+        $('#capture24hEndModal').modal('show');
+    } else if (stage === '12h') {
+        $('#jobId12hEnd').val(jobId);
+        $('#capture12hEndModal').modal('show');
+    }
+}
+
+function viewCapturedData(jobId) {
+    fetch(`/api/stage_parameters/${jobId}`)
+        .then(response => response.json())
+        .then(data => {
+            displayCapturedData(data);
+            $('#capturedDataModal').modal('show');
+        })
+        .catch(error => {
+            console.error('Error fetching captured data:', error);
+            alert('Error loading captured data');
+        });
+}
+
+function displayCapturedData(data) {
+    let html = '<div class="table-responsive"><table class="table table-striped">';
+    html += '<thead><tr><th>Parameter</th><th>Value</th><th>Captured By</th><th>Captured At</th></tr></thead>';
+    html += '<tbody>';
+    
+    data.forEach(param => {
+        html += `<tr>`;
+        html += `<td><strong>${param.parameter_name}</strong></td>`;
+        html += `<td>${param.value} ${param.unit || ''}</td>`;
+        html += `<td>${param.captured_by}</td>`;
+        html += `<td>${new Date(param.captured_at).toLocaleString()}</td>`;
+        html += `</tr>`;
+    });
+    
+    html += '</tbody></table></div>';
+    
+    if (data.length === 0) {
+        html = '<p class="text-muted">No parameters captured yet.</p>';
+    }
+    
+    $('#capturedDataContent').html(html);
+}
+
+function showCleaningReminders() {
+    fetch('/api/cleaning_reminders')
+        .then(response => response.json())
+        .then(data => {
+            displayCleaningReminders(data);
+            $('#cleaningRemindersPanel').show();
+        })
+        .catch(error => {
+            console.error('Error fetching cleaning reminders:', error);
+        });
+}
+
+function displayCleaningReminders(reminders) {
+    let html = '';
+    
+    reminders.forEach(reminder => {
+        html += `<div class="alert alert-warning d-flex justify-content-between align-items-center">`;
+        html += `<div>`;
+        html += `<strong>${reminder.machine_name}</strong> - Cleaning due `;
+        html += `<span class="badge badge-danger">${reminder.status}</span>`;
+        html += `<br><small>Last cleaned: ${reminder.last_cleaned || 'Never'}</small>`;
+        html += `</div>`;
+        html += `<button class="btn btn-success btn-sm" onclick="confirmCleaning(${reminder.id})">`;
+        html += `<i class="fas fa-check"></i> Mark Cleaned`;
+        html += `</button>`;
+        html += `</div>`;
+    });
+    
+    if (reminders.length === 0) {
+        html = '<p class="text-success"><i class="fas fa-check"></i> All machines are up to date with cleaning.</p>';
+    }
+    
+    $('#activeReminders').html(html);
+}
+
+function confirmCleaning(reminderId) {
+    // Implementation for confirming cleaning
+    const operatorName = prompt('Enter operator name:');
+    if (operatorName) {
+        fetch('/api/confirm_cleaning', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                reminder_id: reminderId,
+                confirmed_by: operatorName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showCleaningReminders(); // Refresh reminders
+                alert('Cleaning confirmed successfully!');
+            } else {
+                alert('Error confirming cleaning: ' + data.error);
+            }
+        });
+    }
+}
+
+// Form submissions
+$('#capture24hEndForm').on('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    fetch('/api/capture_stage_parameters', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#capture24hEndModal').modal('hide');
+            refreshView();
+            alert('Parameters captured successfully!');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+});
+
+$('#capture12hStartForm').on('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    fetch('/api/capture_stage_parameters', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#capture12hStartModal').modal('hide');
+            refreshView();
+            alert('Start parameters captured and process started!');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+});
+
+$('#capture12hEndForm').on('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    fetch('/api/capture_stage_parameters', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#capture12hEndModal').modal('hide');
+            refreshView();
+            alert('End parameters captured and process completed!');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+});
+
+// Auto-refresh cleaning reminders every 5 minutes
+setInterval(showCleaningReminders, 300000);
+
+// Initial load of cleaning reminders
+$(document).ready(function() {
+    showCleaningReminders();
+});
+</script>
+
+<style>
+.stage-job {
+    transition: background-color 0.3s ease;
+}
+
+.stage-job:hover {
+    background-color: #f8f9fa;
+}
+
+.badge-sm {
+    font-size: 0.7em;
+}
+
+#cleaningRemindersPanel {
+    position: sticky;
+    top: 20px;
+    z-index: 100;
+}
+</style>
+{% endblock %}
