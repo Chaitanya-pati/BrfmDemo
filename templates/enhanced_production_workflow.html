@@ -198,8 +198,8 @@
                                 <div class="mb-3 p-3 border rounded" data-process-id="{{ process.id }}">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <strong>Job {{ process.job_id }}</strong>
-                                            <div class="countdown-timer" data-end-time="{{ process.end_time.isoformat() }}">
+                                            <strong>Job {{ process.job_id if process.job_id else process.id }}</strong>
+                                            <div class="countdown-timer timer-display" data-end-time="{{ process.end_time.isoformat() if process.end_time else '' }}">
                                                 Calculating...
                                             </div>
                                         </div>
@@ -274,8 +274,8 @@
                                 <div class="mb-3 p-3 border rounded" data-process-id="{{ process.id }}">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <strong>Job {{ process.job_id }}</strong>
-                                            <div class="countdown-timer" data-end-time="{{ process.end_time.isoformat() }}">
+                                            <strong>Job {{ process.job_id if process.job_id else process.id }}</strong>
+                                            <div class="countdown-timer timer-display" data-end-time="{{ process.end_time.isoformat() if process.end_time else '' }}">
                                                 Calculating...
                                             </div>
                                         </div>
@@ -353,8 +353,8 @@
                                 <div class="mb-3 p-3 border rounded" data-process-id="{{ process.id }}">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <strong>{{ process.machine_name }}</strong>
-                                            <div class="upcount-timer" data-start-time="{{ process.start_time.isoformat() }}">
+                                            <strong>{{ process.machine_name if process.machine_name else 'Grinding Machine' }}</strong>
+                                            <div class="upcount-timer timer-display" data-start-time="{{ process.start_time.isoformat() if process.start_time else '' }}">
                                                 Calculating...
                                             </div>
                                         </div>
@@ -899,13 +899,20 @@ function startTimerUpdates() {
 
 // Update countdown timer display
 function updateCountdownTimer(timerElement) {
-    const endTime = new Date(timerElement.dataset.endTime);
+    const endTimeStr = timerElement.dataset.endTime;
+    if (!endTimeStr) {
+        timerElement.textContent = "No timer data";
+        return;
+    }
+
+    const endTime = new Date(endTimeStr);
     const now = new Date();
     const diff = endTime - now;
 
     if (diff <= 0) {
         timerElement.textContent = "COMPLETED";
         timerElement.classList.add('pulse-animation');
+        timerElement.style.color = '#28a745';
         return;
     }
 
@@ -914,19 +921,32 @@ function updateCountdownTimer(timerElement) {
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
     timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    timerElement.style.color = '#ff6b35';
 }
 
 // Update upcount timer display
 function updateUpcountTimer(timerElement) {
-    const startTime = new Date(timerElement.dataset.startTime);
+    const startTimeStr = timerElement.dataset.startTime;
+    if (!startTimeStr) {
+        timerElement.textContent = "No timer data";
+        return;
+    }
+
+    const startTime = new Date(startTimeStr);
     const now = new Date();
     const diff = now - startTime;
+
+    if (diff < 0) {
+        timerElement.textContent = "00:00:00";
+        return;
+    }
 
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
     timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    timerElement.style.color = '#28a745';
 }
 
 // Open process modal
@@ -1141,9 +1161,28 @@ function recordCleaning() {
 // Complete cleaning process
 function completeCleaningProcess(processId) {
     if (confirm('Are you sure you want to complete this cleaning process?')) {
-        // This would typically call an API to complete the process
-        // For now, just reload the page
-        location.reload();
+        fetch('/api/complete_cleaning_process', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                process_id: processId
+            })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert(result.message);
+                location.reload();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while completing the process');
+        });
     }
 }
 
