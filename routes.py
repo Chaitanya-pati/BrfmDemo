@@ -1399,17 +1399,28 @@ def enhanced_production_workflow():
 def api_start_24h_cleaning_process():
     """API endpoint to start 24-hour cleaning process with countdown timer"""
     try:
-        job_id = request.json.get('job_id')
+        order_id = request.json.get('order_id')
         duration_hours = float(request.json.get('duration_hours', 24))
         start_moisture = float(request.json.get('start_moisture'))
         operator_name = request.json.get('operator_name')
         water_added = float(request.json.get('water_added', 0))
         
-        job = ProductionJobNew.query.get_or_404(job_id)
+        order = ProductionOrder.query.get_or_404(order_id)
+        
+        # Create a new job for this order if it doesn't exist
+        job = ProductionJobNew.query.filter_by(order_id=order_id, stage='cleaning_24h').first()
+        if not job:
+            job = ProductionJobNew()
+            job.order_id = order_id
+            job.stage = 'cleaning_24h'
+            job.job_number = f"J24H-{order.order_number}"
+            job.status = 'pending'
+            db.session.add(job)
+            db.session.flush()
         
         # Create new cleaning process
         cleaning_process = CleaningProcess()
-        cleaning_process.job_id = job_id
+        cleaning_process.job_id = job.id
         cleaning_process.process_type = '24_hour'
         cleaning_process.duration_hours = duration_hours
         cleaning_process.start_time = datetime.now()
@@ -1443,17 +1454,28 @@ def api_start_24h_cleaning_process():
 def api_start_12h_cleaning_process():
     """API endpoint to start 12-hour cleaning process with countdown timer"""
     try:
-        job_id = request.json.get('job_id')
+        order_id = request.json.get('order_id')
         duration_hours = float(request.json.get('duration_hours', 12))
         start_moisture = float(request.json.get('start_moisture'))
         target_moisture = float(request.json.get('target_moisture'))
         operator_name = request.json.get('operator_name')
         
-        job = ProductionJobNew.query.get_or_404(job_id)
+        order = ProductionOrder.query.get_or_404(order_id)
+        
+        # Create a new job for this order if it doesn't exist
+        job = ProductionJobNew.query.filter_by(order_id=order_id, stage='cleaning_12h').first()
+        if not job:
+            job = ProductionJobNew()
+            job.order_id = order_id
+            job.stage = 'cleaning_12h'
+            job.job_number = f"J12H-{order.order_number}"
+            job.status = 'pending'
+            db.session.add(job)
+            db.session.flush()
         
         # Create new cleaning process
         cleaning_process = CleaningProcess()
-        cleaning_process.job_id = job_id
+        cleaning_process.job_id = job.id
         cleaning_process.process_type = '12_hour'
         cleaning_process.duration_hours = duration_hours
         cleaning_process.start_time = datetime.now()
@@ -1487,18 +1509,29 @@ def api_start_12h_cleaning_process():
 def api_start_grinding_process():
     """API endpoint to start grinding process with start/stop timer"""
     try:
-        job_id = request.json.get('job_id')
+        order_id = request.json.get('order_id')
         machine_name = request.json.get('machine_name')
         input_quantity = float(request.json.get('input_quantity'))
         operator_name = request.json.get('operator_name')
         b1_scale_operator = request.json.get('b1_scale_operator')
         b1_scale_weight = float(request.json.get('b1_scale_weight'))
         
-        job = ProductionJobNew.query.get_or_404(job_id)
+        order = ProductionOrder.query.get_or_404(order_id)
+        
+        # Create a new job for this order if it doesn't exist
+        job = ProductionJobNew.query.filter_by(order_id=order_id, stage='grinding').first()
+        if not job:
+            job = ProductionJobNew()
+            job.order_id = order_id
+            job.stage = 'grinding'
+            job.job_number = f"JGR-{order.order_number}"
+            job.status = 'pending'
+            db.session.add(job)
+            db.session.flush()
         
         # Create new grinding process
         grinding_process = GrindingProcess()
-        grinding_process.job_id = job_id
+        grinding_process.job_id = job.id
         grinding_process.machine_name = machine_name
         grinding_process.start_time = datetime.now()
         grinding_process.input_quantity_kg = input_quantity

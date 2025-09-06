@@ -475,11 +475,11 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">Job ID</label>
-                                <select name="job_id" class="form-select" required>
-                                    <option value="">Select Job</option>
-                                    {% for job in jobs_by_stage.transfer if job.status == 'completed' %}
-                                    <option value="{{ job.id }}">{{ job.job_number }}</option>
+                                <label class="form-label">Production Order</label>
+                                <select name="order_id" class="form-select" required>
+                                    <option value="">Select Production Order</option>
+                                    {% for order in active_orders %}
+                                    <option value="{{ order.id }}">{{ order.order_number }} - {{ order.product.name if order.product else 'N/A' }} ({{ "%.1f"|format(order.quantity) }} tons)</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -536,11 +536,11 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">Job ID</label>
-                                <select name="job_id" class="form-select" required>
-                                    <option value="">Select Job</option>
-                                    {% for job in jobs_by_stage.cleaning_24h if job.status == 'completed' %}
-                                    <option value="{{ job.id }}">{{ job.job_number }}</option>
+                                <label class="form-label">Production Order</label>
+                                <select name="order_id" class="form-select" required>
+                                    <option value="">Select Production Order</option>
+                                    {% for order in active_orders %}
+                                    <option value="{{ order.id }}">{{ order.order_number }} - {{ order.product.name if order.product else 'N/A' }} ({{ "%.1f"|format(order.quantity) }} tons)</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -597,11 +597,11 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">Job ID</label>
-                                <select name="job_id" class="form-select" required>
-                                    <option value="">Select Job</option>
-                                    {% for job in jobs_by_stage.cleaning_12h if job.status == 'completed' %}
-                                    <option value="{{ job.id }}">{{ job.job_number }}</option>
+                                <label class="form-label">Production Order</label>
+                                <select name="order_id" class="form-select" required>
+                                    <option value="">Select Production Order</option>
+                                    {% for order in active_orders %}
+                                    <option value="{{ order.id }}">{{ order.order_number }} - {{ order.product.name if order.product else 'N/A' }} ({{ "%.1f"|format(order.quantity) }} tons)</option>
                                     {% endfor %}
                                 </select>
                             </div>
