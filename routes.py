@@ -1045,31 +1045,53 @@ def api_production_jobs_by_stage():
             'packing': []
         }
 
-        # Get all active jobs
-        active_jobs = ProductionJobNew.query.filter(
-            ProductionJobNew.status.in_(['pending', 'in_progress'])
-        ).all()
+        # Get all active jobs with proper error handling
+        try:
+            active_jobs = ProductionJobNew.query.filter(
+                ProductionJobNew.status.in_(['pending', 'in_progress'])
+            ).all()
+        except Exception as db_error:
+            app.logger.error(f"Database error: {str(db_error)}")
+            return jsonify({
+                'success': False,
+                'error': 'Database connection error',
+                'jobs': jobs_by_stage
+            })
 
         for job in active_jobs:
-            job_data = {
-                'id': job.id,
-                'job_number': job.job_number,
-                'order_number': job.order.order_number if job.order else 'N/A',
-                'status': job.status,
-                'stage': job.stage,
-                'progress': 0 if job.status == 'pending' else 50 if job.status == 'in_progress' else 100,
-                'can_proceed': job.status == 'pending',
-                'is_previous_step': False,
-                'is_running': job.status == 'in_progress',
-                'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '',
-                'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '',
-                'started_by': job.started_by or '',
-                'completed_at': job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else '',
-                'completed_by': job.completed_by or ''
-            }
+            try:
+                # Safe attribute access with fallbacks
+                order_number = 'N/A'
+                if hasattr(job, 'order') and job.order:
+                    order_number = getattr(job.order, 'order_number', 'N/A')
 
-            if job.stage in jobs_by_stage:
-                jobs_by_stage[job.stage].append(job_data)
+                job_data = {
+                    'id': getattr(job, 'id', 0),
+                    'job_number': getattr(job, 'job_number', 'Unknown'),
+                    'order_number': order_number,
+                    'status': getattr(job, 'status', 'unknown'),
+                    'stage': getattr(job, 'stage', 'unknown'),
+                    'progress': 0 if job.status == 'pending' else 50 if job.status == 'in_progress' else 100,
+                    'can_proceed': job.status == 'pending',
+                    'is_previous_step': False,
+                    'is_running': job.status == 'in_progress',
+                    'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '',
+                    'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '',
+                    'started_by': getattr(job, 'started_by', '') or '',
+                    'completed_at': job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else '',
+                    'completed_by': getattr(job, 'completed_by', '') or ''
+                }
+
+                stage = getattr(job, 'stage', 'unknown')
+                if stage in jobs_by_stage:
+                    jobs_by_stage[stage].append(job_data)
+                else:
+                    # Log unknown stage
+                    app.logger.warning(f"Unknown job stage: {stage}")
+
+            except Exception as job_error:
+                app.logger.error(f"Error processing job {getattr(job, 'id', 'unknown')}: {str(job_error)}")
+                continue
 
         return jsonify({
             'success': True,
@@ -1089,31 +1111,40 @@ def api_production_jobs_by_stage():
                 'grinding': [],
                 'packing': []
             }
-        }), 200  # Return 200 but with error flag
+        }), 200
 
 @app.route('/api/job_details/<int:job_id>')
 def api_job_details(job_id):
     """API endpoint to get detailed job information"""
     try:
-        job = ProductionJobNew.query.get_or_404(job_id)
+        job = ProductionJobNew.query.get(job_id)
+        
+        if not job:
+            return jsonify({'success': False, 'error': 'Job not found'}), 404
+
+        # Safe attribute access
+        order_number = 'N/A'
+        if hasattr(job, 'order') and job.order:
+            order_number = getattr(job.order, 'order_number', 'N/A')
 
         job_data = {
-            'id': job.id,
-            'job_number': job.job_number,
-            'order_number': job.order.order_number if job.order else 'N/A',
-            'status': job.status,
-            'stage': job.stage,
+            'id': getattr(job, 'id', 0),
+            'job_number': getattr(job, 'job_number', 'Unknown'),
+            'order_number': order_number,
+            'status': getattr(job, 'status', 'unknown'),
+            'stage': getattr(job, 'stage', 'unknown'),
             'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '',
             'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '',
-            'started_by': job.started_by,
+            'started_by': getattr(job, 'started_by', '') or '',
             'completed_at': job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else '',
-            'completed_by': job.completed_by,
-            'notes': job.notes
+            'completed_by': getattr(job, 'completed_by', '') or '',
+            'notes': getattr(job, 'notes', '') or ''
         }
 
         return jsonify({'success': True, 'job': job_data})
 
     except Exception as e:
+        app.logger.error(f"Error in job_details API for job {job_id}: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/available_production_orders')
