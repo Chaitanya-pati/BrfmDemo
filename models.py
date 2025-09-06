@@ -625,6 +625,19 @@ class CleaningSchedule(db.Model):
 
 # Production Order comprehensive tracking
 class ProductionOrderTracking(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    stage = db.Column(db.String(50), nullable=False)  # transfer, cleaning_24h, cleaning_12h, grinding, packing
+    status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    operator_name = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    order = db.relationship('ProductionOrder', backref='tracking_records')
+
 class RawWheatQualityReport(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicle.id'), nullable=False)
