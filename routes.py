@@ -812,27 +812,7 @@ def api_production_jobs_by_stage():
             'packing': []
         }
 
-        # Placeholder for potential future error handling or logging
-        # This block is intended to catch database connection issues or similar
-        # It's placed here to be the first point of error handling for the query
-        try:
-            # A simple query to test database connectivity and schema access
-            # This is a placeholder and might need adjustment based on actual DB setup
-            # For example, querying a small table or a system table
-            # If active_jobs query above fails, this might also fail or vice-versa
-            # For simplicity, we assume active_jobs covers most DB interaction needs.
-            # If a specific DB error is anticipated, a more targeted check could be added.
-            pass # Placeholder for potential specific DB check
-
-        except Exception as db_error:
-            app.logger.error(f"Database error in production_jobs_by_stage: {str(db_error)}")
-            return jsonify({
-                'success': False,
-                'error': 'Database connection error',
-                'jobs': jobs_by_stage
-            }), 500
-
-    for job in active_jobs:
+        for job in active_jobs:
             try:
                 # Safe attribute access with fallbacks
                 order_number = 'N/A'
