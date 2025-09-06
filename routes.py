@@ -1407,11 +1407,22 @@ def api_start_24h_cleaning_process():
         
         order = ProductionOrder.query.get_or_404(order_id)
         
+        # Find or create a production plan for this order
+        plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+        if not plan:
+            plan = ProductionPlan()
+            plan.order_id = order_id
+            plan.planned_by = operator_name
+            plan.status = 'approved'
+            db.session.add(plan)
+            db.session.flush()
+        
         # Create a new job for this order if it doesn't exist
         job = ProductionJobNew.query.filter_by(order_id=order_id, stage='cleaning_24h').first()
         if not job:
             job = ProductionJobNew()
             job.order_id = order_id
+            job.plan_id = plan.id
             job.stage = 'cleaning_24h'
             job.job_number = f"J24H-{order.order_number}"
             job.status = 'pending'
@@ -1462,11 +1473,22 @@ def api_start_12h_cleaning_process():
         
         order = ProductionOrder.query.get_or_404(order_id)
         
+        # Find or create a production plan for this order
+        plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+        if not plan:
+            plan = ProductionPlan()
+            plan.order_id = order_id
+            plan.planned_by = operator_name
+            plan.status = 'approved'
+            db.session.add(plan)
+            db.session.flush()
+        
         # Create a new job for this order if it doesn't exist
         job = ProductionJobNew.query.filter_by(order_id=order_id, stage='cleaning_12h').first()
         if not job:
             job = ProductionJobNew()
             job.order_id = order_id
+            job.plan_id = plan.id
             job.stage = 'cleaning_12h'
             job.job_number = f"J12H-{order.order_number}"
             job.status = 'pending'
@@ -1518,11 +1540,22 @@ def api_start_grinding_process():
         
         order = ProductionOrder.query.get_or_404(order_id)
         
+        # Find or create a production plan for this order
+        plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+        if not plan:
+            plan = ProductionPlan()
+            plan.order_id = order_id
+            plan.planned_by = operator_name
+            plan.status = 'approved'
+            db.session.add(plan)
+            db.session.flush()
+        
         # Create a new job for this order if it doesn't exist
         job = ProductionJobNew.query.filter_by(order_id=order_id, stage='grinding').first()
         if not job:
             job = ProductionJobNew()
             job.order_id = order_id
+            job.plan_id = plan.id
             job.stage = 'grinding'
             job.job_number = f"JGR-{order.order_number}"
             job.status = 'pending'
