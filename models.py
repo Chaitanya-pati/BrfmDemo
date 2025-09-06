@@ -121,17 +121,25 @@ class QualityTest(db.Model):
     sample_photos_after = db.Column(db.String(200))   # file path for after photos
 
 class Transfer(db.Model):
+    __tablename__ = 'transfer'
+
     id = db.Column(db.Integer, primary_key=True)
-    from_godown_id = db.Column(db.Integer, db.ForeignKey('godown.id'))
-    to_godown_id = db.Column(db.Integer, db.ForeignKey('godown.id'))
-    from_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'))
-    to_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'))
+    from_godown_id = db.Column(db.Integer, db.ForeignKey('godown.id'), nullable=True)
+    to_godown_id = db.Column(db.Integer, db.ForeignKey('godown.id'), nullable=True)
+    from_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=True)
+    to_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=True)
     quantity = db.Column(db.Float, nullable=False)
-    transfer_type = db.Column(db.String(50), nullable=False)  # godown_to_precleaning, precleaning_to_cleaning, etc
-    operator = db.Column(db.String(100))
+    transfer_type = db.Column(db.String(50), nullable=False)  # 'godown_to_precleaning', 'precleaning_to_cleaning', etc.
+    operator = db.Column(db.String(100), nullable=False)
     transfer_time = db.Column(db.DateTime, default=datetime.utcnow)
     notes = db.Column(db.Text)
-    evidence_photo = db.Column(db.String(200))
+    evidence_photo = db.Column(db.String(255))
+
+    # Relationships
+    from_godown = db.relationship('Godown', foreign_keys=[from_godown_id], backref='outgoing_transfers')
+    to_godown = db.relationship('Godown', foreign_keys=[to_godown_id], backref='incoming_transfers')
+    from_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[from_precleaning_bin_id], backref='outgoing_transfers')
+    to_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[to_precleaning_bin_id], backref='incoming_transfers')
 
 class CleaningMachine(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -335,17 +343,24 @@ class ProductionJobNew(db.Model):
     plan = db.relationship('ProductionPlan', back_populates='jobs')
 
 class ProductionTransfer(db.Model):
+    __tablename__ = 'production_transfer'
+
     id = db.Column(db.Integer, primary_key=True)
     job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
-    from_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=False)
-    quantity_transferred = db.Column(db.Float, nullable=False)
-    transfer_time = db.Column(db.DateTime, default=datetime.utcnow)
+    from_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=True)
+    to_cleaning_bin_id = db.Column(db.Integer, db.ForeignKey('cleaning_bin.id'), nullable=True)
+    quantity = db.Column(db.Float, nullable=False)
+    transfer_type = db.Column(db.String(50), nullable=False)
     operator_name = db.Column(db.String(100), nullable=False)
-    start_photo = db.Column(db.String(255))
-    end_photo = db.Column(db.String(255))
+    transfer_time = db.Column(db.DateTime, default=datetime.utcnow)
+    notes = db.Column(db.Text)
+    evidence_photo = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    job = db.relationship('ProductionJobNew', backref=db.backref('transfers', lazy=True))
-    from_bin = db.relationship('PrecleaningBin', backref=db.backref('transfers', lazy=True))
+    # Relationships
+    job = db.relationship('ProductionJobNew', backref='transfers')
+    from_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[from_precleaning_bin_id])
+    to_cleaning_bin = db.relationship('CleaningBin', foreign_keys=[to_cleaning_bin_id])
 
 class CleaningBin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -476,7 +491,7 @@ class ProcessReminder(db.Model):
 
     job = db.relationship('ProductionJobNew', backref=db.backref('reminders', lazy=True))
 
-# Enhanced Machine Cleaning Model for Hourly Cleaning with B1 Scale
+# Enhanced Machine Cleaning System - Process Linked
 class B1ScaleCleaning(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     machine_name = db.Column(db.String(100), default='B1 Scale', nullable=False)
@@ -603,14 +618,14 @@ class RawWheatQualityReport(db.Model):
     bill_number = db.Column(db.String(50))
     arrival_datetime = db.Column(db.DateTime)
     lab_chemist = db.Column(db.String(100), nullable=False)
-    
+
     # Test parameters
     moisture = db.Column(db.Float)
     hectoliter_weight = db.Column(db.Float)
     wet_gluten = db.Column(db.Float)
     dry_gluten = db.Column(db.Float)
     sedimentation_value = db.Column(db.Float)
-    
+
     # Refractions/Impurities
     chaff_husk = db.Column(db.Float)
     straws_sticks = db.Column(db.Float)
@@ -619,7 +634,7 @@ class RawWheatQualityReport(db.Model):
     stones = db.Column(db.Float)
     dust_sand = db.Column(db.Float)
     total_impurities = db.Column(db.Float)
-    
+
     # Grain dockage
     shriveled_wheat = db.Column(db.Float)
     insect_damage = db.Column(db.Float)
@@ -630,12 +645,12 @@ class RawWheatQualityReport(db.Model):
     immature_wheat = db.Column(db.Float)
     broken_wheat = db.Column(db.Float)
     total_dockage = db.Column(db.Float)
-    
+
     # Final assessment
     comments_action = db.Column(db.Text)
     category_assigned = db.Column(db.String(50), nullable=False)
     approved = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     vehicle = db.relationship('Vehicle', backref='raw_wheat_reports')

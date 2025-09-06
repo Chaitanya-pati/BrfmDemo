@@ -1256,32 +1256,89 @@ def start_production_execution(order_id):
         flash(f'Error starting production execution: {str(e)}', 'error')
         return redirect(url_for('production_planning', order_id=order_id))
 
-@app.route('/production_execution/transfer_setup/<int:job_id>')
+@app.route('/production_execution/transfer_setup/<int:job_id>', methods=['GET', 'POST'])
 def transfer_setup(job_id):
     """Set up transfer process"""
     job = ProductionJobNew.query.get_or_404(job_id)
     plan = ProductionPlan.query.get_or_404(job.plan_id)
     plan_items = ProductionPlanItem.query.filter_by(plan_id=plan.id).all()
+    
+    if request.method == 'POST':
+        try:
+            # Process the transfer setup
+            operator_name = request.form['operator_name']
+            from_bin_ids = request.form.getlist('from_bin_id')
+            quantities = request.form.getlist('quantity')
+            
+            total_transferred = 0
+            
+            for i, from_bin_id in enumerate(from_bin_ids):
+                if from_bin_id and quantities[i]:
+                    quantity = float(quantities[i])
+                    
+                    # Create transfer record
+                    transfer = ProductionTransfer()
+                    transfer.job_id = job_id
+                    transfer.from_precleaning_bin_id = int(from_bin_id)
+                    transfer.quantity = quantity
+                    transfer.transfer_type = 'precleaning_to_cleaning'
+                    transfer.operator_name = operator_name
+                    transfer.transfer_time = datetime.now()
+                    
+                    # Update bin stocks
+                    from_bin = PrecleaningBin.query.get(int(from_bin_id))
+                    if from_bin:
+                        from_bin.current_stock -= quantity
+                    
+                    db.session.add(transfer)
+                    total_transferred += quantity
+            
+            # Update job status
+            job.status = 'in_progress'
+            job.started_at = datetime.now()
+            job.started_by = operator_name
+            
+            db.session.commit()
+            
+            flash(f'Transfer process started! Transferred {total_transferred} kg total.', 'success')
+            return redirect(url_for('production_execution'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error in transfer process: {str(e)}', 'error')
+    
     return render_template('transfer_execution_setup.html', job=job, plan_items=plan_items)
 
-@app.route('/production_execution/cleaning_setup/<int:job_id>')
+@app.route('/production_execution/cleaning_setup/<int:job_id>', methods=['GET', 'POST'])
 def cleaning_setup(job_id):
     """Set up 24-hour cleaning process"""
     job = ProductionJobNew.query.get_or_404(job_id)
     # Get available cleaning bins
     cleaning_bins = CleaningBin.query.filter_by(status='available').all()
+    
+    if request.method == 'POST':
+        return redirect(url_for('process_cleaning_24h', job_id=job_id))
+    
     return render_template('cleaning_setup.html', job=job, cleaning_bins=cleaning_bins)
 
-@app.route('/production_execution/cleaning_12h_setup/<int:job_id>')
+@app.route('/production_execution/cleaning_12h_setup/<int:job_id>', methods=['GET', 'POST'])
 def cleaning_12h_setup(job_id):
     """Set up 12-hour cleaning process"""
     job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if request.method == 'POST':
+        return redirect(url_for('production_execution'))
+    
     return render_template('cleaning_12h_setup.html', job=job)
 
-@app.route('/production_execution/b1_scale/<int:job_id>')
+@app.route('/production_execution/b1_scale/<int:job_id>', methods=['GET', 'POST'])
 def b1_scale_process(job_id):
     """B1 scale and grinding process"""
     job = ProductionJobNew.query.get_or_404(job_id)
+    
+    if request.method == 'POST':
+        return redirect(url_for('production_execution'))
+    
     return render_template('b1_scale_process.html', job=job)
 
 @app.route('/production_execution/packing/<int:job_id>')
