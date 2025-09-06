@@ -557,7 +557,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Duration (Hours)</label>
-                                <select name="duration_hours" id="durationSelect" class="form-select" required>
+                                <select name="duration_hours" id="durationSelect12h" class="form-select" required>
                                     <option value="12">12 Hours (Standard)</option>
                                     <option value="8">8 Hours (Fast)</option>
                                     <option value="0.5">30 Minutes (Demo)</option>
@@ -566,11 +566,11 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row" id="customDurationDiv" style="display: none;">
+                    <div class="row" id="customDurationDiv12h" style="display: none;">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Custom Duration (Hours)</label>
-                                <input type="number" name="duration_hours" id="customDurationInput" class="form-control" step="0.1">
+                                <input type="number" name="custom_duration_hours" id="customDurationInput12h" class="form-control" step="0.1" min="0.1">
                             </div>
                         </div>
                     </div>
@@ -799,6 +799,7 @@ setInterval(refreshJobStatus, 30000);
 
 // Handle custom duration selection
 document.addEventListener('DOMContentLoaded', function() {
+    // Handle 24h modal duration
     const durationSelect = document.getElementById('durationSelect');
     const customDurationDiv = document.getElementById('customDurationDiv');
     const customDurationInput = document.getElementById('customDurationInput');
@@ -808,13 +809,34 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.value === 'custom') {
                 customDurationDiv.style.display = 'block';
                 customDurationInput.required = true;
-                this.removeAttribute('name'); // Remove name from select when custom is chosen
-                customDurationInput.setAttribute('name', 'duration_hours'); // Add name to input
+                this.removeAttribute('name');
+                customDurationInput.setAttribute('name', 'duration_hours');
             } else {
                 customDurationDiv.style.display = 'none';
                 customDurationInput.required = false;
-                this.setAttribute('name', 'duration_hours'); // Add name back to select
-                customDurationInput.removeAttribute('name'); // Remove name from input
+                this.setAttribute('name', 'duration_hours');
+                customDurationInput.removeAttribute('name');
+            }
+        });
+    }
+
+    // Handle 12h modal duration
+    const durationSelect12h = document.getElementById('durationSelect12h');
+    const customDurationDiv12h = document.getElementById('customDurationDiv12h');
+    const customDurationInput12h = document.getElementById('customDurationInput12h');
+
+    if (durationSelect12h) {
+        durationSelect12h.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customDurationDiv12h.style.display = 'block';
+                customDurationInput12h.required = true;
+                this.removeAttribute('name');
+                customDurationInput12h.setAttribute('name', 'duration_hours');
+            } else {
+                customDurationDiv12h.style.display = 'none';
+                customDurationInput12h.required = false;
+                this.setAttribute('name', 'duration_hours');
+                customDurationInput12h.removeAttribute('name');
             }
         });
     }
@@ -1002,6 +1024,35 @@ function start12hCleaning() {
     const form = document.getElementById('form12hCleaning');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
+
+    // Validate required fields
+    if (!data.order_id || !data.duration_hours || !data.start_moisture || !data.target_moisture || !data.operator_name) {
+        alert('Please fill in all required fields');
+        return;
+    }
+
+    // Convert numeric values and validate
+    try {
+        data.duration_hours = parseFloat(data.duration_hours);
+        data.start_moisture = parseFloat(data.start_moisture);
+        data.target_moisture = parseFloat(data.target_moisture);
+
+        if (isNaN(data.duration_hours) || data.duration_hours <= 0) {
+            alert('Please enter a valid duration');
+            return;
+        }
+        if (isNaN(data.start_moisture) || data.start_moisture < 0 || data.start_moisture > 100) {
+            alert('Please enter a valid start moisture percentage (0-100)');
+            return;
+        }
+        if (isNaN(data.target_moisture) || data.target_moisture < 0 || data.target_moisture > 100) {
+            alert('Please enter a valid target moisture percentage (0-100)');
+            return;
+        }
+    } catch (error) {
+        alert('Please check the numeric values entered');
+        return;
+    }
 
     fetch('/api/start_12h_cleaning_process', {
         method: 'POST',

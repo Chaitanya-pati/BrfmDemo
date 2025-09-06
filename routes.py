@@ -1465,11 +1465,34 @@ def api_start_24h_cleaning_process():
 def api_start_12h_cleaning_process():
     """API endpoint to start 12-hour cleaning process with countdown timer"""
     try:
-        order_id = request.json.get('order_id')
-        duration_hours = float(request.json.get('duration_hours', 12))
-        start_moisture = float(request.json.get('start_moisture'))
-        target_moisture = float(request.json.get('target_moisture'))
-        operator_name = request.json.get('operator_name')
+        data = request.json
+        
+        # Validate required fields
+        required_fields = ['order_id', 'duration_hours', 'start_moisture', 'target_moisture', 'operator_name']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+
+        # Convert and validate numeric values
+        try:
+            order_id = int(data.get('order_id'))
+            duration_hours = float(data.get('duration_hours'))
+            start_moisture = float(data.get('start_moisture'))
+            target_moisture = float(data.get('target_moisture'))
+        except (ValueError, TypeError) as e:
+            return jsonify({'success': False, 'error': 'Invalid numeric values provided'}), 400
+        
+        # Validate ranges
+        if duration_hours <= 0:
+            return jsonify({'success': False, 'error': 'Duration must be greater than 0'}), 400
+        if not (0 <= start_moisture <= 100):
+            return jsonify({'success': False, 'error': 'Start moisture must be between 0-100%'}), 400
+        if not (0 <= target_moisture <= 100):
+            return jsonify({'success': False, 'error': 'Target moisture must be between 0-100%'}), 400
+
+        operator_name = data.get('operator_name').strip()
+        if not operator_name:
+            return jsonify({'success': False, 'error': 'Operator name is required'}), 400
 
         order = ProductionOrder.query.get_or_404(order_id)
 
