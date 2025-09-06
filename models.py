@@ -49,6 +49,8 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     category = db.Column(db.String(50))  # Main Product or Bran
     description = db.Column(db.Text)
+    unit = db.Column(db.String(20), default='kg')
+    standard_price = db.Column(db.Float, default=0.0)
 
 class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -136,10 +138,10 @@ class Transfer(db.Model):
     evidence_photo = db.Column(db.String(255))
 
     # Relationships
-    from_godown = db.relationship('Godown', foreign_keys=[from_godown_id])
-    to_godown = db.relationship('Godown', foreign_keys=[to_godown_id])
+    from_godown = db.relationship('Godown', foreign_keys=[from_godown_id], overlaps="transfers_from")
+    to_godown = db.relationship('Godown', foreign_keys=[to_godown_id], overlaps="transfers_to")
     from_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[from_precleaning_bin_id])
-    to_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[to_precleaning_bin_id])
+    to_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[to_precleaning_bin_id], overlaps="transfers_to")
 
 # Enhanced Models for Production Stage Tracking
 class StageParameters(db.Model):
@@ -199,8 +201,8 @@ class CleaningLog(db.Model):
 class ProductionOrder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(50), unique=True, nullable=False)
-    product = db.Column(db.String(100))  # Changed from product_id to product string
-    customer = db.Column(db.String(100))  # Added customer field
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=True)
     quantity = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed
     priority = db.Column(db.String(20), default='normal')  # low, normal, high
@@ -211,6 +213,8 @@ class ProductionOrder(db.Model):
     notes = db.Column(db.Text)  # Added notes field
     
     # Relationships
+    product = db.relationship('Product', backref='production_orders')
+    customer = db.relationship('Customer', backref='production_orders')
     production_plans = db.relationship('ProductionPlan', backref='order', lazy=True)
     production_jobs = db.relationship('ProductionJobNew', back_populates='order', lazy=True)
 

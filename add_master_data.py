@@ -145,11 +145,11 @@ def add_sample_data():
             # Add ProductionOrders
             if not ProductionOrder.query.first():
                 production_orders = [
-                    ProductionOrder(order_number='ORD-2025-001', product_id=1, quantity=1000.0, status='completed', 
+                    ProductionOrder(order_number='ORD-2025-001', product_id=1, customer_id=1, quantity=1000.0, status='completed', 
                                    priority='high', created_by='Manager1', target_completion_date=datetime.now() + timedelta(days=2)),
-                    ProductionOrder(order_number='ORD-2025-002', product_id=2, quantity=800.0, status='in_progress', 
+                    ProductionOrder(order_number='ORD-2025-002', product_id=2, customer_id=2, quantity=800.0, status='in_progress', 
                                    priority='normal', created_by='Manager2', target_completion_date=datetime.now() + timedelta(days=3)),
-                    ProductionOrder(order_number='ORD-2025-003', product_id=3, quantity=1200.0, status='pending', 
+                    ProductionOrder(order_number='ORD-2025-003', product_id=3, customer_id=3, quantity=1200.0, status='pending', 
                                    priority='low', created_by='Manager1', target_completion_date=datetime.now() + timedelta(days=5))
                 ]
                 for order in production_orders:
