@@ -1355,6 +1355,126 @@ def process_cleaning_24h(job_id):
         flash(f'Error starting cleaning process: {str(e)}', 'error')
         return redirect(url_for('cleaning_setup', job_id=job_id))
 
+@app.route('/api/start_job/<int:job_id>/<stage>', methods=['POST'])
+def api_start_job(job_id, stage):
+    """API endpoint to start a specific job stage"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Check if job can be started (previous stage completed)
+        if not can_start_job(job, stage):
+            return jsonify({
+                'success': False,
+                'error': 'Previous stage must be completed before starting this job'
+            })
+        
+        # Update job status
+        job.status = 'in_progress'
+        job.started_at = datetime.now()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Job {job.job_number} started for {stage}',
+            'redirect_url': f'/production_execution/{stage}_setup/{job_id}'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/complete_job/<int:job_id>', methods=['POST'])
+def api_complete_job(job_id):
+    """API endpoint to complete a job"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        job.status = 'completed'
+        job.completed_at = datetime.now()
+        job.completed_by = request.json.get('completed_by', 'System')
+        
+        db.session.commit()
+        
+        # Check if this completes the entire order
+        check_and_update_order_completion(job.order_id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Job {job.job_number} completed successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/job_timer/<int:job_id>')
+def api_job_timer(job_id):
+    """API endpoint to get job timer information"""
+    try:
+        job = ProductionJobNew.query.get_or_404(job_id)
+        
+        # Get associated cleaning process if exists
+        cleaning_process = CleaningProcess.query.filter_by(job_id=job_id).first()
+        
+        timer_info = {
+            'job_id': job_id,
+            'status': job.status,
+            'has_timer': False,
+            'time_remaining': None,
+            'end_time': None
+        }
+        
+        if cleaning_process and cleaning_process.status == 'running':
+            timer_info['has_timer'] = True
+            timer_info['end_time'] = cleaning_process.end_time.isoformat()
+            
+            if cleaning_process.end_time > datetime.now():
+                time_remaining = cleaning_process.end_time - datetime.now()
+                timer_info['time_remaining'] = {
+                    'hours': int(time_remaining.total_seconds() // 3600),
+                    'minutes': int((time_remaining.total_seconds() % 3600) // 60),
+                    'seconds': int(time_remaining.total_seconds() % 60)
+                }
+            else:
+                timer_info['time_remaining'] = {'hours': 0, 'minutes': 0, 'seconds': 0}
+        
+        return jsonify({
+            'success': True,
+            'timer': timer_info
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+def can_start_job(job, stage):
+    """Check if a job can be started based on dependencies"""
+    stage_order = ['transfer', 'cleaning_24h', 'cleaning_12h', 'grinding', 'packing']
+    
+    try:
+        current_index = stage_order.index(stage)
+    except ValueError:
+        return False
+    
+    if current_index == 0:  # Transfer can always start
+        return True
+    
+    # Check if previous stage is completed
+    previous_stage = stage_order[current_index - 1]
+    previous_job = ProductionJobNew.query.filter_by(
+        order_id=job.order_id,
+        stage=previous_stage
+    ).first()
+    
+    return previous_job and previous_job.status == 'completed'
+
 @app.route('/debug_production_order')
 def debug_production_order():
     """Debug route to test production order creation"""
