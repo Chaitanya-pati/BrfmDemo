@@ -141,6 +141,63 @@ class Transfer(db.Model):
     from_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[from_precleaning_bin_id])
     to_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[to_precleaning_bin_id])
 
+# Enhanced Models for Production Stage Tracking
+class StageParameters(db.Model):
+    """Tracks all parameters captured during production stages"""
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=False)
+    stage = db.Column(db.String(50), nullable=False)  # cleaning_24h, cleaning_12h, grinding, packing
+    parameter_type = db.Column(db.String(50), nullable=False)  # start, end, buffer
+    
+    # 24-hour cleaning end parameters
+    moisture_content = db.Column(db.Float)
+    water_added_liters = db.Column(db.Float)
+    waste_collected_kg = db.Column(db.Float)
+    
+    # 12-hour cleaning start parameters
+    initial_moisture = db.Column(db.Float)
+    target_moisture = db.Column(db.Float)
+    
+    # 12-hour cleaning end parameters
+    final_moisture = db.Column(db.Float)
+    
+    # Buffer timing
+    buffer_duration_minutes = db.Column(db.Float)
+    buffer_reason = db.Column(db.String(200))
+    
+    # General tracking
+    captured_by = db.Column(db.String(100), nullable=False)
+    captured_at = db.Column(db.DateTime, default=datetime.utcnow)
+    notes = db.Column(db.Text)
+    
+    job = db.relationship('ProductionJobNew', backref=db.backref('stage_parameters', lazy=True))
+
+class MachineCleaningReminder(db.Model):
+    """Configurable cleaning reminders for production machines"""
+    id = db.Column(db.Integer, primary_key=True)
+    machine_id = db.Column(db.Integer, db.ForeignKey('production_machine.id'), nullable=False)
+    frequency_hours = db.Column(db.Float, nullable=False)  # Configurable frequency
+    last_cleaned_at = db.Column(db.DateTime)
+    next_cleaning_due = db.Column(db.DateTime)
+    reminder_sent = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    machine = db.relationship('ProductionMachine', backref=db.backref('cleaning_reminders', lazy=True))
+
+class CleaningConfirmation(db.Model):
+    """Tracks user confirmations of machine cleaning"""
+    id = db.Column(db.Integer, primary_key=True)
+    reminder_id = db.Column(db.Integer, db.ForeignKey('machine_cleaning_reminder.id'), nullable=False)
+    confirmed_by = db.Column(db.String(100), nullable=False)
+    confirmed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    cleaning_duration_minutes = db.Column(db.Float)
+    before_photo = db.Column(db.String(255))
+    after_photo = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    
+    reminder = db.relationship('MachineCleaningReminder', backref=db.backref('confirmations', lazy=True))
+
 class CleaningMachine(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -395,11 +452,18 @@ class CleaningProcess(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Enhanced tracking fields for step requirements
+    buffer_time_minutes = db.Column(db.Float, default=0.0)  # Buffer timing for total duration
+    buffer_start_time = db.Column(db.DateTime)  # When buffer time started
+    buffer_end_time = db.Column(db.DateTime)    # When buffer time ended
     is_locked = db.Column(db.Boolean, default=True, nullable=True)  # Locks access during cleaning
     reminder_sent_5min = db.Column(db.Boolean, default=False, nullable=True)
     reminder_sent_10min = db.Column(db.Boolean, default=False, nullable=True)
     reminder_sent_30min = db.Column(db.Boolean, default=False, nullable=True)
     next_process_job_id = db.Column(db.Integer, db.ForeignKey('production_job_new.id'), nullable=True)  # For 12h process after 24h
+    
+    # Additional tracking for 12-hour process start parameters
+    start_parameters_captured = db.Column(db.Boolean, default=False)
+    completion_parameters_captured = db.Column(db.Boolean, default=False)
 
     job = db.relationship('ProductionJobNew', foreign_keys=[job_id], backref=db.backref('cleaning_processes', lazy=True))
     next_process_job = db.relationship('ProductionJobNew', foreign_keys=[next_process_job_id], backref=db.backref('previous_cleaning_processes', lazy=True))
