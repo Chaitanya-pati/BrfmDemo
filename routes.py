@@ -1255,7 +1255,9 @@ def start_production_execution(order_id):
 def transfer_setup(job_id):
     """Set up transfer process"""
     job = ProductionJobNew.query.get_or_404(job_id)
-    return render_template('transfer_execution_setup.html', job=job)
+    plan = ProductionPlan.query.get_or_404(job.plan_id)
+    plan_items = ProductionPlanItem.query.filter_by(plan_id=plan.id).all()
+    return render_template('transfer_execution_setup.html', job=job, plan_items=plan_items)
 
 @app.route('/production_execution/cleaning_setup/<int:job_id>')
 def cleaning_setup(job_id):

@@ -27,19 +27,19 @@
                     <div class="row">
                         <div class="col-md-3">
                             <strong>Order Number:</strong><br>
-                            <span class="text-primary fs-5">{{ order.order_number }}</span>
+                            <span class="text-primary fs-5">{{ job.order.order_number }}</span>
                         </div>
                         <div class="col-md-3">
                             <strong>Product:</strong><br>
-                            {{ order.product }}
+                            {{ job.order.product }}
                         </div>
                         <div class="col-md-3">
                             <strong>Quantity:</strong><br>
-                            {{ "%.1f"|format(order.quantity) }} kg
+                            {{ "%.1f"|format(job.order.quantity) }} kg
                         </div>
                         <div class="col-md-3">
                             <strong>Status:</strong><br>
-                            <span class="badge bg-warning">{{ order.status.title() }}</span>
+                            <span class="badge bg-warning">{{ job.order.status.title() }}</span>
                         </div>
                     </div>
                 </div>
