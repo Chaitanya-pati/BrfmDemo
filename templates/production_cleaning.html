@@ -113,7 +113,7 @@
                             </table>
                         </div>
                     </div>
-                    
+
                 </div>
             </div>
         </div>
@@ -332,7 +332,7 @@
                         <i class="fas fa-spinner fa-spin me-2"></i>Loading reminders...
                     </div>
                 </div>
-                
+
                 <!-- Photo Upload Form -->
                 <div class="mt-4 p-3 bg-light rounded" id="photo-upload-section" style="display: none;">
                     <h6 class="mb-3"><i class="fas fa-upload me-2"></i>Upload Cleaning Photo</h6>
@@ -350,6 +350,7 @@
                             <div class="col-md-4">
                                 <label class="form-label">Select Photo</label>
                                 <input type="file" class="form-control" id="photo-file-input" accept="image/*" required>
+                                <small class="form-text text-muted">Max 5MB</small>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Notes (Optional)</label>
@@ -402,7 +403,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
@@ -422,7 +423,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-6">
                             <h6 class="mb-3 text-primary">Process Information</h6>
                             <div class="mb-3">
@@ -431,13 +432,13 @@
                                        step="0.1" min="0" max="100" value="100" required>
                                 <small class="form-text text-muted">Overall machine performance during process</small>
                             </div>
-                            
+
                             <div class="mb-3">
                                 <label class="form-label">Operator Name</label>
                                 <input type="text" class="form-control" id="post-process-operator" 
                                        value="Cleaning Operator" required>
                             </div>
-                            
+
                             <div class="mb-3">
                                 <label class="form-label">Process Notes</label>
                                 <textarea class="form-control" id="process-notes" rows="4" 
@@ -445,7 +446,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Quality Metrics Display -->
                     <div class="row mt-4">
                         <div class="col-12">
@@ -466,7 +467,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mt-4 text-center">
                         <button type="submit" class="btn btn-success btn-lg me-3">
                             <i class="fas fa-check-circle me-2"></i>Complete Cleaning Process
@@ -481,555 +482,252 @@
     </div>
 </div>
 
+<!-- Manual Cleaning Modal -->
+<div class="modal fade" id="manualCleaningModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Log Manual Cleaning Activity</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="manualCleaningForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" id="manual_order_id" name="order_id">
+                    <input type="hidden" id="manual_cleaning_process_id" name="cleaning_process_id">
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Machine/Area Name *</label>
+                                <input type="text" id="manual_machine_name" name="machine_name" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Operator Name *</label>
+                                <input type="text" id="manual_operator_name" name="operator_name" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Before Cleaning Photo *</label>
+                                <input type="file" name="before_photo" class="form-control" accept="image/*" required>
+                                <small class="form-text text-muted">Upload photo before cleaning starts</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">After Cleaning Photo *</label>
+                                <input type="file" name="after_photo" class="form-control" accept="image/*" required>
+                                <small class="form-text text-muted">Upload photo after cleaning completion</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Cleaning Notes (Optional)</label>
+                        <textarea name="notes" class="form-control" rows="3" 
+                                  placeholder="Add notes about the cleaning process, issues found, etc..."></textarea>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This will log a manual cleaning activity for tracking purposes. Both before and after photos are required.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Log Manual Cleaning
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Cleaning History Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-history me-2"></i>Manual Cleaning History
+                    <span class="badge bg-info" id="manualCleaningCount">0</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="manualCleaningHistory">
+                    <div class="text-center py-4">
+                        <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No manual cleaning activities logged yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+</style>
+
 <script>
-let timerInterval;
-let timerData = null;
+// Manual Cleaning Modal Functions
+function openManualCleaningModal(orderId, cleaningProcessId, machineName) {
+    document.getElementById('manual_order_id').value = orderId;
+    document.getElementById('manual_cleaning_process_id').value = cleaningProcessId || '';
+    document.getElementById('manual_machine_name').value = machineName || 'Manual Cleaning Machine';
 
-document.addEventListener('DOMContentLoaded', function() {
-    const startTransferBtns = document.querySelectorAll('.start-transfer-btn');
-    const completeTransferBtns = document.querySelectorAll('.complete-transfer-btn');
-    
-    
-    // Timer controls
-    const processTypeRadios = document.querySelectorAll('input[name="processType"]');
-    const customHoursInput = document.getElementById('customHours');
-    const startProcessBtn = document.getElementById('start-process-btn');
-    const processCleaningBinSelect = document.getElementById('process-cleaning-bin');
-    const processOperatorInput = document.getElementById('process-operator');
+    // Show modal
+    new bootstrap.Modal(document.getElementById('manualCleaningModal')).show();
+}
 
-    // Start transfer functionality
-    startTransferBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const precleaningBinId = this.dataset.precleaningBinId;
-            const quantity = parseFloat(this.dataset.quantity);
-            // Use default values since controls are removed
-            const cleaningBinId = 1; // Default cleaning bin
-            const operatorName = 'Production Operator'; // Default operator
+// Handle manual cleaning form submission
+document.getElementById('manualCleaningForm').addEventListener('submit', function(e) {
+    e.preventDefault();
 
-            startTransfer(precleaningBinId, cleaningBinId, quantity, operatorName, this);
-        });
-    });
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
 
-    // Complete transfer functionality
-    completeTransferBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const jobId = this.dataset.jobId;
-            completeTransfer(jobId, this);
-        });
-    });
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
 
-    function startTransfer(precleaningBinId, cleaningBinId, quantity, operatorName, btnElement) {
-        btnElement.disabled = true;
-        btnElement.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Starting...';
+    fetch('/upload_manual_cleaning', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('manualCleaningModal')).hide();
 
-        fetch('/start_transfer', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                order_id: {{ order.id }},
-                precleaning_bin_id: precleaningBinId,
-                cleaning_bin_id: cleaningBinId,
-                quantity_tons: quantity,
-                operator_name: operatorName
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload(); // Reload to show new transfer job
-            } else {
-                alert('Error: ' + data.error);
-                btnElement.disabled = false;
-                btnElement.innerHTML = '<i class="fas fa-play me-1"></i>Start Transfer';
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Transfer failed');
-            btnElement.disabled = false;
-            btnElement.innerHTML = '<i class="fas fa-play me-1"></i>Start Transfer';
-        });
-    }
+            // Show success message
+            showAlert('Manual cleaning logged successfully!', 'success');
 
-    function completeTransfer(jobId, btnElement) {
-        btnElement.disabled = true;
-        btnElement.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Completing...';
+            // Reset form
+            document.getElementById('manualCleaningForm').reset();
 
-        fetch('/complete_transfer', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                job_id: jobId
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload(); // Reload to show updated transfer job
-            } else {
-                alert('Error: ' + data.error);
-                btnElement.disabled = false;
-                btnElement.innerHTML = '<i class="fas fa-check me-1"></i>Complete';
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Completion failed');
-            btnElement.disabled = false;
-            btnElement.innerHTML = '<i class="fas fa-check me-1"></i>Complete';
-        });
-    }
-
-    // Timer functionality
-    processTypeRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            customHoursInput.disabled = this.value !== 'custom';
-        });
-    });
-
-    if (startProcessBtn) {
-        startProcessBtn.addEventListener('click', function() {
-            const processType = document.querySelector('input[name="processType"]:checked').value;
-            const cleaningBinId = processCleaningBinSelect.value;
-            const operatorName = processOperatorInput.value;
-            const customHours = customHoursInput.value;
-
-            if (!cleaningBinId) {
-                alert('Please select a cleaning bin');
-                return;
-            }
-
-            if (!operatorName.trim()) {
-                alert('Please enter operator name');
-                return;
-            }
-
-            startCleaningProcess(processType, cleaningBinId, operatorName, customHours);
-        });
-    }
-
-    function startCleaningProcess(processType, cleaningBinId, operatorName, customHours) {
-        startProcessBtn.disabled = true;
-        startProcessBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Starting Process...';
-
-        const data = {
-            order_id: {{ order.id }},
-            process_type: processType,
-            cleaning_bin_id: cleaningBinId,
-            operator_name: operatorName
-        };
-
-        if (processType === 'custom') {
-            data.custom_hours = parseFloat(customHours);
+            // Refresh manual cleaning history
+            loadManualCleaningHistory();
+        } else {
+            showAlert(data.error || 'Error logging manual cleaning', 'error');
         }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Error logging manual cleaning', 'error');
+    })
+    .finally(() => {
+        // Restore button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
 
-        fetch('/start_cleaning_process', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload(); // Reload to show timer
-            } else {
-                alert('Error: ' + data.error);
-                startProcessBtn.disabled = false;
-                startProcessBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Cleaning Process';
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Process start failed');
-            startProcessBtn.disabled = false;
-            startProcessBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Cleaning Process';
-        });
-    }
+// Load manual cleaning history
+function loadManualCleaningHistory() {
+    const orderId = {{ order.id }};
 
-    // Initialize timer if active
-    {% if cleaning_process and cleaning_process.timer_active %}
-    initializeTimer();
-    loadCleaningReminders();
-    // Auto-refresh reminders every 10 seconds during active cleaning for real-time updates
-    setInterval(loadCleaningReminders, 10000);
-    {% endif %}
-    
-    // Reminder and photo functionality
-    // Refresh button removed - using automatic refresh only
-    const photoUploadSection = document.getElementById('photo-upload-section');
-    const photoUploadForm = document.getElementById('photo-upload-form');
-    const cancelUploadBtn = document.getElementById('cancel-upload-btn');
-    
-    // Post-process form functionality
-    const postProcessSection = document.getElementById('post-process-section');
-    const postProcessForm = document.getElementById('post-process-form');
-    const moistureBeforeInput = document.getElementById('moisture-before');
-    const moistureAfterInput = document.getElementById('moisture-after');
-    
-    // Refresh button removed - reminders now auto-update every 10 seconds
-    
-    if (cancelUploadBtn) {
-        cancelUploadBtn.addEventListener('click', function() {
-            photoUploadSection.style.display = 'none';
-            photoUploadForm.reset();
-        });
-    }
-    
-    if (photoUploadForm) {
-        photoUploadForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            uploadPhoto();
-        });
-    }
-    
-    // Post-process form event listeners
-    if (moistureBeforeInput && moistureAfterInput) {
-        moistureBeforeInput.addEventListener('input', calculateQualityMetrics);
-        moistureAfterInput.addEventListener('input', calculateQualityMetrics);
-    }
-    
-    if (postProcessForm) {
-        postProcessForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            submitPostProcessData();
-        });
-    }
-
-    function initializeTimer() {
-        updateTimerDisplay();
-        timerInterval = setInterval(updateTimerDisplay, 1000);
-    }
-
-    function updateTimerDisplay() {
-        fetch('/api/cleaning_timer_status/{{ order.id }}')
-        .then(response => response.json())
-        .then(data => {
-            timerData = data;
-            
-            if (!data.timer_active) {
-                if (data.completed) {
-                    // Timer completed - show completion status and post-process form
-                    document.getElementById('countdown-display').textContent = 'COMPLETED';
-                    document.getElementById('process-status-badge').textContent = 'Completed';
-                    document.getElementById('process-status-badge').className = 'badge bg-success text-white';
-                    document.getElementById('timer-progress-bar').style.width = '100%';
-                    document.getElementById('timer-progress-bar').className = 'progress-bar bg-success';
-                    
-                    // Show post-process form
-                    if (postProcessSection) {
-                        postProcessSection.style.display = 'block';
-                        postProcessSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                }
-                
-                if (timerInterval) {
-                    clearInterval(timerInterval);
-                }
-                return;
-            }
-
-            // Update countdown display
-            const hours = Math.floor(data.remaining_seconds / 3600);
-            const minutes = Math.floor((data.remaining_seconds % 3600) / 60);
-            const seconds = data.remaining_seconds % 60;
-            
-            const display = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            document.getElementById('countdown-display').textContent = display;
-            
-            // Update progress bar
-            const totalSeconds = data.duration_hours * 3600;
-            const elapsed = totalSeconds - data.remaining_seconds;
-            const progressPercent = (elapsed / totalSeconds) * 100;
-            
-            document.getElementById('timer-progress-bar').style.width = progressPercent + '%';
-            
-            // Update status
-            if (data.remaining_seconds < 300) { // Last 5 minutes
-                document.getElementById('timer-progress-bar').className = 'progress-bar bg-warning';
-            } else {
-                document.getElementById('timer-progress-bar').className = 'progress-bar bg-primary';
-            }
-        })
-        .catch(error => {
-            console.error('Timer update failed:', error);
-        });
-    }
-    
-    function loadCleaningReminders() {
-        const container = document.getElementById('reminders-container');
-        
-        // Show loading only if container is empty or on first load
-        if (!container.innerHTML || container.innerHTML.includes('Failed to load')) {
-            container.innerHTML = '<div class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Loading reminders...</div>';
+    fetch(`/get_manual_cleanings/${orderId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.manual_cleanings) {
+            updateManualCleaningHistory(data.manual_cleanings);
+            document.getElementById('manualCleaningCount').textContent = data.total_manual_cleanings;
         }
-        
-        fetch('/get_cleaning_reminders/{{ order.id }}')
-        .then(response => response.json())
-        .then(data => {
-            if (data.reminders && data.reminders.length > 0) {
-                displayReminders(data.reminders);
-                // Update last refresh time
-                const now = new Date().toLocaleTimeString();
-                const refreshIndicator = document.getElementById('last-refresh-time');
-                if (refreshIndicator) {
-                    refreshIndicator.textContent = `Last updated: ${now}`;
-                }
-            } else {
-                container.innerHTML = '<div class="text-center text-muted">No reminders yet. Reminders will appear here every minute during the cleaning process.</div>';
-            }
-        })
-        .catch(error => {
-            console.error('Failed to load reminders:', error);
-            // Don't completely overwrite on auto-refresh failures, just log
-            if (container.innerHTML.includes('Loading reminders')) {
-                container.innerHTML = '<div class="text-center text-warning">Connection issue. Retrying automatically...</div>';
-            }
-        });
+    })
+    .catch(error => {
+        console.error('Error loading manual cleaning history:', error);
+    });
+}
+
+// Update manual cleaning history display
+function updateManualCleaningHistory(cleanings) {
+    const historyDiv = document.getElementById('manualCleaningHistory');
+
+    if (cleanings.length === 0) {
+        historyDiv.innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                <p class="text-muted">No manual cleaning activities logged yet.</p>
+            </div>
+        `;
+        return;
     }
-    
-    function displayReminders(reminders) {
-        const container = document.getElementById('reminders-container');
-        
-        let html = '<div class="row">';
-        
-        reminders.forEach((reminder, index) => {
-            const dueTime = new Date(reminder.due_time).toLocaleTimeString();
-            const reminderClass = reminder.photo_uploaded ? 'border-success' : 
-                                 reminder.reminder_sent ? 'border-warning' : 'border-secondary';
-            
-            html += `
-                <div class="col-md-6 mb-3">
-                    <div class="card ${reminderClass}">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h6 class="mb-0">Reminder #${reminder.sequence}</h6>
-                                <small class="text-muted">${dueTime}</small>
+
+    let html = '<div class="row">';
+    cleanings.forEach(cleaning => {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card border-success">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="card-title mb-1">${cleaning.machine_name}</h6>
+                                <small class="text-muted">By: ${cleaning.operator_name}</small>
                             </div>
-                            <div class="mb-2">
-                                ${reminder.reminder_sent ? 
-                                    '<span class="badge bg-warning text-dark"><i class="fas fa-bell me-1"></i>Sent</span>' : 
-                                    '<span class="badge bg-secondary"><i class="fas fa-clock me-1"></i>Pending</span>'
-                                }
-                                ${reminder.photo_uploaded ? 
-                                    '<span class="badge bg-success ms-1"><i class="fas fa-check me-1"></i>Photo Uploaded</span>' : ''
-                                }
-                            </div>
-                            
-                            ${reminder.photos && reminder.photos.length > 0 ? `
-                                <div class="mb-2">
-                                    <small class="text-muted">Photos:</small>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        ${reminder.photos.map(photo => `
-                                            <span class="badge bg-light text-dark">
-                                                <i class="fas fa-image me-1"></i>${photo.type}
-                                            </span>
-                                        `).join('')}
-                                    </div>
-                                </div>
+                            <span class="badge bg-success">Completed</span>
+                        </div>
+                        <p class="card-text mt-2">
+                            <small><strong>Time:</strong> ${new Date(cleaning.cleaning_time).toLocaleString()}</small>
+                        </p>
+                        ${cleaning.notes ? `<p class="card-text"><small><strong>Notes:</strong> ${cleaning.notes}</small></p>` : ''}
+                        <div class="d-flex gap-2">
+                            ${cleaning.before_photo ? `
+                                <a href="/uploads/${cleaning.before_photo}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-image me-1"></i>Before
+                                </a>
                             ` : ''}
-                            
-                            ${!reminder.photo_uploaded && reminder.reminder_sent ? `
-                                <button class="btn btn-sm btn-outline-info upload-photo-btn" 
-                                        data-reminder-id="${reminder.id}">
-                                    <i class="fas fa-camera me-1"></i>Upload Photo
-                                </button>
+                            ${cleaning.after_photo ? `
+                                <a href="/uploads/${cleaning.after_photo}" target="_blank" class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-image me-1"></i>After
+                                </a>
                             ` : ''}
                         </div>
                     </div>
                 </div>
-            `;
-        });
-        
-        html += '</div>';
-        container.innerHTML = html;
-        
-        // Add event listeners to upload buttons
-        document.querySelectorAll('.upload-photo-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const reminderId = this.dataset.reminderId;
-                showPhotoUploadForm(reminderId);
-            });
-        });
-    }
-    
-    function showPhotoUploadForm(reminderId) {
-        document.getElementById('reminder-id-input').value = reminderId;
-        document.getElementById('photo-upload-section').style.display = 'block';
-        document.getElementById('photo-upload-section').scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    function uploadPhoto() {
-        const form = document.getElementById('photo-upload-form');
-        const formData = new FormData();
-        
-        const reminderId = document.getElementById('reminder-id-input').value;
-        const photoType = document.getElementById('photo-type-select').value;
-        const photoFile = document.getElementById('photo-file-input').files[0];
-        const notes = document.getElementById('photo-notes-input').value;
-        
-        if (!reminderId || !photoType || !photoFile) {
-            alert('Please fill in all required fields');
-            return;
-        }
-        
-        formData.append('reminder_id', reminderId);
-        formData.append('photo_type', photoType);
-        formData.append('photo_file', photoFile);
-        formData.append('notes', notes);
-        
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
-        
-        fetch('/upload_cleaning_photo', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Show success message but don't hide the form - allow multiple uploads
-                const photoType = document.getElementById('photo-type-select').value;
-                const successMessage = `${photoType.charAt(0).toUpperCase() + photoType.slice(1)} photo uploaded successfully! You can now upload the ${photoType === 'before' ? 'after' : 'before'} photo.`;
-                
-                // Create success notification instead of alert
-                showNotification(successMessage, 'success');
-                
-                // Reset only the file input and notes, keep the form visible
-                document.getElementById('photo-file-input').value = '';
-                document.getElementById('photo-notes-input').value = '';
-                
-                // Auto-switch to the other photo type if needed
-                if (photoType === 'before') {
-                    document.getElementById('photo-type-select').value = 'after';
-                } else if (photoType === 'after') {
-                    document.getElementById('photo-type-select').value = 'before';
-                }
-                
-                loadCleaningReminders(); // Refresh reminders
-            } else {
-                showNotification('Upload failed: ' + data.error, 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Upload failed:', error);
-            showNotification('Upload failed. Please try again.', 'error');
-        })
-        .finally(() => {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
-        });
-    }
-    
-    function calculateQualityMetrics() {
-        const moistureBefore = parseFloat(moistureBeforeInput.value) || 0;
-        const moistureAfter = parseFloat(moistureAfterInput.value) || 0;
-        
-        if (moistureBefore > 0) {
-            const moistureReduction = moistureBefore - moistureAfter;
-            const cleaningEfficiency = (moistureReduction / moistureBefore) * 100;
-            
-            document.getElementById('moisture-reduction-display').textContent = 
-                moistureReduction.toFixed(1) + '%';
-            document.getElementById('cleaning-efficiency-display').textContent = 
-                Math.max(0, cleaningEfficiency).toFixed(1) + '%';
-        } else {
-            document.getElementById('moisture-reduction-display').textContent = '-';
-            document.getElementById('cleaning-efficiency-display').textContent = '-';
-        }
-    }
-    
-    function showNotification(message, type = 'info') {
-        // Create a temporary notification element
-        const notification = document.createElement('div');
-        notification.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} alert-dismissible fade show position-fixed`;
-        notification.style.cssText = 'top: 20px; right: 20px; z-index: 1050; max-width: 300px;';
-        notification.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
         `;
-        
-        document.body.appendChild(notification);
-        
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 5000);
-    }
-    
-    function submitPostProcessData() {
-        const form = postProcessForm;
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        
-        // Validate required fields
-        const moistureBefore = parseFloat(document.getElementById('moisture-before').value);
-        const moistureAfter = parseFloat(document.getElementById('moisture-after').value);
-        const wasteMaterial = parseFloat(document.getElementById('waste-material').value);
-        const waterUsed = parseFloat(document.getElementById('water-used').value);
-        const machineEfficiency = parseFloat(document.getElementById('machine-efficiency').value);
-        const operatorName = document.getElementById('post-process-operator').value;
-        const processNotes = document.getElementById('process-notes').value;
-        
-        if (!moistureBefore || !moistureAfter || !wasteMaterial || !waterUsed || !machineEfficiency || !operatorName) {
-            alert('Please fill in all required fields');
-            return;
+    });
+    html += '</div>';
+
+    historyDiv.innerHTML = html;
+}
+
+// Show alert messages
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    // Insert alert at top of page
+    const container = document.querySelector('.container-fluid');
+    container.insertBefore(alertDiv, container.firstChild);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
         }
-        
-        if (moistureBefore < moistureAfter) {
-            alert('Moisture after cleaning cannot be higher than before cleaning');
-            return;
-        }
-        
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Completing Process...';
-        
-        const data = {
-            order_id: {{ order.id }},
-            moisture_before: moistureBefore,
-            moisture_after: moistureAfter,
-            waste_material_kg: wasteMaterial,
-            water_used_liters: waterUsed,
-            machine_efficiency: machineEfficiency,
-            operator_name: operatorName,
-            operator_notes: processNotes
-        };
-        
-        fetch('/submit_post_process_data', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(`Cleaning process completed successfully!\n\nMoisture Reduction: ${data.moisture_reduction}%\nCleaning Efficiency: ${data.cleaning_efficiency}%`);
-                // Redirect to production orders or dashboard
-                window.location.href = '{{ url_for("production_orders") }}';
-            } else {
-                alert('Error completing process: ' + data.error);
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalText;
-            }
-        })
-        .catch(error => {
-            console.error('Error completing process:', error);
-            alert('Process completion failed. Please try again.');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
-        });
-    }
+    }, 5000);
+}
+
+// Load manual cleaning history on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadManualCleaningHistory();
 });
+
+
+// Timer update functionality
+function updateTimer() {
 </script>
 {% endblock %}

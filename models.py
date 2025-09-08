@@ -655,3 +655,23 @@ class CleaningReminderPhoto(db.Model):
     
     # Relationship
     reminder = db.relationship('CleaningReminder', backref='photos')
+
+class ManualCleaningLog(db.Model):
+    """Track manual cleaning activities with before/after photos and timing"""
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    cleaning_process_id = db.Column(db.Integer, db.ForeignKey('cleaning_process.id'), nullable=True)
+    machine_name = db.Column(db.String(100), nullable=False, default='Manual Cleaning Machine')
+    operator_name = db.Column(db.String(100), nullable=False)
+    cleaning_start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    cleaning_end_time = db.Column(db.DateTime)
+    duration_minutes = db.Column(db.Float)
+    before_photo = db.Column(db.String(255))
+    after_photo = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='completed')  # completed, in_progress
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    production_order = db.relationship('ProductionOrder', backref='manual_cleanings')
+    cleaning_process = db.relationship('CleaningProcess', backref='manual_cleaning_logs')

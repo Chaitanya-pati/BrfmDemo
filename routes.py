@@ -979,6 +979,104 @@ def get_cleaning_reminders(order_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@app.route('/upload_manual_cleaning', methods=['POST'])
+def upload_manual_cleaning():
+    """Handle manual cleaning photo upload and logging"""
+    try:
+        # Get form data
+        order_id = request.form.get('order_id')
+        operator_name = request.form.get('operator_name')
+        machine_name = request.form.get('machine_name', 'Manual Cleaning Machine')
+        notes = request.form.get('notes', '')
+        cleaning_process_id = request.form.get('cleaning_process_id')
+        
+        # Validate inputs
+        if not order_id or not operator_name:
+            return jsonify({'error': 'Order ID and operator name are required'}), 400
+        
+        # Handle file uploads
+        before_photo = None
+        after_photo = None
+        
+        if 'before_photo' in request.files:
+            file = request.files['before_photo']
+            if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"manual_before_{timestamp}_{filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                before_photo = filename
+        
+        if 'after_photo' in request.files:
+            file = request.files['after_photo']
+            if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"manual_after_{timestamp}_{filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                after_photo = filename
+        
+        # Create manual cleaning log
+        manual_cleaning = ManualCleaningLog(
+            order_id=int(order_id),
+            cleaning_process_id=int(cleaning_process_id) if cleaning_process_id else None,
+            machine_name=machine_name,
+            operator_name=operator_name,
+            cleaning_start_time=datetime.utcnow(),
+            cleaning_end_time=datetime.utcnow(),  # For manual cleaning, start and end are same
+            duration_minutes=1.0,  # Default 1 minute for manual cleaning
+            before_photo=before_photo,
+            after_photo=after_photo,
+            notes=notes,
+            status='completed'
+        )
+        
+        db.session.add(manual_cleaning)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'manual_cleaning_id': manual_cleaning.id,
+            'message': 'Manual cleaning logged successfully',
+            'cleaning_time': manual_cleaning.cleaning_start_time.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/get_manual_cleanings/<int:order_id>')
+def get_manual_cleanings(order_id):
+    """Get manual cleaning logs for an order"""
+    try:
+        manual_cleanings = ManualCleaningLog.query.filter_by(order_id=order_id).order_by(
+            ManualCleaningLog.cleaning_start_time.desc()
+        ).all()
+        
+        cleaning_data = []
+        for cleaning in manual_cleanings:
+            cleaning_data.append({
+                'id': cleaning.id,
+                'machine_name': cleaning.machine_name,
+                'operator_name': cleaning.operator_name,
+                'cleaning_time': cleaning.cleaning_start_time.isoformat(),
+                'duration_minutes': cleaning.duration_minutes,
+                'before_photo': cleaning.before_photo,
+                'after_photo': cleaning.after_photo,
+                'notes': cleaning.notes,
+                'status': cleaning.status
+            })
+        
+        return jsonify({
+            'manual_cleanings': cleaning_data,
+            'total_manual_cleanings': len(cleaning_data)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
 @app.route('/submit_post_process_data', methods=['POST'])
 def submit_post_process_data():
     """Submit post-process cleaning data"""
