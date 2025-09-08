@@ -888,8 +888,72 @@ function generate_job_id() {
 }
 
 // Timer update functionality
-function updateTimer() {
-    // Timer functionality here if needed
+function updateTimerDisplay() {
+    fetch('/api/cleaning_timer_status/{{ order.id }}')
+    .then(response => response.json())
+    .then(data => {
+        console.log('Timer data:', data);
+        const countdownDisplay = document.getElementById('countdown-display');
+        const progressBar = document.getElementById('timer-progress-bar');
+        const statusBadge = document.getElementById('process-status-badge');
+        
+        if (!data.timer_active) {
+            if (data.completed) {
+                // Timer completed
+                countdownDisplay.textContent = 'Completed!';
+                countdownDisplay.className = 'mb-0 text-success';
+                progressBar.style.width = '100%';
+                progressBar.className = 'progress-bar bg-success';
+                statusBadge.textContent = 'Completed';
+                statusBadge.className = 'badge bg-success text-white';
+                
+                // Clear interval to stop updating
+                if (window.timerInterval) {
+                    clearInterval(window.timerInterval);
+                }
+            } else {
+                countdownDisplay.textContent = 'No active timer';
+                progressBar.style.width = '0%';
+                statusBadge.textContent = 'Inactive';
+                statusBadge.className = 'badge bg-secondary text-white';
+            }
+            return;
+        }
+        
+        // Calculate time display
+        const remainingSeconds = data.remaining_seconds;
+        const totalSeconds = data.duration_hours * 3600;
+        
+        // Format time display
+        const hours = Math.floor(remainingSeconds / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        const seconds = Math.floor(remainingSeconds % 60);
+        
+        const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        countdownDisplay.textContent = timeString;
+        countdownDisplay.className = 'mb-0 text-primary';
+        
+        // Update progress bar
+        const progress = ((totalSeconds - remainingSeconds) / totalSeconds) * 100;
+        progressBar.style.width = progress + '%';
+        
+        // Update status
+        statusBadge.textContent = 'Running';
+        statusBadge.className = 'badge bg-primary text-white';
+        
+    })
+    .catch(error => {
+        console.error('Error fetching timer status:', error);
+        const countdownDisplay = document.getElementById('countdown-display');
+        countdownDisplay.textContent = 'Error loading timer';
+        countdownDisplay.className = 'mb-0 text-danger';
+    });
+}
+
+function initializeTimer() {
+    updateTimerDisplay();
+    // Update every second
+    window.timerInterval = setInterval(updateTimerDisplay, 1000);
 }
 
 // Photo upload functionality
