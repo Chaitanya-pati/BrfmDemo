@@ -1820,123 +1820,6 @@ def api_get_active_timers():
 
 
 
-# API Routes for Stage Parameter Management
-@app.route('/api/capture_stage_parameters', methods=['POST'])
-def capture_stage_parameters():
-    """API endpoint to capture stage parameters"""
-    try:
-        job_id = request.form.get('job_id')
-        job = ProductionJobNew.query.get_or_404(job_id)
-
-        # Determine parameter type based on job stage and status
-        if job.stage == 'cleaning_24h':
-            parameter_type = 'end'
-            stage_params = StageParameters(
-                job_id=job_id,
-                stage=job.stage,
-                parameter_type=parameter_type,
-                moisture_content=float(request.form.get('moisture_content', 0)),
-                water_added_liters=float(request.form.get('water_added_liters', 0)),
-                waste_collected_kg=float(request.form.get('waste_collected_kg', 0)),
-                buffer_duration_minutes=float(request.form.get('buffer_duration_minutes', 0)),
-                buffer_reason=request.form.get('buffer_reason', ''),
-                captured_by=request.form.get('captured_by'),
-                notes=request.form.get('notes', '')
-            )
-
-            # Update job status
-            job.status = 'completed'
-            job.completed_at = datetime.utcnow()
-            job.completed_by = request.form.get('captured_by')
-
-        elif job.stage == 'cleaning_12h':
-            if job.status == 'pending':
-                # Start parameters
-                parameter_type = 'start'
-                stage_params = StageParameters(
-                    job_id=job_id,
-                    stage=job.stage,
-                    parameter_type=parameter_type,
-                    initial_moisture=float(request.form.get('initial_moisture', 0)),
-                    target_moisture=float(request.form.get('target_moisture', 0)),
-                    captured_by=request.form.get('captured_by'),
-                    notes=request.form.get('notes', '')
-                )
-
-                # Update job status
-                job.status = 'in_progress'
-                job.started_at = datetime.utcnow()
-                job.started_by = request.form.get('captured_by')
-
-            else:
-                # End parameters
-                parameter_type = 'end'
-                stage_params = StageParameters(
-                    job_id=job_id,
-                    stage=job.stage,
-                    parameter_type=parameter_type,
-                    final_moisture=float(request.form.get('final_moisture', 0)),
-                    water_added_liters=float(request.form.get('water_added_liters', 0)),
-                    buffer_duration_minutes=float(request.form.get('buffer_duration_minutes', 0)),
-                    buffer_reason=request.form.get('buffer_reason', ''),
-                    captured_by=request.form.get('captured_by'),
-                    notes=request.form.get('notes', '')
-                )
-
-                # Update job status
-                job.status = 'completed'
-                job.completed_at = datetime.utcnow()
-                job.completed_by = request.form.get('captured_by')
-
-        db.session.add(stage_params)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Parameters captured successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/stage_parameters/<int:job_id>')
-def get_stage_parameters(job_id):
-    """API endpoint to get captured stage parameters for a job"""
-    try:
-        parameters = StageParameters.query.filter_by(job_id=job_id).all()
-
-        result = []
-        for param in parameters:
-            param_data = {
-                'captured_by': param.captured_by,
-                'captured_at': param.captured_at.isoformat(),
-                'parameter_type': param.parameter_type,
-                'stage': param.stage
-            }
-
-            # Add specific parameters based on stage and type
-            if param.stage == 'cleaning_24h' and param.parameter_type == 'end':
-                result.extend([
-                    {'parameter_name': 'Moisture Content', 'value': param.moisture_content, 'unit': '%', **param_data},
-                    {'parameter_name': 'Water Added', 'value': param.water_added_liters, 'unit': 'L', **param_data},
-                    {'parameter_name': 'Waste Collected', 'value': param.waste_collected_kg, 'unit': 'kg', **param_data},
-                    {'parameter_name': 'Buffer Time', 'value': param.buffer_duration_minutes, 'unit': 'min', **param_data}
-                ])
-            elif param.stage == 'cleaning_12h':
-                if param.parameter_type == 'start':
-                    result.extend([
-                        {'parameter_name': 'Initial Moisture', 'value': param.initial_moisture, 'unit': '%', **param_data},
-                        {'parameter_name': 'Target Moisture', 'value': param.target_moisture, 'unit': '%', **param_data}
-                    ])
-                elif param.parameter_type == 'end':
-                    result.extend([
-                        {'parameter_name': 'Final Moisture', 'value': param.final_moisture, 'unit': '%', **param_data},
-                        {'parameter_name': 'Water Added', 'value': param.water_added_liters, 'unit': 'L', **param_data},
-                        {'parameter_name': 'Buffer Time', 'value': param.buffer_duration_minutes, 'unit': 'min', **param_data}
-                    ])
-
-        return jsonify(result)
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/cleaning_reminders')
 def get_cleaning_reminders():
@@ -2055,7 +1938,7 @@ def production_order_details(order_id):
 
     except Exception as e:
         flash(f'Error loading order details: {str(e)}', 'error')
-        return redirect(url_for('comprehensive_production_view'))
+        return redirect(url_for('index'))
 
 # Cleaning Reminder System with Configurable Frequencies
 @app.route('/configure_cleaning_frequencies', methods=['GET', 'POST'])
