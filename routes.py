@@ -906,9 +906,9 @@ def upload_cleaning_photo():
         reminder_photo = CleaningReminderPhoto(
             reminder_id=reminder_id,
             photo_type=photo_type,
-            filename=filename,
             file_path=file_path,
-            upload_time=datetime.utcnow(),
+            uploaded_by='System User',  # You can modify this to get actual user
+            uploaded_at=datetime.utcnow(),
             notes=notes
         )
         
@@ -929,7 +929,7 @@ def upload_cleaning_photo():
             'success': True,
             'photo_id': reminder_photo.id,
             'filename': filename,
-            'upload_time': reminder_photo.upload_time.isoformat(),
+            'upload_time': reminder_photo.uploaded_at.isoformat(),
             'message': f'{photo_type.title()} photo uploaded successfully'
         })
         
