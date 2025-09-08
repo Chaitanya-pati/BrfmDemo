@@ -411,8 +411,8 @@ def production_orders():
             # Create new production order
             order = ProductionOrder()
             order.order_number = generate_order_number('PRO')
-            order.quantity_tons = float(request.form['quantity_tons'])
-            order.finished_goods_type = request.form['finished_goods_type']
+            order.quantity = float(request.form['quantity_tons'])
+            order.finished_good_type = request.form['finished_goods_type']
             order.created_by = request.form.get('created_by', 'Admin')
             order.responsible_person = request.form.get('responsible_person', 'Production Manager')
             
@@ -423,8 +423,8 @@ def production_orders():
             notify_responsible_person(
                 order.order_number,
                 order.responsible_person,
-                order.finished_goods_type,
-                order.quantity_tons
+                order.finished_good_type,
+                order.quantity
             )
             
             # Mark notification as sent
@@ -490,7 +490,7 @@ def production_planning(order_id):
             # Create plan items
             plan.total_percentage = total_percentage
             for bin_id, percentage in bin_percentages.items():
-                calculated_tons = (percentage / 100) * order.quantity_tons
+                calculated_tons = (percentage / 100) * order.quantity
                 
                 plan_item = ProductionPlanItem(
                     plan_id=plan.id,
