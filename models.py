@@ -362,11 +362,16 @@ class ProductionPlanItem(db.Model):
 
 class CleaningReminder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    machine_id = db.Column(db.Integer, db.ForeignKey('cleaning_machine.id'), nullable=False)
+    cleaning_process_id = db.Column(db.Integer, db.ForeignKey('cleaning_process.id'), nullable=False)
     due_time = db.Column(db.DateTime, nullable=False)
     reminder_sent = db.Column(db.Boolean, default=False)
     user_notified = db.Column(db.String(100))
+    completed = db.Column(db.Boolean, default=False)
+    reminder_sequence = db.Column(db.Integer, default=1)  # 1, 2, 3... for multiple reminders
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    cleaning_process = db.relationship('CleaningProcess', backref='cleaning_reminders')
 
 # Enhanced Production Execution Models for Step-by-Step Production Tracking
 
@@ -385,7 +390,7 @@ class CleaningBin(db.Model):
 
 class CleaningProcess(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    # job_id removed - production functionality deleted
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)  # Link to production order
     cleaning_bin_id = db.Column(db.Integer, db.ForeignKey('cleaning_bin.id'))
     process_type = db.Column(db.String(20), nullable=False)  # '24_hour', '12_hour', 'custom'
     duration_hours = db.Column(db.Float, nullable=False)
@@ -402,6 +407,11 @@ class CleaningProcess(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, running, completed, paused
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Timer persistence fields
+    timer_active = db.Column(db.Boolean, default=False)
+    countdown_start = db.Column(db.DateTime)  # When countdown started
+    countdown_end = db.Column(db.DateTime)    # When countdown should end
 
     # Enhanced tracking fields for step requirements
     buffer_time_minutes = db.Column(db.Float, default=0.0)  # Buffer timing for total duration
@@ -605,3 +615,39 @@ class RawWheatQualityReport(db.Model):
 
     # Relationships
     vehicle = db.relationship('Vehicle', backref='raw_wheat_reports')
+
+# New models for extended production cleaning module
+
+class TransferJob(db.Model):
+    """Transfer job for tracking transfers from pre-cleaning bins to cleaning bins"""
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.String(50), unique=True, nullable=False)  # Generated job ID
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=False)
+    cleaning_bin_id = db.Column(db.Integer, db.ForeignKey('cleaning_bin.id'), nullable=False)
+    quantity_tons = db.Column(db.Float, nullable=False)
+    start_time = db.Column(db.DateTime, nullable=False)
+    end_time = db.Column(db.DateTime)
+    duration_minutes = db.Column(db.Float)  # Calculated from start/end time
+    status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed
+    operator_name = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    production_order = db.relationship('ProductionOrder', backref='transfer_jobs')
+    precleaning_bin = db.relationship('PrecleaningBin', backref='outgoing_transfers')  
+    cleaning_bin = db.relationship('CleaningBin', backref='incoming_transfers')
+
+class CleaningReminderPhoto(db.Model):
+    """Photo storage for cleaning reminders with before/after shots"""
+    id = db.Column(db.Integer, primary_key=True)
+    reminder_id = db.Column(db.Integer, db.ForeignKey('cleaning_reminder.id'), nullable=False)
+    photo_type = db.Column(db.String(10), nullable=False)  # 'before' or 'after'
+    file_path = db.Column(db.String(255), nullable=False)
+    uploaded_by = db.Column(db.String(100), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    notes = db.Column(db.Text)
+    
+    # Relationship
+    reminder = db.relationship('CleaningReminder', backref='photos')
