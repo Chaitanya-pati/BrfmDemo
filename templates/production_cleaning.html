@@ -895,17 +895,32 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Photo uploaded successfully!');
-                form.reset();
-                document.getElementById('photo-upload-section').style.display = 'none';
+                // Show success message but don't hide the form - allow multiple uploads
+                const photoType = document.getElementById('photo-type-select').value;
+                const successMessage = `${photoType.charAt(0).toUpperCase() + photoType.slice(1)} photo uploaded successfully! You can now upload the ${photoType === 'before' ? 'after' : 'before'} photo.`;
+                
+                // Create success notification instead of alert
+                showNotification(successMessage, 'success');
+                
+                // Reset only the file input and notes, keep the form visible
+                document.getElementById('photo-file-input').value = '';
+                document.getElementById('photo-notes-input').value = '';
+                
+                // Auto-switch to the other photo type if needed
+                if (photoType === 'before') {
+                    document.getElementById('photo-type-select').value = 'after';
+                } else if (photoType === 'after') {
+                    document.getElementById('photo-type-select').value = 'before';
+                }
+                
                 loadCleaningReminders(); // Refresh reminders
             } else {
-                alert('Upload failed: ' + data.error);
+                showNotification('Upload failed: ' + data.error, 'error');
             }
         })
         .catch(error => {
             console.error('Upload failed:', error);
-            alert('Upload failed. Please try again.');
+            showNotification('Upload failed. Please try again.', 'error');
         })
         .finally(() => {
             submitBtn.disabled = false;
@@ -929,6 +944,26 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('moisture-reduction-display').textContent = '-';
             document.getElementById('cleaning-efficiency-display').textContent = '-';
         }
+    }
+    
+    function showNotification(message, type = 'info') {
+        // Create a temporary notification element
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 1050; max-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
     }
     
     function submitPostProcessData() {
