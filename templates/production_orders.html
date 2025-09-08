@@ -112,9 +112,9 @@
                                     <td>
                                         <strong class="text-primary">{{ order.order_number }}</strong>
                                     </td>
-                                    <td>{{ order.finished_goods_type }}</td>
+                                    <td>{{ order.finished_good_type }}</td>
                                     <td>
-                                        <span class="fw-semibold">{{ order.quantity_tons }}</span> tons
+                                        <span class="fw-semibold">{{ order.quantity }}</span> tons
                                     </td>
                                     <td>
                                         {% if order.status == 'pending' %}

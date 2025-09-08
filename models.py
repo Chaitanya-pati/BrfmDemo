@@ -316,8 +316,8 @@ class ProductionOrder(db.Model):
     """Production orders for finished goods"""
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(50), unique=True, nullable=False)
-    quantity_tons = db.Column(db.Float, nullable=False)
-    finished_goods_type = db.Column(db.String(100), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)  # Changed from quantity_tons to quantity
+    finished_good_type = db.Column(db.String(100), nullable=False)  # Changed from finished_goods_type to finished_good_type
     status = db.Column(db.String(20), default='pending')  # pending, planning, in_production, completed
     created_by = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -325,7 +325,17 @@ class ProductionOrder(db.Model):
     responsible_person = db.Column(db.String(100))
     notification_sent = db.Column(db.Boolean, default=False)
     
+    # Add other fields that exist in the database
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
+    deadline = db.Column(db.DateTime)
+    priority = db.Column(db.String(20), default='normal')
+    description = db.Column(db.Text)
+    target_completion = db.Column(db.DateTime)
+    
     # Relationships
+    customer = db.relationship('Customer', backref='production_orders')
+    product = db.relationship('Product', backref='production_orders')
     production_plans = db.relationship('ProductionPlan', backref='production_order', lazy=True)
 
 class ProductionPlan(db.Model):
