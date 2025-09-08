@@ -660,3 +660,174 @@ def complete_transfer():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
+
+@app.route('/start_cleaning_process', methods=['POST'])
+def start_cleaning_process():
+    """Start the cleaning process with timer"""
+    try:
+        data = request.get_json()
+        order_id = data['order_id']
+        process_type = data['process_type']  # '24_hour', '12_hour', 'custom'
+        cleaning_bin_id = data['cleaning_bin_id']
+        operator_name = data.get('operator_name', 'Operator')
+        custom_hours = data.get('custom_hours', 24.0)
+        
+        # Validate duration based on process type
+        if process_type == '24_hour':
+            duration_hours = 24.0
+        elif process_type == '12_hour':
+            duration_hours = 12.0
+        elif process_type == 'custom':
+            duration_hours = float(custom_hours)
+        else:
+            return jsonify({'error': 'Invalid process type'}), 400
+        
+        # Check if cleaning process already exists for this order
+        existing_process = CleaningProcess.query.filter_by(order_id=order_id).first()
+        if existing_process:
+            return jsonify({'error': 'Cleaning process already started for this order'}), 400
+        
+        # Create cleaning process
+        start_time = datetime.utcnow()
+        end_time = start_time + timedelta(hours=duration_hours)
+        
+        cleaning_process = CleaningProcess(
+            order_id=order_id,
+            cleaning_bin_id=cleaning_bin_id,
+            process_type=process_type,
+            duration_hours=duration_hours,
+            start_time=start_time,
+            end_time=end_time,
+            operator_name=operator_name,
+            status='running',
+            timer_active=True,
+            countdown_start=start_time,
+            countdown_end=end_time
+        )
+        
+        db.session.add(cleaning_process)
+        
+        # Update cleaning bin status
+        cleaning_bin = CleaningBin.query.get(cleaning_bin_id)
+        cleaning_bin.status = 'cleaning'
+        
+        # Update order status
+        order = ProductionOrder.query.get(order_id)
+        order.status = 'cleaning'
+        
+        db.session.commit()
+        
+        # Schedule first cleaning reminder (1 minute from now)
+        schedule_cleaning_reminder(cleaning_process.id, start_time + timedelta(minutes=1))
+        
+        return jsonify({
+            'success': True,
+            'process_id': cleaning_process.id,
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat(),
+            'duration_hours': duration_hours,
+            'message': f'{process_type.replace("_", " ").title()} cleaning process started'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/cleaning_timer_status/<int:order_id>')
+def cleaning_timer_status(order_id):
+    """Get current timer status for cleaning process"""
+    try:
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, timer_active=True).first()
+        
+        if not cleaning_process:
+            return jsonify({'timer_active': False})
+        
+        current_time = datetime.utcnow()
+        
+        # Check if timer has completed
+        if current_time >= cleaning_process.countdown_end:
+            return jsonify({
+                'timer_active': False,
+                'completed': True,
+                'can_proceed': True,
+                'end_time': cleaning_process.countdown_end.isoformat()
+            })
+        
+        # Calculate remaining time
+        remaining_seconds = (cleaning_process.countdown_end - current_time).total_seconds()
+        
+        return jsonify({
+            'timer_active': True,
+            'completed': False,
+            'can_proceed': False,
+            'process_type': cleaning_process.process_type,
+            'start_time': cleaning_process.countdown_start.isoformat(),
+            'end_time': cleaning_process.countdown_end.isoformat(),
+            'remaining_seconds': int(remaining_seconds),
+            'duration_hours': cleaning_process.duration_hours
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+def schedule_cleaning_reminder(process_id, due_time):
+    """Schedule a cleaning reminder"""
+    try:
+        # Get the next reminder sequence number
+        existing_reminders = CleaningReminder.query.filter_by(
+            cleaning_process_id=process_id
+        ).count()
+        
+        reminder = CleaningReminder(
+            cleaning_process_id=process_id,
+            due_time=due_time,
+            reminder_sequence=existing_reminders + 1
+        )
+        
+        db.session.add(reminder)
+        db.session.commit()
+        
+        # Add job to scheduler
+        from app import scheduler
+        scheduler.add_job(
+            id=f'cleaning_reminder_{reminder.id}',
+            func=send_cleaning_reminder,
+            args=[reminder.id],
+            trigger='date',
+            run_date=due_time
+        )
+        
+        return True
+        
+    except Exception as e:
+        logging.error(f"Error scheduling reminder: {e}")
+        return False
+
+def send_cleaning_reminder(reminder_id):
+    """Send cleaning reminder (called by scheduler)"""
+    try:
+        reminder = CleaningReminder.query.get(reminder_id)
+        if not reminder:
+            return False
+        
+        # Mark reminder as sent
+        reminder.reminder_sent = True
+        reminder.user_notified = 'System'
+        
+        # Schedule next reminder (1 minute later) if process is still active
+        cleaning_process = reminder.cleaning_process
+        current_time = datetime.utcnow()
+        
+        if current_time < cleaning_process.countdown_end:
+            next_reminder_time = current_time + timedelta(minutes=1)
+            if next_reminder_time < cleaning_process.countdown_end:
+                schedule_cleaning_reminder(cleaning_process.id, next_reminder_time)
+        
+        db.session.commit()
+        logging.info(f"Cleaning reminder sent for process {cleaning_process.id}")
+        
+        return True
+        
+    except Exception as e:
+        logging.error(f"Error sending reminder: {e}")
+        return False
