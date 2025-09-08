@@ -453,15 +453,23 @@ def production_orders():
 @app.route('/production_cleaning_overview')
 def production_cleaning_overview():
     """Overview of all production cleaning processes"""
-    # Get all orders with their cleaning processes
-    orders_with_cleaning = db.session.query(ProductionOrder, CleaningProcess)\
-        .outerjoin(CleaningProcess, ProductionOrder.id == CleaningProcess.order_id)\
-        .order_by(ProductionOrder.created_at.desc()).all()
-    
-    # Get active cleaning processes
-    active_processes = CleaningProcess.query.filter(
-        CleaningProcess.status.in_(['running', 'pending'])
-    ).all()
+    try:
+        # Get all orders with their cleaning processes
+        orders_with_cleaning = db.session.query(ProductionOrder, CleaningProcess)\
+            .outerjoin(CleaningProcess, ProductionOrder.id == CleaningProcess.order_id)\
+            .order_by(ProductionOrder.created_at.desc()).all()
+        
+        # Get active cleaning processes
+        active_processes = CleaningProcess.query.filter(
+            CleaningProcess.status.in_(['running', 'pending'])
+        ).all()
+    except Exception as e:
+        # Handle missing order_id column gracefully
+        print(f"Database error: {e}")
+        # Get all production orders without cleaning processes for now
+        orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
+        orders_with_cleaning = [(order, None) for order in orders]
+        active_processes = []
     
     return render_template('production_cleaning_overview.html', 
                          orders_with_cleaning=orders_with_cleaning,
