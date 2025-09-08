@@ -11,7 +11,8 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
 def init_cleaning_reminders():
     """Initialize sample cleaning reminders for existing machines"""
     try:
-        machines = ProductionMachine.query.all()
+        # machines query removed - ProductionMachine model deleted
+        machines = []
 
         for machine in machines:
             # Check if reminder already exists

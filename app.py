@@ -157,22 +157,7 @@ def init_sample_data():
             db.session.add(b1_machine)
             db.session.commit()
         
-        # Create sample production machines
-        from models import ProductionMachine
-        if not db.session.query(ProductionMachine).first():
-            sample_machines = [
-                ProductionMachine(name='Drum Shield #1', machine_type='drum_shield', process_step='precleaning', location='Precleaning Area A', cleaning_frequency_hours=3),
-                ProductionMachine(name='Magnet Separator #1', machine_type='magnet', process_step='precleaning', location='Precleaning Area B', cleaning_frequency_hours=3),
-                ProductionMachine(name='24h Cleaning Machine #1', machine_type='cleaner', process_step='cleaning_24h', location='Cleaning Bay 1', cleaning_frequency_hours=3),
-                ProductionMachine(name='24h Cleaning Machine #2', machine_type='cleaner', process_step='cleaning_24h', location='Cleaning Bay 2', cleaning_frequency_hours=3),
-                ProductionMachine(name='12h Cleaning Machine #1', machine_type='cleaner', process_step='cleaning_12h', location='Final Cleaning Area', cleaning_frequency_hours=3),
-                ProductionMachine(name='Grinding Machine #1', machine_type='grinder', process_step='grinding', location='Grinding Hall A', cleaning_frequency_hours=3),
-                ProductionMachine(name='Grinding Machine #2', machine_type='grinder', process_step='grinding', location='Grinding Hall B', cleaning_frequency_hours=3),
-                ProductionMachine(name='Packing Machine #1', machine_type='packer', process_step='packing', location='Packing Area A', cleaning_frequency_hours=4),
-                ProductionMachine(name='Packing Machine #2', machine_type='packer', process_step='packing', location='Packing Area B', cleaning_frequency_hours=4)
-            ]
-            db.session.add_all(sample_machines)
-            db.session.commit()
+        # ProductionMachine initialization removed - production functionality deleted
             
     except Exception as e:
         db.session.rollback()
