@@ -34,7 +34,7 @@
                     </div>
                     <div class="col-md-3">
                         <h6 class="text-muted mb-1">Total Quantity</h6>
-                        <span class="fw-bold">{{ order.quantity_tons }} tons</span>
+                        <span class="fw-bold">{{ "%.2f"|format(order.quantity) }} tons</span>
                     </div>
                     <div class="col-md-2">
                         <h6 class="text-muted mb-1">Status</h6>
@@ -84,7 +84,7 @@
                 {% if order.status not in ['in_production', 'completed'] %}
                 <form method="POST" id="planning-form">
                     <input type="hidden" name="created_by" value="Production Manager">
-                    
+
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
@@ -159,13 +159,13 @@
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <!-- Validation Alert -->
                     <div id="validation-alert" class="alert alert-warning d-none">
                         <i class="fas fa-exclamation-triangle me-2"></i>
                         <span id="validation-message">Percentages must sum to exactly 100%</span>
                     </div>
-                    
+
                     <div class="d-flex justify-content-between align-items-center mt-4">
                         <div>
                             <small class="text-muted">
@@ -183,7 +183,7 @@
                     <i class="fas fa-lock me-2"></i>
                     This order is locked and cannot be modified as it has moved to the next stage.
                 </div>
-                
+
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead class="table-light">
@@ -221,7 +221,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Planning Summary -->
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm">
@@ -231,21 +231,21 @@
             <div class="card-body">
                 <div class="mb-3">
                     <h6 class="text-muted mb-2">Total Order Quantity</h6>
-                    <div class="h4 text-primary mb-0">{{ order.quantity_tons }} tons</div>
+                    <div class="h4 text-primary mb-0">{{ "%.2f"|format(order.quantity) }} tons</div>
                 </div>
-                
+
                 <div class="mb-3">
                     <h6 class="text-muted mb-2">Total Allocated</h6>
                     <div class="h5 mb-0" id="total-allocated-tons">0.000 tons</div>
                 </div>
-                
+
                 <div class="mb-3">
                     <h6 class="text-muted mb-2">Remaining</h6>
-                    <div class="h5 mb-0" id="remaining-tons">{{ order.quantity_tons }} tons</div>
+                    <div class="h5 mb-0" id="remaining-tons">{{ order.quantity }} tons</div>
                 </div>
-                
+
                 <hr>
-                
+
                 <div class="small text-muted">
                     <div class="d-flex justify-content-between mb-1">
                         <span>Progress:</span>
@@ -272,20 +272,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const remainingSpan = document.getElementById('remaining-tons');
     const progressPercentage = document.getElementById('progress-percentage');
     const progressBar = document.getElementById('progress-bar');
-    
+
     function updateCalculations() {
         let totalPercentage = 0;
         let totalAllocated = 0;
-        
+
         percentageInputs.forEach(input => {
             if (input.value && !input.disabled) {
                 const percentage = parseFloat(input.value) || 0;
                 const binId = input.dataset.binId;
                 const calculatedTons = (percentage / 100) * orderTotal;
-                
-                totalPercentage += percentage;
-                totalAllocated += calculatedTons;
-                
+
                 // Update calculated tons display
                 const calculatedDisplay = document.querySelector('.calculated-tons[data-bin-id="' + binId + '"]');
                 if (calculatedDisplay) {
@@ -293,19 +290,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-        
+
         // Update summary displays
         totalPercentageSpan.textContent = totalPercentage.toFixed(2);
         totalAllocatedSpan.textContent = totalAllocated.toFixed(3) + ' tons';
         remainingSpan.textContent = (orderTotal - totalAllocated).toFixed(3) + ' tons';
-        
+
         const progress = Math.min((totalPercentage / 100) * 100, 100);
         progressPercentage.textContent = progress.toFixed(0) + '%';
         progressBar.style.width = progress + '%';
-        
+
         // Validation
         const isValid = Math.abs(totalPercentage - 100) < 0.001;
-        
+
         if (totalPercentage === 0) {
             validationAlert.classList.add('d-none');
             savePlanBtn.disabled = true;
@@ -322,14 +319,14 @@ document.addEventListener('DOMContentLoaded', function() {
             savePlanBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Fix percentages to save';
             savePlanBtn.classList.remove('btn-success');
             savePlanBtn.classList.add('btn-warning');
-            
+
             if (totalPercentage < 100) {
                 validationMessage.textContent = `Total is ${totalPercentage.toFixed(2)}%. Add ${(100 - totalPercentage).toFixed(2)}% more.`;
             } else {
                 validationMessage.textContent = `Total is ${totalPercentage.toFixed(2)}%. Remove ${(totalPercentage - 100).toFixed(2)}%.`;
             }
         }
-        
+
         // Update total percentage badge color
         const totalBadge = document.getElementById('total-percentage');
         totalBadge.classList.remove('bg-light', 'bg-warning', 'bg-success');
@@ -347,13 +344,13 @@ document.addEventListener('DOMContentLoaded', function() {
             totalBadge.classList.remove('text-white');
         }
     }
-    
+
     // Add event listeners
     percentageInputs.forEach(input => {
         input.addEventListener('input', updateCalculations);
         input.addEventListener('change', updateCalculations);
     });
-    
+
     // Initial calculation
     updateCalculations();
 });

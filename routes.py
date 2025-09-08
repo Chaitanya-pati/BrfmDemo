@@ -294,8 +294,15 @@ def masters():
                 product = Product()
                 product.name = request.form['name']
                 product.description = request.form.get('description')
-                product.price_per_kg = float(request.form.get('price_per_kg', 0))
+                # Remove price_per_kg as it doesn't exist in the model
                 db.session.add(product)
+                
+            elif form_type == 'precleaning_bin':
+                bin = PrecleaningBin()
+                bin.name = request.form['name']
+                bin.capacity = float(request.form['capacity'])
+                bin.current_stock = 0.0  # Start with empty bin
+                db.session.add(bin)
             
             db.session.commit()
             flash(f'{form_type.title()} added successfully!', 'success')
@@ -308,9 +315,10 @@ def masters():
     customers = Customer.query.all()
     products = Product.query.all()
     godown_types = GodownType.query.all()
+    precleaning_bins = PrecleaningBin.query.all()
     
     return render_template('masters.html', suppliers=suppliers, customers=customers, 
-                         products=products, godown_types=godown_types)
+                         products=products, godown_types=godown_types, precleaning_bins=precleaning_bins)
 
 @app.route('/raw_wheat_quality_report', methods=['GET', 'POST'])
 def raw_wheat_quality_report():
@@ -439,6 +447,9 @@ def production_orders():
 def production_planning(order_id):
     """Handle production planning with bin percentages"""
     order = ProductionOrder.query.get_or_404(order_id)
+    
+    # Allow all users to access production planning
+    # Remove role restrictions for now
     
     # Check if order is locked (next stage started)
     if order.status == 'in_production' or order.status == 'completed':
