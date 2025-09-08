@@ -324,9 +324,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="fas fa-camera me-2"></i>Cleaning Reminders & Photos</h6>
-                <button type="button" class="btn btn-light btn-sm" id="refresh-reminders-btn">
-                    <i class="fas fa-sync-alt me-1"></i>Refresh
-                </button>
+                <small id="last-refresh-time" class="text-light">Auto-refreshing...</small>
             </div>
             <div class="card-body">
                 <div id="reminders-container">
@@ -658,12 +656,12 @@ document.addEventListener('DOMContentLoaded', function() {
     {% if cleaning_process and cleaning_process.timer_active %}
     initializeTimer();
     loadCleaningReminders();
-    // Auto-refresh reminders every 30 seconds during active cleaning
-    setInterval(loadCleaningReminders, 30000);
+    // Auto-refresh reminders every 10 seconds during active cleaning for real-time updates
+    setInterval(loadCleaningReminders, 10000);
     {% endif %}
     
     // Reminder and photo functionality
-    const refreshRemindersBtn = document.getElementById('refresh-reminders-btn');
+    // Refresh button removed - using automatic refresh only
     const photoUploadSection = document.getElementById('photo-upload-section');
     const photoUploadForm = document.getElementById('photo-upload-form');
     const cancelUploadBtn = document.getElementById('cancel-upload-btn');
@@ -674,9 +672,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const moistureBeforeInput = document.getElementById('moisture-before');
     const moistureAfterInput = document.getElementById('moisture-after');
     
-    if (refreshRemindersBtn) {
-        refreshRemindersBtn.addEventListener('click', loadCleaningReminders);
-    }
+    // Refresh button removed - reminders now auto-update every 10 seconds
     
     if (cancelUploadBtn) {
         cancelUploadBtn.addEventListener('click', function() {
