@@ -753,8 +753,36 @@ def start_cleaning_process():
         
         db.session.commit()
         
-        # Schedule first cleaning reminder (1 minute from now)
-        schedule_cleaning_reminder(cleaning_process.id, start_time + timedelta(minutes=1))
+        # Schedule multiple cleaning reminders throughout the process
+        total_minutes = int(duration_hours * 60)
+        reminder_intervals = []
+        
+        # Generate reminders every 30 minutes for long processes, or every 10 minutes for short processes
+        if total_minutes > 60:
+            # For processes longer than 1 hour, remind every 30 minutes
+            interval_minutes = 30
+        else:
+            # For processes 1 hour or less, remind every 10 minutes
+            interval_minutes = 10
+        
+        # Create reminder schedule
+        current_minute = interval_minutes
+        while current_minute < total_minutes:
+            reminder_time = start_time + timedelta(minutes=current_minute)
+            reminder_intervals.append(reminder_time)
+            current_minute += interval_minutes
+        
+        # Always add a final reminder 5 minutes before completion
+        if total_minutes > 5:
+            final_reminder = start_time + timedelta(minutes=total_minutes - 5)
+            if final_reminder not in reminder_intervals:
+                reminder_intervals.append(final_reminder)
+        
+        # Schedule all reminders
+        for reminder_time in reminder_intervals:
+            schedule_cleaning_reminder(cleaning_process.id, reminder_time)
+            
+        logging.info(f"Scheduled {len(reminder_intervals)} cleaning reminders for process {cleaning_process.id}")
         
         return jsonify({
             'success': True,
@@ -825,18 +853,24 @@ def schedule_cleaning_reminder(process_id, due_time):
         
         # Add job to scheduler
         from app import scheduler
-        scheduler.add_job(
-            id=f'cleaning_reminder_{reminder.id}',
-            func=send_cleaning_reminder,
-            args=[reminder.id],
-            trigger='date',
-            run_date=due_time
-        )
+        try:
+            scheduler.add_job(
+                id=f'cleaning_reminder_{reminder.id}',
+                func=send_cleaning_reminder,
+                args=[reminder.id],
+                trigger='date',
+                run_date=due_time
+            )
+            logging.info(f"Scheduled cleaning reminder {reminder.id} for {due_time}")
+        except Exception as scheduler_error:
+            logging.error(f"Error adding job to scheduler: {scheduler_error}")
+            # Continue even if scheduler fails
         
         return True
         
     except Exception as e:
         logging.error(f"Error scheduling reminder: {e}")
+        db.session.rollback()
         return False
 
 def send_cleaning_reminder(reminder_id):
@@ -846,28 +880,28 @@ def send_cleaning_reminder(reminder_id):
         with app.app_context():
             reminder = CleaningReminder.query.get(reminder_id)
             if not reminder:
+                logging.error(f"Reminder {reminder_id} not found")
+                return False
+            
+            # Check if cleaning process is still active
+            cleaning_process = reminder.cleaning_process
+            current_time = datetime.utcnow()
+            
+            if current_time >= cleaning_process.countdown_end:
+                logging.info(f"Cleaning process {cleaning_process.id} already completed, skipping reminder")
                 return False
             
             # Mark reminder as sent
             reminder.reminder_sent = True
             reminder.user_notified = 'System'
             
-            # Schedule next reminder (1 minute later) if process is still active
-            cleaning_process = reminder.cleaning_process
-            current_time = datetime.utcnow()
-            
-            if current_time < cleaning_process.countdown_end:
-                next_reminder_time = current_time + timedelta(minutes=1)
-                if next_reminder_time < cleaning_process.countdown_end:
-                    schedule_cleaning_reminder(cleaning_process.id, next_reminder_time)
-            
             db.session.commit()
-            logging.info(f"Cleaning reminder sent for process {cleaning_process.id}")
+            logging.info(f"Manual cleaning reminder sent for process {cleaning_process.id}, sequence {reminder.reminder_sequence}")
             
             return True
         
     except Exception as e:
-        logging.error(f"Error sending reminder: {e}")
+        logging.error(f"Error sending reminder {reminder_id}: {e}")
         return False
 
 @app.route('/upload_cleaning_photo', methods=['POST'])
@@ -1156,27 +1190,83 @@ def get_pending_reminders(order_id):
         if not cleaning_process:
             return jsonify({'has_pending': False})
         
-        # Find the latest reminder that has been sent but not completed
-        pending_reminder = CleaningReminder.query.filter_by(
+        current_time = datetime.utcnow()
+        
+        # Find reminders that are due now (sent but not completed)
+        pending_reminders = CleaningReminder.query.filter_by(
             cleaning_process_id=cleaning_process.id,
             reminder_sent=True,
             completed=False
-        ).order_by(CleaningReminder.due_time.desc()).first()
+        ).filter(
+            CleaningReminder.due_time <= current_time
+        ).order_by(CleaningReminder.due_time.desc()).all()
         
-        if pending_reminder:
+        if pending_reminders:
+            # Return the most recent pending reminder
+            latest_reminder = pending_reminders[0]
             return jsonify({
                 'has_pending': True,
                 'reminder': {
-                    'id': pending_reminder.id,
+                    'id': latest_reminder.id,
                     'order_id': order_id,
-                    'sequence': pending_reminder.reminder_sequence,
-                    'due_time': pending_reminder.due_time.isoformat()
-                }
+                    'sequence': latest_reminder.reminder_sequence,
+                    'due_time': latest_reminder.due_time.isoformat()
+                },
+                'total_pending': len(pending_reminders)
             })
         
-        return jsonify({'has_pending': False})
+        # Check for upcoming reminders (within next 2 minutes)
+        upcoming_reminders = CleaningReminder.query.filter_by(
+            cleaning_process_id=cleaning_process.id,
+            reminder_sent=False
+        ).filter(
+            CleaningReminder.due_time <= current_time + timedelta(minutes=2),
+            CleaningReminder.due_time > current_time
+        ).count()
+        
+        return jsonify({
+            'has_pending': False,
+            'upcoming_reminders': upcoming_reminders
+        })
         
     except Exception as e:
+        logging.error(f"Error getting pending reminders: {e}")
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/trigger_manual_reminders/<int:order_id>', methods=['POST'])
+def trigger_manual_reminders(order_id):
+    """Manually trigger cleaning reminders for testing"""
+    try:
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, timer_active=True).first()
+        
+        if not cleaning_process:
+            return jsonify({'error': 'No active cleaning process found'}), 404
+        
+        current_time = datetime.utcnow()
+        
+        # Create an immediate reminder
+        reminder = CleaningReminder(
+            cleaning_process_id=cleaning_process.id,
+            due_time=current_time,
+            reminder_sequence=99,  # Special sequence for manual triggers
+            reminder_sent=True,
+            user_notified='Manual Trigger'
+        )
+        
+        db.session.add(reminder)
+        db.session.commit()
+        
+        logging.info(f"Manual cleaning reminder triggered for process {cleaning_process.id}")
+        
+        return jsonify({
+            'success': True,
+            'reminder_id': reminder.id,
+            'message': 'Manual cleaning reminder triggered'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error triggering manual reminder: {e}")
         return jsonify({'error': str(e)}), 400
 
 @app.route('/upload_reminder_photos', methods=['POST'])
