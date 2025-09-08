@@ -407,18 +407,18 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Waste Material (kg)</label>
+                                        <label class="form-label">Waste Collected (kg)</label>
                                         <input type="number" class="form-control" id="waste-material" 
                                                step="0.1" min="0" required>
-                                        <small class="form-text text-muted">Total waste removed during cleaning</small>
+                                        <small class="form-text text-muted">Total waste collected during cleaning</small>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Water Used (liters)</label>
+                                        <label class="form-label">Water Added to Bins (liters)</label>
                                         <input type="number" class="form-control" id="water-used" 
                                                step="0.1" min="0" required>
-                                        <small class="form-text text-muted">Total water consumption</small>
+                                        <small class="form-text text-muted">Water added to bins during cleaning</small>
                                     </div>
                                 </div>
                             </div>
@@ -427,10 +427,10 @@
                         <div class="col-md-6">
                             <h6 class="mb-3 text-primary">Process Information</h6>
                             <div class="mb-3">
-                                <label class="form-label">Machine Efficiency (%)</label>
-                                <input type="number" class="form-control" id="machine-efficiency" 
-                                       step="0.1" min="0" max="100" value="100" required>
-                                <small class="form-text text-muted">Overall machine performance during process</small>
+                                <label class="form-label">Machine Name</label>
+                                <input type="text" class="form-control" id="machine-name" 
+                                       placeholder="Enter machine name" required>
+                                <small class="form-text text-muted">Name of the machine used for cleaning</small>
                             </div>
 
                             <div class="mb-3">
@@ -567,6 +567,78 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cleaning Reminder Modal -->
+<div class="modal fade" id="cleaningReminderModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-bell me-2"></i>Cleaning Reminder - Photo Required
+                </h5>
+                <small class="text-muted">Reminder #<span id="reminder-sequence">1</span></small>
+            </div>
+            <form id="reminderPhotoForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" id="reminder_id" name="reminder_id">
+                    <input type="hidden" id="reminder_order_id" name="order_id">
+                    
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Time for cleaning documentation!</strong> Please capture both before and after photos to track the cleaning progress.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-3 text-primary">Before Cleaning Photo</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Select Before Photo</label>
+                                <input type="file" class="form-control" id="before-photo-input" 
+                                       accept="image/*" name="before_photo" required>
+                                <small class="form-text text-muted">Photo before starting cleaning</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Before Photo Notes</label>
+                                <textarea class="form-control" id="before-notes" name="before_notes" 
+                                          rows="3" placeholder="Describe the condition before cleaning..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <h6 class="mb-3 text-success">After Cleaning Photo</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Select After Photo</label>
+                                <input type="file" class="form-control" id="after-photo-input" 
+                                       accept="image/*" name="after_photo" required>
+                                <small class="form-text text-muted">Photo after completing cleaning</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">After Photo Notes</label>
+                                <textarea class="form-control" id="after-notes" name="after_notes" 
+                                          rows="3" placeholder="Describe the condition after cleaning..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label class="form-label">Machine/Area Cleaned</label>
+                                <input type="text" class="form-control" id="cleaning-area" name="cleaning_area" 
+                                       placeholder="Enter machine name or area cleaned" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Save Photos & Continue
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
