@@ -550,3 +550,113 @@ def calculate_tons():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+# 24-Hour Cleaning Stage Routes
+
+@app.route('/production_cleaning/<int:order_id>', methods=['GET', 'POST'])
+def production_cleaning(order_id):
+    """Handle 24-hour cleaning stage for production orders"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    # Check if production plan exists and is complete
+    existing_plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+    if not existing_plan or existing_plan.total_percentage != 100:
+        flash('Please complete production planning before starting cleaning stage.', 'error')
+        return redirect(url_for('production_planning', order_id=order_id))
+    
+    # Get transfer jobs for this order
+    transfer_jobs = TransferJob.query.filter_by(order_id=order_id).all()
+    
+    # Get cleaning bins with current stock
+    cleaning_bins = CleaningBin.query.all()
+    
+    # Get existing cleaning process if any
+    cleaning_process = CleaningProcess.query.filter_by(order_id=order_id).first()
+    
+    return render_template('production_cleaning.html', 
+                         order=order,
+                         existing_plan=existing_plan,
+                         transfer_jobs=transfer_jobs,
+                         cleaning_bins=cleaning_bins,
+                         cleaning_process=cleaning_process)
+
+@app.route('/start_transfer', methods=['POST'])
+def start_transfer():
+    """Start a transfer job from pre-cleaning bin to cleaning bin"""
+    try:
+        data = request.get_json()
+        order_id = data['order_id']
+        precleaning_bin_id = data['precleaning_bin_id']
+        cleaning_bin_id = data['cleaning_bin_id']
+        quantity_tons = float(data['quantity_tons'])
+        operator_name = data.get('operator_name', 'Operator')
+        
+        # Generate unique job ID
+        job_id = generate_job_id()
+        
+        # Create transfer job
+        transfer_job = TransferJob(
+            job_id=job_id,
+            order_id=order_id,
+            precleaning_bin_id=precleaning_bin_id,
+            cleaning_bin_id=cleaning_bin_id,
+            quantity_tons=quantity_tons,
+            start_time=datetime.utcnow(),
+            status='in_progress',
+            operator_name=operator_name
+        )
+        
+        db.session.add(transfer_job)
+        
+        # Update bin stocks
+        precleaning_bin = PrecleaningBin.query.get(precleaning_bin_id)
+        cleaning_bin = CleaningBin.query.get(cleaning_bin_id)
+        
+        if precleaning_bin.current_stock < quantity_tons:
+            return jsonify({'error': 'Insufficient stock in pre-cleaning bin'}), 400
+        
+        precleaning_bin.current_stock -= quantity_tons
+        cleaning_bin.current_stock += quantity_tons
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'job_id': job_id,
+            'start_time': transfer_job.start_time.isoformat(),
+            'message': f'Transfer job {job_id} started successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/complete_transfer', methods=['POST'])
+def complete_transfer():
+    """Complete a transfer job and record end time"""
+    try:
+        data = request.get_json()
+        job_id = data['job_id']
+        
+        transfer_job = TransferJob.query.filter_by(job_id=job_id).first()
+        if not transfer_job:
+            return jsonify({'error': 'Transfer job not found'}), 404
+        
+        # Record end time and calculate duration
+        end_time = datetime.utcnow()
+        transfer_job.end_time = end_time
+        transfer_job.status = 'completed'
+        transfer_job.duration_minutes = (end_time - transfer_job.start_time).total_seconds() / 60
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'end_time': end_time.isoformat(),
+            'duration_minutes': round(transfer_job.duration_minutes, 2),
+            'message': f'Transfer job {job_id} completed successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
