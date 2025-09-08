@@ -945,3 +945,66 @@ def get_cleaning_reminders(order_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@app.route('/submit_post_process_data', methods=['POST'])
+def submit_post_process_data():
+    """Submit post-process cleaning data"""
+    try:
+        data = request.get_json()
+        order_id = data['order_id']
+        
+        # Required post-process fields
+        moisture_before = float(data.get('moisture_before', 0))
+        moisture_after = float(data.get('moisture_after', 0))
+        waste_material_kg = float(data.get('waste_material_kg', 0))
+        water_used_liters = float(data.get('water_used_liters', 0))
+        machine_efficiency = float(data.get('machine_efficiency', 100))
+        operator_notes = data.get('operator_notes', '')
+        operator_name = data.get('operator_name', 'Operator')
+        
+        # Get the cleaning process
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id).first()
+        if not cleaning_process:
+            return jsonify({'error': 'No cleaning process found for this order'}), 404
+        
+        # Check if timer is completed
+        current_time = datetime.utcnow()
+        if current_time < cleaning_process.countdown_end:
+            return jsonify({'error': 'Cannot submit data until cleaning process is complete'}), 400
+        
+        # Update cleaning process with post-process data
+        cleaning_process.moisture_before = moisture_before
+        cleaning_process.moisture_after = moisture_after
+        cleaning_process.waste_material_kg = waste_material_kg
+        cleaning_process.water_used_liters = water_used_liters
+        cleaning_process.machine_efficiency = machine_efficiency
+        cleaning_process.post_process_notes = operator_notes
+        cleaning_process.completed_by = operator_name
+        cleaning_process.completion_time = current_time
+        cleaning_process.status = 'completed'
+        cleaning_process.timer_active = False
+        
+        # Update order and bin status
+        order = ProductionOrder.query.get(order_id)
+        order.status = 'completed'
+        
+        cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
+        cleaning_bin.status = 'available'
+        
+        # Calculate quality metrics
+        moisture_reduction = moisture_before - moisture_after
+        cleaning_efficiency = ((moisture_reduction / moisture_before) * 100) if moisture_before > 0 else 0
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'completion_time': current_time.isoformat(),
+            'moisture_reduction': round(moisture_reduction, 2),
+            'cleaning_efficiency': round(cleaning_efficiency, 2),
+            'message': 'Post-process data submitted successfully. Cleaning process completed!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+

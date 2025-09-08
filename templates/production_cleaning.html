@@ -390,6 +390,115 @@
 </div>
 {% endif %}
 
+<!-- Post-Process Data Capture Form (shown when timer completes) -->
+<div class="row mb-4" id="post-process-section" style="display: none;">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Complete Cleaning Process - Enter Final Data</h6>
+            </div>
+            <div class="card-body">
+                <form id="post-process-form">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-3 text-primary">Quality Metrics</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Moisture Before (%)</label>
+                                        <input type="number" class="form-control" id="moisture-before" 
+                                               step="0.1" min="0" max="100" required>
+                                        <small class="form-text text-muted">Initial moisture content percentage</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Moisture After (%)</label>
+                                        <input type="number" class="form-control" id="moisture-after" 
+                                               step="0.1" min="0" max="100" required>
+                                        <small class="form-text text-muted">Final moisture content percentage</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Waste Material (kg)</label>
+                                        <input type="number" class="form-control" id="waste-material" 
+                                               step="0.1" min="0" required>
+                                        <small class="form-text text-muted">Total waste removed during cleaning</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Water Used (liters)</label>
+                                        <input type="number" class="form-control" id="water-used" 
+                                               step="0.1" min="0" required>
+                                        <small class="form-text text-muted">Total water consumption</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6 class="mb-3 text-primary">Process Information</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Machine Efficiency (%)</label>
+                                <input type="number" class="form-control" id="machine-efficiency" 
+                                       step="0.1" min="0" max="100" value="100" required>
+                                <small class="form-text text-muted">Overall machine performance during process</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Operator Name</label>
+                                <input type="text" class="form-control" id="post-process-operator" 
+                                       value="Cleaning Operator" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Process Notes</label>
+                                <textarea class="form-control" id="process-notes" rows="4" 
+                                          placeholder="Add any observations, issues, or special notes about the cleaning process..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quality Metrics Display -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="bg-light p-3 rounded">
+                                <h6 class="mb-2">Calculated Metrics</h6>
+                                <div class="row text-center">
+                                    <div class="col-md-6">
+                                        <div class="border-end">
+                                            <span class="h5 fw-bold text-success" id="moisture-reduction-display">-</span>
+                                            <p class="text-muted mb-0">Moisture Reduction (%)</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <span class="h5 fw-bold text-primary" id="cleaning-efficiency-display">-</span>
+                                        <p class="text-muted mb-0">Cleaning Efficiency (%)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 text-center">
+                        <button type="submit" class="btn btn-success btn-lg me-3">
+                            <i class="fas fa-check-circle me-2"></i>Complete Cleaning Process
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="location.reload()">
+                            <i class="fas fa-sync me-2"></i>Refresh Page
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 let timerInterval;
 let timerData = null;
@@ -583,6 +692,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const photoUploadForm = document.getElementById('photo-upload-form');
     const cancelUploadBtn = document.getElementById('cancel-upload-btn');
     
+    // Post-process form functionality
+    const postProcessSection = document.getElementById('post-process-section');
+    const postProcessForm = document.getElementById('post-process-form');
+    const moistureBeforeInput = document.getElementById('moisture-before');
+    const moistureAfterInput = document.getElementById('moisture-after');
+    
     if (refreshRemindersBtn) {
         refreshRemindersBtn.addEventListener('click', loadCleaningReminders);
     }
@@ -600,6 +715,19 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadPhoto();
         });
     }
+    
+    // Post-process form event listeners
+    if (moistureBeforeInput && moistureAfterInput) {
+        moistureBeforeInput.addEventListener('input', calculateQualityMetrics);
+        moistureAfterInput.addEventListener('input', calculateQualityMetrics);
+    }
+    
+    if (postProcessForm) {
+        postProcessForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitPostProcessData();
+        });
+    }
 
     function initializeTimer() {
         updateTimerDisplay();
@@ -614,12 +742,18 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!data.timer_active) {
                 if (data.completed) {
-                    // Timer completed
+                    // Timer completed - show completion status and post-process form
                     document.getElementById('countdown-display').textContent = 'COMPLETED';
                     document.getElementById('process-status-badge').textContent = 'Completed';
                     document.getElementById('process-status-badge').className = 'badge bg-success text-white';
                     document.getElementById('timer-progress-bar').style.width = '100%';
                     document.getElementById('timer-progress-bar').className = 'progress-bar bg-success';
+                    
+                    // Show post-process form
+                    if (postProcessSection) {
+                        postProcessSection.style.display = 'block';
+                        postProcessSection.scrollIntoView({ behavior: 'smooth' });
+                    }
                 }
                 
                 if (timerInterval) {
@@ -789,6 +923,89 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Upload failed. Please try again.');
         })
         .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        });
+    }
+    
+    function calculateQualityMetrics() {
+        const moistureBefore = parseFloat(moistureBeforeInput.value) || 0;
+        const moistureAfter = parseFloat(moistureAfterInput.value) || 0;
+        
+        if (moistureBefore > 0) {
+            const moistureReduction = moistureBefore - moistureAfter;
+            const cleaningEfficiency = (moistureReduction / moistureBefore) * 100;
+            
+            document.getElementById('moisture-reduction-display').textContent = 
+                moistureReduction.toFixed(1) + '%';
+            document.getElementById('cleaning-efficiency-display').textContent = 
+                Math.max(0, cleaningEfficiency).toFixed(1) + '%';
+        } else {
+            document.getElementById('moisture-reduction-display').textContent = '-';
+            document.getElementById('cleaning-efficiency-display').textContent = '-';
+        }
+    }
+    
+    function submitPostProcessData() {
+        const form = postProcessForm;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // Validate required fields
+        const moistureBefore = parseFloat(document.getElementById('moisture-before').value);
+        const moistureAfter = parseFloat(document.getElementById('moisture-after').value);
+        const wasteMaterial = parseFloat(document.getElementById('waste-material').value);
+        const waterUsed = parseFloat(document.getElementById('water-used').value);
+        const machineEfficiency = parseFloat(document.getElementById('machine-efficiency').value);
+        const operatorName = document.getElementById('post-process-operator').value;
+        const processNotes = document.getElementById('process-notes').value;
+        
+        if (!moistureBefore || !moistureAfter || !wasteMaterial || !waterUsed || !machineEfficiency || !operatorName) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        if (moistureBefore < moistureAfter) {
+            alert('Moisture after cleaning cannot be higher than before cleaning');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Completing Process...';
+        
+        const data = {
+            order_id: {{ order.id }},
+            moisture_before: moistureBefore,
+            moisture_after: moistureAfter,
+            waste_material_kg: wasteMaterial,
+            water_used_liters: waterUsed,
+            machine_efficiency: machineEfficiency,
+            operator_name: operatorName,
+            operator_notes: processNotes
+        };
+        
+        fetch('/submit_post_process_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Cleaning process completed successfully!\n\nMoisture Reduction: ${data.moisture_reduction}%\nCleaning Efficiency: ${data.cleaning_efficiency}%`);
+                // Redirect to production orders or dashboard
+                window.location.href = '{{ url_for("production_orders") }}';
+            } else {
+                alert('Error completing process: ' + data.error);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('Error completing process:', error);
+            alert('Process completion failed. Please try again.');
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
         });
