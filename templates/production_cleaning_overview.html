@@ -1,0 +1,210 @@
+
+{% extends "base.html" %}
+
+{% block title %}24-Hour Production Cleaning Overview{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-clock me-2"></i>24-Hour Production Cleaning Overview
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('production_orders') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>New Production Order
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Cleaning Processes -->
+    {% if active_processes %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0 text-warning">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Active Cleaning Processes ({{ active_processes|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for process in active_processes %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card border-warning">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ process.production_order.order_number }}</h6>
+                                    <p class="card-text">
+                                        <strong>Type:</strong> {{ process.process_type.replace('_', ' ').title() }}<br>
+                                        <strong>Status:</strong> 
+                                        <span class="badge bg-{{ 'success' if process.status == 'running' else 'warning' }}">
+                                            {{ process.status.title() }}
+                                        </span><br>
+                                        <strong>Duration:</strong> {{ process.duration_hours }} hours
+                                    </p>
+                                    {% if process.countdown_end %}
+                                    <small class="text-muted">
+                                        Ends: {{ process.countdown_end.strftime('%Y-%m-%d %H:%M') }}
+                                    </small>
+                                    {% endif %}
+                                    <div class="mt-2">
+                                        <a href="{{ url_for('production_cleaning', order_id=process.order_id) }}" 
+                                           class="btn btn-sm btn-warning">
+                                            <i class="fas fa-eye me-1"></i>Monitor
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- All Production Orders with Cleaning Status -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>All Production Orders & Cleaning Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if orders_with_cleaning %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Order Number</th>
+                                    <th>Product Type</th>
+                                    <th>Quantity</th>
+                                    <th>Order Status</th>
+                                    <th>Cleaning Status</th>
+                                    <th>Cleaning Type</th>
+                                    <th>Timer Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order, cleaning_process in orders_with_cleaning %}
+                                <tr>
+                                    <td>
+                                        <strong class="text-primary">{{ order.order_number }}</strong>
+                                    </td>
+                                    <td>{{ order.finished_good_type }}</td>
+                                    <td>{{ "%.3f"|format(order.quantity) }} tons</td>
+                                    <td>
+                                        {% if order.status == 'pending' %}
+                                            <span class="badge bg-warning">Pending</span>
+                                        {% elif order.status == 'planning' %}
+                                            <span class="badge bg-info">Planning</span>
+                                        {% elif order.status == 'cleaning' %}
+                                            <span class="badge bg-primary">Cleaning</span>
+                                        {% elif order.status == 'completed' %}
+                                            <span class="badge bg-success">Completed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cleaning_process %}
+                                            {% if cleaning_process.status == 'running' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-play me-1"></i>Running
+                                                </span>
+                                            {% elif cleaning_process.status == 'completed' %}
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-check me-1"></i>Completed
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-warning">
+                                                    {{ cleaning_process.status.title() }}
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">Not Started</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cleaning_process %}
+                                            {{ cleaning_process.process_type.replace('_', ' ').title() }}
+                                            <br><small class="text-muted">{{ cleaning_process.duration_hours }}h</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cleaning_process and cleaning_process.timer_active %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-clock me-1"></i>Active
+                                            </span>
+                                        {% elif cleaning_process and cleaning_process.status == 'completed' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Finished
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if order.status in ['planning', 'cleaning'] %}
+                                            <a href="{{ url_for('production_cleaning', order_id=order.id) }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye me-1"></i>View/Start
+                                            </a>
+                                        {% elif order.status == 'pending' %}
+                                            <a href="{{ url_for('production_planning', order_id=order.id) }}" 
+                                               class="btn btn-sm btn-outline-warning">
+                                                <i class="fas fa-cogs me-1"></i>Plan First
+                                            </a>
+                                        {% else %}
+                                            <a href="{{ url_for('production_cleaning', order_id=order.id) }}" 
+                                               class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-eye me-1"></i>View
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-3">
+                            <i class="fas fa-clock fa-3x text-muted"></i>
+                        </div>
+                        <h5 class="text-muted">No production orders yet</h5>
+                        <p class="text-muted mb-0">Create your first production order to start 24-hour cleaning processes</p>
+                        <div class="mt-3">
+                            <a href="{{ url_for('production_orders') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>Create Production Order
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-refresh page every 30 seconds for active processes
+{% if active_processes %}
+setInterval(function() {
+    location.reload();
+}, 30000);
+{% endif %}
+</script>
+{% endblock %}

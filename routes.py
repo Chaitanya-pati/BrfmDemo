@@ -438,10 +438,34 @@ def production_orders():
             db.session.rollback()
             flash(f'Error creating production order: {str(e)}', 'error')
     
-    # Get all production orders
+    # Get all production orders with their cleaning processes
     orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
     
-    return render_template('production_orders.html', orders=orders)
+    # Get cleaning processes for each order
+    cleaning_status = {}
+    for order in orders:
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order.id).first()
+        if cleaning_process:
+            cleaning_status[order.id] = cleaning_process
+    
+    return render_template('production_orders.html', orders=orders, cleaning_status=cleaning_status)
+
+@app.route('/production_cleaning_overview')
+def production_cleaning_overview():
+    """Overview of all production cleaning processes"""
+    # Get all orders with their cleaning processes
+    orders_with_cleaning = db.session.query(ProductionOrder, CleaningProcess)\
+        .outerjoin(CleaningProcess, ProductionOrder.id == CleaningProcess.order_id)\
+        .order_by(ProductionOrder.created_at.desc()).all()
+    
+    # Get active cleaning processes
+    active_processes = CleaningProcess.query.filter(
+        CleaningProcess.status.in_(['running', 'pending'])
+    ).all()
+    
+    return render_template('production_cleaning_overview.html', 
+                         orders_with_cleaning=orders_with_cleaning,
+                         active_processes=active_processes)
 
 @app.route('/production_planning/<int:order_id>', methods=['GET', 'POST'])
 def production_planning(order_id):
