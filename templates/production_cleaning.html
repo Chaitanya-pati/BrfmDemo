@@ -81,7 +81,7 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-8">
+                    <div class="col-12">
                         <!-- Planned Allocations -->
                         <h6 class="mb-3">Planned Allocations</h6>
                         <div class="table-responsive">
@@ -113,23 +113,7 @@
                             </table>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <!-- Transfer Controls -->
-                        <h6 class="mb-3">Select Cleaning Bin</h6>
-                        <select class="form-select" id="cleaning-bin-select">
-                            <option value="">Choose cleaning bin...</option>
-                            {% for bin in cleaning_bins %}
-                            <option value="{{ bin.id }}">
-                                {{ bin.name }} ({{ "%.1f"|format(bin.current_stock) }}/{{ bin.capacity }} tons)
-                            </option>
-                            {% endfor %}
-                        </select>
-                        
-                        <div class="mt-3">
-                            <label class="form-label">Operator Name</label>
-                            <input type="text" class="form-control" id="operator-name" value="Production Operator">
-                        </div>
-                    </div>
+                    
                 </div>
             </div>
         </div>
@@ -506,8 +490,7 @@ let timerData = null;
 document.addEventListener('DOMContentLoaded', function() {
     const startTransferBtns = document.querySelectorAll('.start-transfer-btn');
     const completeTransferBtns = document.querySelectorAll('.complete-transfer-btn');
-    const cleaningBinSelect = document.getElementById('cleaning-bin-select');
-    const operatorNameInput = document.getElementById('operator-name');
+    
     
     // Timer controls
     const processTypeRadios = document.querySelectorAll('input[name="processType"]');
@@ -521,18 +504,9 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', function() {
             const precleaningBinId = this.dataset.precleaningBinId;
             const quantity = parseFloat(this.dataset.quantity);
-            const cleaningBinId = cleaningBinSelect.value;
-            const operatorName = operatorNameInput.value;
-
-            if (!cleaningBinId) {
-                alert('Please select a cleaning bin first');
-                return;
-            }
-
-            if (!operatorName.trim()) {
-                alert('Please enter operator name');
-                return;
-            }
+            // Use default values since controls are removed
+            const cleaningBinId = 1; // Default cleaning bin
+            const operatorName = 'Production Operator'; // Default operator
 
             startTransfer(precleaningBinId, cleaningBinId, quantity, operatorName, this);
         });
