@@ -333,6 +333,63 @@
 </div>
 {% endif %}
 
+<!-- Cleaning Reminders and Photos -->
+{% if cleaning_process and cleaning_process.timer_active %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-camera me-2"></i>Cleaning Reminders & Photos</h6>
+                <button type="button" class="btn btn-light btn-sm" id="refresh-reminders-btn">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="reminders-container">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading reminders...
+                    </div>
+                </div>
+                
+                <!-- Photo Upload Form -->
+                <div class="mt-4 p-3 bg-light rounded" id="photo-upload-section" style="display: none;">
+                    <h6 class="mb-3"><i class="fas fa-upload me-2"></i>Upload Cleaning Photo</h6>
+                    <form id="photo-upload-form" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <input type="hidden" id="reminder-id-input">
+                                <label class="form-label">Photo Type</label>
+                                <select class="form-select" id="photo-type-select" required>
+                                    <option value="">Select type...</option>
+                                    <option value="before">Before Cleaning</option>
+                                    <option value="after">After Cleaning</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Select Photo</label>
+                                <input type="file" class="form-control" id="photo-file-input" accept="image/*" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Notes (Optional)</label>
+                                <input type="text" class="form-control" id="photo-notes-input" placeholder="Add notes about the photo...">
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-info me-2">
+                                <i class="fas fa-upload me-1"></i>Upload Photo
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="cancel-upload-btn">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
 let timerInterval;
 let timerData = null;
@@ -517,7 +574,32 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize timer if active
     {% if cleaning_process and cleaning_process.timer_active %}
     initializeTimer();
+    loadCleaningReminders();
     {% endif %}
+    
+    // Reminder and photo functionality
+    const refreshRemindersBtn = document.getElementById('refresh-reminders-btn');
+    const photoUploadSection = document.getElementById('photo-upload-section');
+    const photoUploadForm = document.getElementById('photo-upload-form');
+    const cancelUploadBtn = document.getElementById('cancel-upload-btn');
+    
+    if (refreshRemindersBtn) {
+        refreshRemindersBtn.addEventListener('click', loadCleaningReminders);
+    }
+    
+    if (cancelUploadBtn) {
+        cancelUploadBtn.addEventListener('click', function() {
+            photoUploadSection.style.display = 'none';
+            photoUploadForm.reset();
+        });
+    }
+    
+    if (photoUploadForm) {
+        photoUploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            uploadPhoto();
+        });
+    }
 
     function initializeTimer() {
         updateTimerDisplay();
@@ -570,6 +652,145 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Timer update failed:', error);
+        });
+    }
+    
+    function loadCleaningReminders() {
+        const container = document.getElementById('reminders-container');
+        container.innerHTML = '<div class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Loading reminders...</div>';
+        
+        fetch('/get_cleaning_reminders/{{ order.id }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.reminders && data.reminders.length > 0) {
+                displayReminders(data.reminders);
+            } else {
+                container.innerHTML = '<div class="text-center text-muted">No reminders yet. Reminders will appear here every minute during the cleaning process.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load reminders:', error);
+            container.innerHTML = '<div class="text-center text-danger">Failed to load reminders. Please refresh the page.</div>';
+        });
+    }
+    
+    function displayReminders(reminders) {
+        const container = document.getElementById('reminders-container');
+        
+        let html = '<div class="row">';
+        
+        reminders.forEach((reminder, index) => {
+            const dueTime = new Date(reminder.due_time).toLocaleTimeString();
+            const reminderClass = reminder.photo_uploaded ? 'border-success' : 
+                                 reminder.reminder_sent ? 'border-warning' : 'border-secondary';
+            
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="card ${reminderClass}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="mb-0">Reminder #${reminder.sequence}</h6>
+                                <small class="text-muted">${dueTime}</small>
+                            </div>
+                            <div class="mb-2">
+                                ${reminder.reminder_sent ? 
+                                    '<span class="badge bg-warning text-dark"><i class="fas fa-bell me-1"></i>Sent</span>' : 
+                                    '<span class="badge bg-secondary"><i class="fas fa-clock me-1"></i>Pending</span>'
+                                }
+                                ${reminder.photo_uploaded ? 
+                                    '<span class="badge bg-success ms-1"><i class="fas fa-check me-1"></i>Photo Uploaded</span>' : ''
+                                }
+                            </div>
+                            
+                            ${reminder.photos && reminder.photos.length > 0 ? `
+                                <div class="mb-2">
+                                    <small class="text-muted">Photos:</small>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        ${reminder.photos.map(photo => `
+                                            <span class="badge bg-light text-dark">
+                                                <i class="fas fa-image me-1"></i>${photo.type}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${!reminder.photo_uploaded && reminder.reminder_sent ? `
+                                <button class="btn btn-sm btn-outline-info upload-photo-btn" 
+                                        data-reminder-id="${reminder.id}">
+                                    <i class="fas fa-camera me-1"></i>Upload Photo
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+        
+        // Add event listeners to upload buttons
+        document.querySelectorAll('.upload-photo-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const reminderId = this.dataset.reminderId;
+                showPhotoUploadForm(reminderId);
+            });
+        });
+    }
+    
+    function showPhotoUploadForm(reminderId) {
+        document.getElementById('reminder-id-input').value = reminderId;
+        document.getElementById('photo-upload-section').style.display = 'block';
+        document.getElementById('photo-upload-section').scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function uploadPhoto() {
+        const form = document.getElementById('photo-upload-form');
+        const formData = new FormData();
+        
+        const reminderId = document.getElementById('reminder-id-input').value;
+        const photoType = document.getElementById('photo-type-select').value;
+        const photoFile = document.getElementById('photo-file-input').files[0];
+        const notes = document.getElementById('photo-notes-input').value;
+        
+        if (!reminderId || !photoType || !photoFile) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        formData.append('reminder_id', reminderId);
+        formData.append('photo_type', photoType);
+        formData.append('photo_file', photoFile);
+        formData.append('notes', notes);
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
+        
+        fetch('/upload_cleaning_photo', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Photo uploaded successfully!');
+                form.reset();
+                document.getElementById('photo-upload-section').style.display = 'none';
+                loadCleaningReminders(); // Refresh reminders
+            } else {
+                alert('Upload failed: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Upload failed:', error);
+            alert('Upload failed. Please try again.');
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
         });
     }
 });

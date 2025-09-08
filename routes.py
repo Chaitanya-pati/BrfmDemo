@@ -831,3 +831,117 @@ def send_cleaning_reminder(reminder_id):
     except Exception as e:
         logging.error(f"Error sending reminder: {e}")
         return False
+
+@app.route('/upload_cleaning_photo', methods=['POST'])
+def upload_cleaning_photo():
+    """Upload cleaning reminder photo"""
+    try:
+        # Get form data
+        reminder_id = request.form.get('reminder_id')
+        photo_type = request.form.get('photo_type')  # 'before', 'after'
+        notes = request.form.get('notes', '')
+        
+        # Validate inputs
+        if not reminder_id or not photo_type:
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Check if file was uploaded
+        if 'photo_file' not in request.files:
+            return jsonify({'error': 'No photo file uploaded'}), 400
+        
+        file = request.files['photo_file']
+        if file.filename == '':
+            return jsonify({'error': 'No photo file selected'}), 400
+        
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid file type'}), 400
+        
+        # Get the reminder
+        reminder = CleaningReminder.query.get(reminder_id)
+        if not reminder:
+            return jsonify({'error': 'Reminder not found'}), 404
+        
+        # Save the file
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"cleaning_{photo_type}_{timestamp}_{filename}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        
+        # Create photo record
+        reminder_photo = CleaningReminderPhoto(
+            reminder_id=reminder_id,
+            photo_type=photo_type,
+            filename=filename,
+            file_path=file_path,
+            upload_time=datetime.utcnow(),
+            notes=notes
+        )
+        
+        db.session.add(reminder_photo)
+        
+        # Update reminder status if this completes the requirement
+        existing_photos = CleaningReminderPhoto.query.filter_by(
+            reminder_id=reminder_id,
+            photo_type=photo_type
+        ).count()
+        
+        if existing_photos == 0:  # This is the first photo of this type
+            reminder.photo_uploaded = True
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'photo_id': reminder_photo.id,
+            'filename': filename,
+            'upload_time': reminder_photo.upload_time.isoformat(),
+            'message': f'{photo_type.title()} photo uploaded successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/get_cleaning_reminders/<int:order_id>')
+def get_cleaning_reminders(order_id):
+    """Get cleaning reminders for an order"""
+    try:
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id).first()
+        if not cleaning_process:
+            return jsonify({'reminders': []})
+        
+        # Get all reminders for this process
+        reminders = CleaningReminder.query.filter_by(
+            cleaning_process_id=cleaning_process.id
+        ).order_by(CleaningReminder.reminder_sequence.desc()).limit(5).all()
+        
+        reminder_data = []
+        for reminder in reminders:
+            # Get photos for this reminder
+            photos = CleaningReminderPhoto.query.filter_by(reminder_id=reminder.id).all()
+            
+            photo_data = []
+            for photo in photos:
+                photo_data.append({
+                    'id': photo.id,
+                    'type': photo.photo_type,
+                    'filename': photo.filename,
+                    'upload_time': photo.upload_time.isoformat() if photo.upload_time else None,
+                    'notes': photo.notes
+                })
+            
+            reminder_data.append({
+                'id': reminder.id,
+                'sequence': reminder.reminder_sequence,
+                'due_time': reminder.due_time.isoformat(),
+                'reminder_sent': reminder.reminder_sent,
+                'photo_uploaded': reminder.photo_uploaded,
+                'photos': photo_data
+            })
+        
+        return jsonify({'reminders': reminder_data})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
