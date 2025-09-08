@@ -838,27 +838,29 @@ def schedule_cleaning_reminder(process_id, due_time):
 def send_cleaning_reminder(reminder_id):
     """Send cleaning reminder (called by scheduler)"""
     try:
-        reminder = CleaningReminder.query.get(reminder_id)
-        if not reminder:
-            return False
-        
-        # Mark reminder as sent
-        reminder.reminder_sent = True
-        reminder.user_notified = 'System'
-        
-        # Schedule next reminder (1 minute later) if process is still active
-        cleaning_process = reminder.cleaning_process
-        current_time = datetime.utcnow()
-        
-        if current_time < cleaning_process.countdown_end:
-            next_reminder_time = current_time + timedelta(minutes=1)
-            if next_reminder_time < cleaning_process.countdown_end:
-                schedule_cleaning_reminder(cleaning_process.id, next_reminder_time)
-        
-        db.session.commit()
-        logging.info(f"Cleaning reminder sent for process {cleaning_process.id}")
-        
-        return True
+        from app import app
+        with app.app_context():
+            reminder = CleaningReminder.query.get(reminder_id)
+            if not reminder:
+                return False
+            
+            # Mark reminder as sent
+            reminder.reminder_sent = True
+            reminder.user_notified = 'System'
+            
+            # Schedule next reminder (1 minute later) if process is still active
+            cleaning_process = reminder.cleaning_process
+            current_time = datetime.utcnow()
+            
+            if current_time < cleaning_process.countdown_end:
+                next_reminder_time = current_time + timedelta(minutes=1)
+                if next_reminder_time < cleaning_process.countdown_end:
+                    schedule_cleaning_reminder(cleaning_process.id, next_reminder_time)
+            
+            db.session.commit()
+            logging.info(f"Cleaning reminder sent for process {cleaning_process.id}")
+            
+            return True
         
     except Exception as e:
         logging.error(f"Error sending reminder: {e}")
