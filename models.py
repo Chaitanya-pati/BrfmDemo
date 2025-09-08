@@ -427,6 +427,16 @@ class CleaningProcess(db.Model):
     # Additional tracking for 12-hour process start parameters
     start_parameters_captured = db.Column(db.Boolean, default=False)
     completion_parameters_captured = db.Column(db.Boolean, default=False)
+    
+    # Post-process data capture fields (to match requirements exactly)
+    moisture_before = db.Column(db.Float)  # Moisture before processing
+    moisture_after = db.Column(db.Float)   # Moisture after processing
+    waste_material_kg = db.Column(db.Float)  # Waste collected in kg
+    water_used_liters = db.Column(db.Float)  # Water added to bins in liters
+    machine_efficiency = db.Column(db.Float)  # Machine efficiency percentage
+    post_process_notes = db.Column(db.Text)   # Process notes
+    completed_by = db.Column(db.String(100))  # Who completed the process
+    completion_time = db.Column(db.DateTime)  # When process was marked complete
 
     # Relationships
     production_order = db.relationship('ProductionOrder', backref='cleaning_processes')
