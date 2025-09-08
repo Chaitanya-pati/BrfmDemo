@@ -153,7 +153,7 @@ class StageParameters(db.Model):
 class MachineCleaningReminder(db.Model):
     """Configurable cleaning reminders for production machines"""
     id = db.Column(db.Integer, primary_key=True)
-    machine_id = db.Column(db.Integer, db.ForeignKey('production_machine.id'), nullable=False)
+    machine_name = db.Column(db.String(100), nullable=False)  # Changed from foreign key to string
     frequency_hours = db.Column(db.Float, nullable=False)  # Configurable frequency
     last_cleaned_at = db.Column(db.DateTime)
     next_cleaning_due = db.Column(db.DateTime)
@@ -310,6 +310,46 @@ class User(db.Model):
     phone = db.Column(db.String(20))
     is_blocked = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Production Order and Planning Models
+class ProductionOrder(db.Model):
+    """Production orders for finished goods"""
+    id = db.Column(db.Integer, primary_key=True)
+    order_number = db.Column(db.String(50), unique=True, nullable=False)
+    quantity_tons = db.Column(db.Float, nullable=False)
+    finished_goods_type = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, planning, in_production, completed
+    created_by = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    planned_at = db.Column(db.DateTime)
+    responsible_person = db.Column(db.String(100))
+    notification_sent = db.Column(db.Boolean, default=False)
+    
+    # Relationships
+    production_plans = db.relationship('ProductionPlan', backref='production_order', lazy=True)
+
+class ProductionPlan(db.Model):
+    """Production planning with bin percentages"""
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    total_percentage = db.Column(db.Float, default=0)
+    is_locked = db.Column(db.Boolean, default=False)
+    created_by = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    plan_items = db.relationship('ProductionPlanItem', backref='production_plan', lazy=True)
+
+class ProductionPlanItem(db.Model):
+    """Individual bin allocation for production plan"""
+    id = db.Column(db.Integer, primary_key=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey('production_plan.id'), nullable=False)
+    precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=False)
+    percentage = db.Column(db.Float, nullable=False)
+    calculated_tons = db.Column(db.Float)
+    
+    # Relationships
+    precleaning_bin = db.relationship('PrecleaningBin', backref='plan_items')
 
 class CleaningReminder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
