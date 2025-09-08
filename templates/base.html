@@ -92,7 +92,21 @@
                     </div>
                 </li>
 
-
+                <!-- Production Management -->
+                <li class="nav-item">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="collapse" data-bs-target="#productionManagement" aria-expanded="false">
+                        <i class="fas fa-cogs"></i><span>Production Management</span>
+                    </a>
+                    <div class="collapse" id="productionManagement">
+                        <ul class="nav flex-column ms-3">
+                            <li class="nav-item">
+                                <a class="nav-link py-2" href="{{ url_for('production_orders') }}">
+                                    <i class="fas fa-clipboard-list"></i>Production Orders
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
 
                 <!-- Sales & Dispatch -->
                 <li class="nav-item">
