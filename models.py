@@ -428,6 +428,9 @@ class CleaningProcess(db.Model):
     start_parameters_captured = db.Column(db.Boolean, default=False)
     completion_parameters_captured = db.Column(db.Boolean, default=False)
 
+    # Relationships
+    production_order = db.relationship('ProductionOrder', backref='cleaning_processes')
+
     # job relationships removed - production functionality deleted
 
 class GrindingProcess(db.Model):
