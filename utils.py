@@ -45,4 +45,18 @@ def get_file_url(filename):
     if filename:
         return f"/uploads/{filename}"
     return None
-# Removed duplicate functions - using the ones above
+
+def notify_responsible_person(order_number, responsible_person, finished_goods_type, quantity_tons):
+    """Notify responsible person about new production order"""
+    # For now, we'll just log the notification
+    # In a real system, this would send an email, SMS, or system notification
+    import logging
+    logging.info(f"NOTIFICATION: Order {order_number} created for {responsible_person}")
+    logging.info(f"  - Type: {finished_goods_type}")
+    logging.info(f"  - Quantity: {quantity_tons} tons")
+    return True
+
+def validate_plan_percentages(plan_items):
+    """Validate that percentages sum to exactly 100%"""
+    total = sum(item['percentage'] for item in plan_items)
+    return abs(total - 100.0) < 0.001  # Allow for small floating point errors

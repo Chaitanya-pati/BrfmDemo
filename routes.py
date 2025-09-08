@@ -4,7 +4,7 @@ from flask import request, render_template, redirect, url_for, flash, jsonify, s
 from werkzeug.utils import secure_filename
 from app import app, db
 from models import *
-from utils import allowed_file, generate_order_number
+from utils import allowed_file, generate_order_number, notify_responsible_person, validate_plan_percentages
 import logging
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
@@ -393,3 +393,150 @@ def init_cleaning_reminders():
         flash(f'Error initializing cleaning reminders: {str(e)}', 'error')
 
     return redirect(url_for('configure_cleaning_frequencies'))
+
+# Production Order Creation and Planning Routes
+@app.route('/production_orders', methods=['GET', 'POST'])
+def production_orders():
+    """Handle production order creation"""
+    if request.method == 'POST':
+        try:
+            # Create new production order
+            order = ProductionOrder()
+            order.order_number = generate_order_number('PRO')
+            order.quantity_tons = float(request.form['quantity_tons'])
+            order.finished_goods_type = request.form['finished_goods_type']
+            order.created_by = request.form.get('created_by', 'Admin')
+            order.responsible_person = request.form.get('responsible_person', 'Production Manager')
+            
+            db.session.add(order)
+            db.session.commit()
+            
+            # Send notification to responsible person
+            notify_responsible_person(
+                order.order_number,
+                order.responsible_person,
+                order.finished_goods_type,
+                order.quantity_tons
+            )
+            
+            # Mark notification as sent
+            order.notification_sent = True
+            db.session.commit()
+            
+            flash(f'Production Order {order.order_number} created successfully! Notification sent to {order.responsible_person}.', 'success')
+            return redirect(url_for('production_orders'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating production order: {str(e)}', 'error')
+    
+    # Get all production orders
+    orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
+    
+    return render_template('production_orders.html', orders=orders)
+
+@app.route('/production_planning/<int:order_id>', methods=['GET', 'POST'])
+def production_planning(order_id):
+    """Handle production planning with bin percentages"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    # Check if order is locked (next stage started)
+    if order.status == 'in_production' or order.status == 'completed':
+        flash('This order is locked and cannot be modified.', 'warning')
+        return redirect(url_for('production_orders'))
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            bin_percentages = {}
+            for key, value in request.form.items():
+                if key.startswith('bin_') and key.endswith('_percentage'):
+                    bin_id = int(key.replace('bin_', '').replace('_percentage', ''))
+                    percentage = float(value) if value else 0
+                    if percentage > 0:
+                        bin_percentages[bin_id] = percentage
+            
+            # Validate percentages sum to 100%
+            total_percentage = sum(bin_percentages.values())
+            if abs(total_percentage - 100.0) > 0.001:
+                flash(f'Total percentage must equal exactly 100%. Current total: {total_percentage:.2f}%', 'error')
+                raise ValueError('Invalid percentage total')
+            
+            # Create or update production plan
+            existing_plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+            if existing_plan:
+                # Delete existing plan items
+                ProductionPlanItem.query.filter_by(plan_id=existing_plan.id).delete()
+                plan = existing_plan
+            else:
+                plan = ProductionPlan(
+                    order_id=order_id,
+                    created_by=request.form.get('created_by', 'Production Manager')
+                )
+                db.session.add(plan)
+                db.session.flush()  # Get plan ID
+            
+            # Create plan items
+            plan.total_percentage = total_percentage
+            for bin_id, percentage in bin_percentages.items():
+                calculated_tons = (percentage / 100) * order.quantity_tons
+                
+                plan_item = ProductionPlanItem(
+                    plan_id=plan.id,
+                    precleaning_bin_id=bin_id,
+                    percentage=percentage,
+                    calculated_tons=calculated_tons
+                )
+                db.session.add(plan_item)
+            
+            # Update order status
+            order.status = 'planning'
+            order.planned_at = datetime.now()
+            
+            db.session.commit()
+            flash('Production plan saved successfully!', 'success')
+            return redirect(url_for('production_planning', order_id=order_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error saving production plan: {str(e)}', 'error')
+    
+    # Get available pre-cleaning bins with current stock
+    bins = PrecleaningBin.query.all()
+    
+    # Get existing plan if any
+    existing_plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+    existing_items = {}
+    if existing_plan:
+        for item in existing_plan.plan_items:
+            existing_items[item.precleaning_bin_id] = {
+                'percentage': item.percentage,
+                'calculated_tons': item.calculated_tons
+            }
+    
+    return render_template('production_planning.html', 
+                         order=order, 
+                         bins=bins, 
+                         existing_items=existing_items)
+
+@app.route('/api/calculate_tons', methods=['POST'])
+def calculate_tons():
+    """API endpoint to calculate tons based on percentage"""
+    try:
+        data = request.get_json()
+        order_id = data['order_id']
+        percentage = float(data['percentage'])
+        
+        order = ProductionOrder.query.get(order_id)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+        
+        calculated_tons = (percentage / 100) * order.quantity_tons
+        
+        return jsonify({
+            'calculated_tons': round(calculated_tons, 3),
+            'order_total': order.quantity_tons
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400

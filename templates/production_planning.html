@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}Production Planning - Wheat Processing Management{% endblock %}
+
+{% block content %}
+<!-- Page Header with Breadcrumb -->
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('production_orders') }}">Production Orders</a></li>
+                <li class="breadcrumb-item active">Planning</li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-0 mt-2">Production Planning</h1>
+        <p class="text-muted mb-0">Plan intake percentages from pre-cleaning bins</p>
+    </div>
+</div>
+
+<!-- Order Information -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm bg-light">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <h6 class="text-muted mb-1">Order Number</h6>
+                        <span class="fw-bold text-primary">{{ order.order_number }}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted mb-1">Finished Goods Type</h6>
+                        <span class="fw-semibold">{{ order.finished_goods_type }}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted mb-1">Total Quantity</h6>
+                        <span class="fw-bold">{{ order.quantity_tons }} tons</span>
+                    </div>
+                    <div class="col-md-2">
+                        <h6 class="text-muted mb-1">Status</h6>
+                        {% if order.status == 'pending' %}
+                            <span class="badge bg-warning">Pending</span>
+                        {% elif order.status == 'planning' %}
+                            <span class="badge bg-info">Planning</span>
+                        {% elif order.status == 'in_production' %}
+                            <span class="badge bg-primary">Locked</span>
+                        {% elif order.status == 'completed' %}
+                            <span class="badge bg-success">Completed</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="row mb-4">
+      <div class="col">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- Planning Form -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-percentage me-2"></i>Bin Allocation Planning</h5>
+                <div id="total-percentage" class="badge bg-light text-dark fs-6">
+                    Total: <span id="percentage-total">0.00</span>%
+                </div>
+            </div>
+            <div class="card-body">
+                {% if order.status not in ['in_production', 'completed'] %}
+                <form method="POST" id="planning-form">
+                    <input type="hidden" name="created_by" value="Production Manager">
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Pre-cleaning Bin</th>
+                                    <th>Current Stock (tons)</th>
+                                    <th>Percentage (%)</th>
+                                    <th>Calculated Tons</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for bin in bins %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3">
+                                                <i class="fas fa-cube text-primary"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-semibold">{{ bin.name }}</div>
+                                                <small class="text-muted">Capacity: {{ bin.capacity }} tons</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="fw-semibold 
+                                            {% if bin.current_stock <= 0 %}text-danger
+                                            {% elif bin.current_stock < 10 %}text-warning
+                                            {% else %}text-success
+                                            {% endif %}">
+                                            {{ bin.current_stock }} tons
+                                        </span>
+                                        <div class="progress progress-sm mt-1" style="height: 4px;">
+                                            <div class="progress-bar 
+                                                {% if bin.current_stock <= 0 %}bg-danger
+                                                {% elif bin.current_stock < 10 %}bg-warning
+                                                {% else %}bg-success
+                                                {% endif %}" 
+                                                style="width: {{ (bin.current_stock / bin.capacity * 100) if bin.capacity > 0 else 0 }}%">
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="input-group">
+                                            <input type="number" 
+                                                   class="form-control percentage-input" 
+                                                   name="bin_{{ bin.id }}_percentage"
+                                                   data-bin-id="{{ bin.id }}"
+                                                   step="0.01" 
+                                                   min="0" 
+                                                   max="100"
+                                                   value="{{ existing_items.get(bin.id, {}).get('percentage', '') }}"
+                                                   {% if bin.current_stock <= 0 %}disabled{% endif %}>
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        {% if bin.current_stock <= 0 %}
+                                            <small class="text-danger">No stock available</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-primary calculated-tons" 
+                                             data-bin-id="{{ bin.id }}">
+                                            {% if existing_items.get(bin.id) %}
+                                                {{ "%.3f"|format(existing_items[bin.id].calculated_tons) }} tons
+                                            {% else %}
+                                                0.000 tons
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Validation Alert -->
+                    <div id="validation-alert" class="alert alert-warning d-none">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="validation-message">Percentages must sum to exactly 100%</span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Percentages must total exactly 100% to save the plan
+                            </small>
+                        </div>
+                        <button type="submit" class="btn btn-success" id="save-plan-btn" disabled>
+                            <i class="fas fa-save me-2"></i>Save Production Plan
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-lock me-2"></i>
+                    This order is locked and cannot be modified as it has moved to the next stage.
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Pre-cleaning Bin</th>
+                                <th>Percentage (%)</th>
+                                <th>Calculated Tons</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bin in bins %}
+                                {% if existing_items.get(bin.id) %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3">
+                                                <i class="fas fa-cube text-primary"></i>
+                                            </div>
+                                            <div class="fw-semibold">{{ bin.name }}</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="fw-semibold">{{ existing_items[bin.id].percentage }}%</span>
+                                    </td>
+                                    <td>
+                                        <span class="fw-semibold text-primary">{{ "%.3f"|format(existing_items[bin.id].calculated_tons) }} tons</span>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Planning Summary -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Planning Summary</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6 class="text-muted mb-2">Total Order Quantity</h6>
+                    <div class="h4 text-primary mb-0">{{ order.quantity_tons }} tons</div>
+                </div>
+                
+                <div class="mb-3">
+                    <h6 class="text-muted mb-2">Total Allocated</h6>
+                    <div class="h5 mb-0" id="total-allocated-tons">0.000 tons</div>
+                </div>
+                
+                <div class="mb-3">
+                    <h6 class="text-muted mb-2">Remaining</h6>
+                    <div class="h5 mb-0" id="remaining-tons">{{ order.quantity_tons }} tons</div>
+                </div>
+                
+                <hr>
+                
+                <div class="small text-muted">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Progress:</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress progress-sm">
+                        <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const orderTotal = {{ order.quantity_tons }};
+    const percentageInputs = document.querySelectorAll('.percentage-input');
+    const totalPercentageSpan = document.getElementById('percentage-total');
+    const savePlanBtn = document.getElementById('save-plan-btn');
+    const validationAlert = document.getElementById('validation-alert');
+    const validationMessage = document.getElementById('validation-message');
+    const totalAllocatedSpan = document.getElementById('total-allocated-tons');
+    const remainingSpan = document.getElementById('remaining-tons');
+    const progressPercentage = document.getElementById('progress-percentage');
+    const progressBar = document.getElementById('progress-bar');
+    
+    function updateCalculations() {
+        let totalPercentage = 0;
+        let totalAllocated = 0;
+        
+        percentageInputs.forEach(input => {
+            if (input.value && !input.disabled) {
+                const percentage = parseFloat(input.value) || 0;
+                const binId = input.dataset.binId;
+                const calculatedTons = (percentage / 100) * orderTotal;
+                
+                totalPercentage += percentage;
+                totalAllocated += calculatedTons;
+                
+                // Update calculated tons display
+                const calculatedDisplay = document.querySelector('.calculated-tons[data-bin-id="' + binId + '"]');
+                if (calculatedDisplay) {
+                    calculatedDisplay.textContent = calculatedTons.toFixed(3) + ' tons';
+                }
+            }
+        });
+        
+        // Update summary displays
+        totalPercentageSpan.textContent = totalPercentage.toFixed(2);
+        totalAllocatedSpan.textContent = totalAllocated.toFixed(3) + ' tons';
+        remainingSpan.textContent = (orderTotal - totalAllocated).toFixed(3) + ' tons';
+        
+        const progress = Math.min((totalPercentage / 100) * 100, 100);
+        progressPercentage.textContent = progress.toFixed(0) + '%';
+        progressBar.style.width = progress + '%';
+        
+        // Validation
+        const isValid = Math.abs(totalPercentage - 100) < 0.001;
+        
+        if (totalPercentage === 0) {
+            validationAlert.classList.add('d-none');
+            savePlanBtn.disabled = true;
+            savePlanBtn.innerHTML = '<i class="fas fa-save me-2"></i>Enter percentages to continue';
+        } else if (isValid) {
+            validationAlert.classList.add('d-none');
+            savePlanBtn.disabled = false;
+            savePlanBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save Production Plan';
+            savePlanBtn.classList.remove('btn-warning');
+            savePlanBtn.classList.add('btn-success');
+        } else {
+            validationAlert.classList.remove('d-none');
+            savePlanBtn.disabled = true;
+            savePlanBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Fix percentages to save';
+            savePlanBtn.classList.remove('btn-success');
+            savePlanBtn.classList.add('btn-warning');
+            
+            if (totalPercentage < 100) {
+                validationMessage.textContent = `Total is ${totalPercentage.toFixed(2)}%. Add ${(100 - totalPercentage).toFixed(2)}% more.`;
+            } else {
+                validationMessage.textContent = `Total is ${totalPercentage.toFixed(2)}%. Remove ${(totalPercentage - 100).toFixed(2)}%.`;
+            }
+        }
+        
+        // Update total percentage badge color
+        const totalBadge = document.getElementById('total-percentage');
+        totalBadge.classList.remove('bg-light', 'bg-warning', 'bg-success');
+        if (isValid) {
+            totalBadge.classList.add('bg-success');
+            totalBadge.classList.add('text-white');
+            totalBadge.classList.remove('text-dark');
+        } else if (totalPercentage > 0) {
+            totalBadge.classList.add('bg-warning');
+            totalBadge.classList.add('text-dark');
+            totalBadge.classList.remove('text-white');
+        } else {
+            totalBadge.classList.add('bg-light');
+            totalBadge.classList.add('text-dark');
+            totalBadge.classList.remove('text-white');
+        }
+    }
+    
+    // Add event listeners
+    percentageInputs.forEach(input => {
+        input.addEventListener('input', updateCalculations);
+        input.addEventListener('change', updateCalculations);
+    });
+    
+    // Initial calculation
+    updateCalculations();
+});
+</script>
+{% endblock %}
