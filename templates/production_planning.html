@@ -283,6 +283,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const binId = input.dataset.binId;
                 const calculatedTons = (percentage / 100) * orderTotal;
 
+                // Add to totals
+                totalPercentage += percentage;
+                totalAllocated += calculatedTons;
+
                 // Update calculated tons display
                 const calculatedDisplay = document.querySelector('.calculated-tons[data-bin-id="' + binId + '"]');
                 if (calculatedDisplay) {
