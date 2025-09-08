@@ -368,6 +368,7 @@ class CleaningReminder(db.Model):
     user_notified = db.Column(db.String(100))
     completed = db.Column(db.Boolean, default=False)
     reminder_sequence = db.Column(db.Integer, default=1)  # 1, 2, 3... for multiple reminders
+    photo_uploaded = db.Column(db.Boolean, default=False)  # Track if photo has been uploaded
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationship
