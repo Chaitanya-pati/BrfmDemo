@@ -34,7 +34,7 @@
                     </div>
                     <div class="col-md-3">
                         <h6 class="text-muted mb-1">Total Quantity</h6>
-                        <span class="fw-bold">{{ "%.2f"|format(order.quantity) }} tons</span>
+                        <span class="fw-bold">{{ "%.3f"|format(order.quantity_tons) }} tons</span>
                     </div>
                     <div class="col-md-2">
                         <h6 class="text-muted mb-1">Status</h6>
@@ -231,7 +231,7 @@
             <div class="card-body">
                 <div class="mb-3">
                     <h6 class="text-muted mb-2">Total Order Quantity</h6>
-                    <div class="h4 text-primary mb-0">{{ "%.2f"|format(order.quantity) }} tons</div>
+                    <div class="h4 text-primary mb-0">{{ "%.3f"|format(order.quantity_tons) }} tons</div>
                 </div>
 
                 <div class="mb-3">
@@ -241,7 +241,7 @@
 
                 <div class="mb-3">
                     <h6 class="text-muted mb-2">Remaining</h6>
-                    <div class="h5 mb-0" id="remaining-tons">{{ order.quantity }} tons</div>
+                    <div class="h5 mb-0" id="remaining-tons">{{ "%.3f"|format(order.quantity_tons) }} tons</div>
                 </div>
 
                 <hr>
