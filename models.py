@@ -49,8 +49,7 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     category = db.Column(db.String(50))  # Main Product or Bran
     description = db.Column(db.Text)
-    unit = db.Column(db.String(20), default='kg')
-    standard_price = db.Column(db.Float, default=0.0)
+    # unit and standard_price columns don't exist in database, removing to match schema
 
 class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -201,7 +200,7 @@ class CleaningLog(db.Model):
 class ProductionOrder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(50), unique=True, nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True)
+    product = db.Column(db.String(100), nullable=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=True)
     quantity = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed
@@ -213,7 +212,7 @@ class ProductionOrder(db.Model):
     notes = db.Column(db.Text)  # Added notes field
     
     # Relationships
-    product = db.relationship('Product', backref='production_orders')
+    # product relationship removed since it's now a string field
     customer = db.relationship('Customer', backref='production_orders')
     production_plans = db.relationship('ProductionPlan', backref='order', lazy=True)
     production_jobs = db.relationship('ProductionJobNew', back_populates='order', lazy=True)
