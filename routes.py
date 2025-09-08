@@ -491,7 +491,6 @@ def production_planning(order_id):
             
             # Update order status
             order.status = 'planning'
-            order.planned_at = datetime.now()
             
             db.session.commit()
             flash('Production plan saved successfully!', 'success')

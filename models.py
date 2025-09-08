@@ -321,7 +321,6 @@ class ProductionOrder(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, planning, in_production, completed
     created_by = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    planned_at = db.Column(db.DateTime)
     responsible_person = db.Column(db.String(100))
     notification_sent = db.Column(db.Boolean, default=False)
     
