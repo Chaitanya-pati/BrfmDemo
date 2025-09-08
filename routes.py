@@ -741,10 +741,14 @@ def start_cleaning_process():
         
         # Update cleaning bin status
         cleaning_bin = CleaningBin.query.get(cleaning_bin_id)
+        if not cleaning_bin:
+            return jsonify({'error': 'Cleaning bin not found'}), 400
         cleaning_bin.status = 'cleaning'
         
         # Update order status
         order = ProductionOrder.query.get(order_id)
+        if not order:
+            return jsonify({'error': 'Production order not found'}), 400
         order.status = 'cleaning'
         
         db.session.commit()
