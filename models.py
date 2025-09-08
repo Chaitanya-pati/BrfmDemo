@@ -207,9 +207,10 @@ class ProductionOrder(db.Model):
     priority = db.Column(db.String(20), default='normal')  # low, normal, high
     created_by = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    target_completion_date = db.Column(db.DateTime)
+    target_completion = db.Column(db.DateTime)
     deadline = db.Column(db.DateTime)  # Added deadline field
-    notes = db.Column(db.Text)  # Added notes field
+    description = db.Column(db.Text)  # matches database column name
+    finished_good_type = db.Column(db.String(50))  # matches database column
     
     # Relationships
     # product relationship removed since it's now a string field
