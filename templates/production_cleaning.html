@@ -608,7 +608,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             if (confirm(`Start transfer of ${quantity} tons from pre-cleaning bin to cleaning bin?`)) {
+                {% if order %}
                 startTransfer({{ order.id }}, precleaningBinId, cleaningBinId, quantity);
+                {% else %}
+                alert('Error: Order information not available');
+                {% endif %}
             }
         });
     });
@@ -641,7 +645,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Start transfer function
 function startTransfer(orderId, precleaningBinId, cleaningBinId, quantity) {
-    const operatorName = document.getElementById('process-operator').value || 'Operator';
+    console.log('Starting transfer with:', { orderId, precleaningBinId, cleaningBinId, quantity });
+    
+    const operatorElement = document.getElementById('process-operator');
+    const operatorName = operatorElement ? operatorElement.value || 'Operator' : 'Operator';
+    
+    // Disable the button to prevent multiple clicks
+    const transferBtn = document.querySelector(`[data-precleaning-bin-id="${precleaningBinId}"]`);
+    if (transferBtn) {
+        transferBtn.disabled = true;
+        transferBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Starting...';
+    }
     
     fetch('/start_transfer', {
         method: 'POST',
@@ -656,19 +670,33 @@ function startTransfer(orderId, precleaningBinId, cleaningBinId, quantity) {
             operator_name: operatorName
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
-            showAlert('Transfer started successfully!', 'success');
+            showNotification('Transfer started successfully! Job ID: ' + data.job_id, 'success');
             // Reload page to show updated transfer jobs
             setTimeout(() => location.reload(), 1000);
         } else {
-            showAlert(data.error || 'Error starting transfer', 'error');
+            showNotification(data.error || 'Error starting transfer', 'error');
+            // Re-enable button on error
+            if (transferBtn) {
+                transferBtn.disabled = false;
+                transferBtn.innerHTML = '<i class="fas fa-play me-1"></i>Start Transfer';
+            }
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('Error starting transfer', 'error');
+        showNotification('Error starting transfer: ' + error.message, 'error');
+        // Re-enable button on error
+        if (transferBtn) {
+            transferBtn.disabled = false;
+            transferBtn.innerHTML = '<i class="fas fa-play me-1"></i>Start Transfer';
+        }
     });
 }
 
