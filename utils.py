@@ -9,17 +9,15 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def generate_order_number(prefix='PO'):
+def generate_order_number(prefix='ORD'):
     """Generate unique order number"""
-    timestamp = datetime.now().strftime('%Y%m%d%H%M')
-    random_suffix = ''.join(random.choices(string.digits, k=4))
-    return f"{prefix}{timestamp}{random_suffix}"
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    return f"{prefix}{timestamp}{random.randint(10, 99)}"
 
 def generate_job_id():
-    """Generate unique job ID"""
+    """Generate unique job ID for transfer jobs"""
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"JOB{timestamp}{random_suffix}"
+    return f"TJ{timestamp}{random.randint(10, 99)}"
 
 def calculate_production_percentages(plan_items, total_quantity):
     """Calculate quantities based on percentages"""

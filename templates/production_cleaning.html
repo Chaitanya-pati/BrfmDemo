@@ -575,6 +575,134 @@
 </style>
 
 <script>
+// Custom duration radio button handling
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle custom duration radio button
+    const customRadio = document.getElementById('durationCustom');
+    const customHoursInput = document.getElementById('customHours');
+    const radioButtons = document.querySelectorAll('input[name="processType"]');
+    
+    // Enable/disable custom hours input based on radio selection
+    radioButtons.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customHoursInput.disabled = false;
+                customHoursInput.focus();
+            } else {
+                customHoursInput.disabled = true;
+            }
+        });
+    });
+    
+    // Start transfer button functionality
+    document.querySelectorAll('.start-transfer-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const precleaningBinId = this.dataset.precleaningBinId;
+            const quantity = parseFloat(this.dataset.quantity);
+            const cleaningBinSelect = document.getElementById('process-cleaning-bin');
+            const cleaningBinId = cleaningBinSelect.value;
+            
+            if (!cleaningBinId) {
+                alert('Please select a cleaning bin first');
+                return;
+            }
+            
+            if (confirm(`Start transfer of ${quantity} tons from pre-cleaning bin to cleaning bin?`)) {
+                startTransfer({{ order.id }}, precleaningBinId, cleaningBinId, quantity);
+            }
+        });
+    });
+    
+    // Start cleaning process button
+    document.getElementById('start-process-btn').addEventListener('click', function() {
+        const processType = document.querySelector('input[name="processType"]:checked').value;
+        const cleaningBinId = document.getElementById('process-cleaning-bin').value;
+        const operatorName = document.getElementById('process-operator').value;
+        const customHours = document.getElementById('customHours').value;
+        
+        if (!cleaningBinId) {
+            alert('Please select a cleaning bin');
+            return;
+        }
+        
+        if (!operatorName.trim()) {
+            alert('Please enter operator name');
+            return;
+        }
+        
+        if (processType === 'custom' && (!customHours || customHours <= 0)) {
+            alert('Please enter a valid custom duration');
+            return;
+        }
+        
+        startCleaningProcess(processType, cleaningBinId, operatorName, customHours);
+    });
+});
+
+// Start transfer function
+function startTransfer(orderId, precleaningBinId, cleaningBinId, quantity) {
+    const operatorName = document.getElementById('process-operator').value || 'Operator';
+    
+    fetch('/start_transfer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            order_id: orderId,
+            precleaning_bin_id: precleaningBinId,
+            cleaning_bin_id: cleaningBinId,
+            quantity_tons: quantity,
+            operator_name: operatorName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Transfer started successfully!', 'success');
+            // Reload page to show updated transfer jobs
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert(data.error || 'Error starting transfer', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Error starting transfer', 'error');
+    });
+}
+
+// Start cleaning process function
+function startCleaningProcess(processType, cleaningBinId, operatorName, customHours) {
+    fetch('/start_cleaning_process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            order_id: {{ order.id }},
+            process_type: processType,
+            cleaning_bin_id: cleaningBinId,
+            operator_name: operatorName,
+            custom_hours: customHours
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Cleaning process started successfully!', 'success');
+            // Reload page to show timer
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert(data.error || 'Error starting cleaning process', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Error starting cleaning process', 'error');
+    });
+}
+
 // Manual Cleaning Modal Functions
 function openManualCleaningModal(orderId, cleaningProcessId, machineName) {
     document.getElementById('manual_order_id').value = orderId;
@@ -726,8 +854,59 @@ document.addEventListener('DOMContentLoaded', function() {
     loadManualCleaningHistory();
 });
 
+// Add missing utility function for job ID generation
+function generate_job_id() {
+    return 'TJ' + Date.now().toString().substr(-8);
+}
 
 // Timer update functionality
 function updateTimer() {
+    // Timer functionality here if needed
+}
+
+// Photo upload functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Photo upload form handler
+    const photoUploadForm = document.getElementById('photo-upload-form');
+    if (photoUploadForm) {
+        photoUploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('reminder_id', document.getElementById('reminder-id-input').value);
+            formData.append('photo_type', document.getElementById('photo-type-select').value);
+            formData.append('photo_file', document.getElementById('photo-file-input').files[0]);
+            formData.append('notes', document.getElementById('photo-notes-input').value);
+            
+            fetch('/upload_cleaning_photo', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Photo uploaded successfully!', 'success');
+                    document.getElementById('photo-upload-section').style.display = 'none';
+                    photoUploadForm.reset();
+                } else {
+                    showAlert(data.error || 'Error uploading photo', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Error uploading photo', 'error');
+            });
+        });
+    }
+    
+    // Cancel upload button
+    const cancelUploadBtn = document.getElementById('cancel-upload-btn');
+    if (cancelUploadBtn) {
+        cancelUploadBtn.addEventListener('click', function() {
+            document.getElementById('photo-upload-section').style.display = 'none';
+            document.getElementById('photo-upload-form').reset();
+        });
+    }
+});
 </script>
 {% endblock %}
