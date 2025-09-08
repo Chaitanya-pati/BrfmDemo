@@ -1103,12 +1103,15 @@ def submit_post_process_data():
         if current_time < cleaning_process.countdown_end:
             return jsonify({'error': 'Cannot submit data until cleaning process is complete'}), 400
         
+        # Get machine name
+        machine_name = data.get('machine_name', '')
+        
         # Update cleaning process with post-process data
         cleaning_process.moisture_before = moisture_before
         cleaning_process.moisture_after = moisture_after
         cleaning_process.waste_material_kg = waste_material_kg
         cleaning_process.water_used_liters = water_used_liters
-        cleaning_process.machine_efficiency = machine_efficiency
+        cleaning_process.machine_name = machine_name
         cleaning_process.post_process_notes = operator_notes
         cleaning_process.completed_by = operator_name
         cleaning_process.completion_time = current_time
@@ -1134,6 +1137,122 @@ def submit_post_process_data():
             'moisture_reduction': round(moisture_reduction, 2),
             'cleaning_efficiency': round(cleaning_efficiency, 2),
             'message': 'Post-process data submitted successfully. Cleaning process completed!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/get_pending_reminders/<int:order_id>')
+def get_pending_reminders(order_id):
+    """Get pending reminders for a cleaning process"""
+    try:
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, timer_active=True).first()
+        
+        if not cleaning_process:
+            return jsonify({'has_pending': False})
+        
+        # Find the latest reminder that has been sent but not completed
+        pending_reminder = CleaningReminder.query.filter_by(
+            cleaning_process_id=cleaning_process.id,
+            reminder_sent=True,
+            completed=False
+        ).order_by(CleaningReminder.due_time.desc()).first()
+        
+        if pending_reminder:
+            return jsonify({
+                'has_pending': True,
+                'reminder': {
+                    'id': pending_reminder.id,
+                    'order_id': order_id,
+                    'sequence': pending_reminder.reminder_sequence,
+                    'due_time': pending_reminder.due_time.isoformat()
+                }
+            })
+        
+        return jsonify({'has_pending': False})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/upload_reminder_photos', methods=['POST'])
+def upload_reminder_photos():
+    """Upload both before and after photos for a cleaning reminder"""
+    try:
+        # Get form data
+        reminder_id = request.form.get('reminder_id')
+        before_notes = request.form.get('before_notes', '')
+        after_notes = request.form.get('after_notes', '')
+        cleaning_area = request.form.get('cleaning_area', '')
+        
+        if not reminder_id:
+            return jsonify({'error': 'Missing reminder ID'}), 400
+        
+        # Check if files were uploaded
+        if 'before_photo' not in request.files or 'after_photo' not in request.files:
+            return jsonify({'error': 'Both before and after photos are required'}), 400
+        
+        before_file = request.files['before_photo']
+        after_file = request.files['after_photo']
+        
+        if before_file.filename == '' or after_file.filename == '':
+            return jsonify({'error': 'Both photos must be selected'}), 400
+        
+        if not allowed_file(before_file.filename) or not allowed_file(after_file.filename):
+            return jsonify({'error': 'Invalid file type'}), 400
+        
+        # Get the reminder
+        reminder = CleaningReminder.query.get(reminder_id)
+        if not reminder:
+            return jsonify({'error': 'Reminder not found'}), 404
+        
+        # Save before photo
+        before_filename = secure_filename(before_file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        before_filename = f"cleaning_before_{timestamp}_{before_filename}"
+        before_path = os.path.join(app.config['UPLOAD_FOLDER'], before_filename)
+        before_file.save(before_path)
+        
+        # Save after photo
+        after_filename = secure_filename(after_file.filename)
+        after_filename = f"cleaning_after_{timestamp}_{after_filename}"
+        after_path = os.path.join(app.config['UPLOAD_FOLDER'], after_filename)
+        after_file.save(after_path)
+        
+        # Create photo records
+        before_photo = CleaningReminderPhoto(
+            reminder_id=reminder_id,
+            photo_type='before',
+            file_path=before_path,
+            uploaded_by='System User',
+            uploaded_at=datetime.utcnow(),
+            notes=f"{cleaning_area} - {before_notes}".strip(' -')
+        )
+        
+        after_photo = CleaningReminderPhoto(
+            reminder_id=reminder_id,
+            photo_type='after',
+            file_path=after_path,
+            uploaded_by='System User',
+            uploaded_at=datetime.utcnow(),
+            notes=f"{cleaning_area} - {after_notes}".strip(' -')
+        )
+        
+        db.session.add(before_photo)
+        db.session.add(after_photo)
+        
+        # Mark reminder as completed
+        reminder.completed = True
+        reminder.photo_uploaded = True
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'before_photo_id': before_photo.id,
+            'after_photo_id': after_photo.id,
+            'upload_time': before_photo.uploaded_at.isoformat(),
+            'message': 'Cleaning photos uploaded successfully'
         })
         
     except Exception as e:

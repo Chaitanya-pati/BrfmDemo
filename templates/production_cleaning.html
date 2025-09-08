@@ -979,6 +979,9 @@ function updateTimerDisplay() {
                 statusBadge.textContent = 'Completed';
                 statusBadge.className = 'badge bg-success text-white';
                 
+                // Show post-process form
+                document.getElementById('post-process-section').style.display = 'block';
+                
                 // Clear interval to stop updating
                 if (window.timerInterval) {
                     clearInterval(window.timerInterval);
@@ -1012,6 +1015,9 @@ function updateTimerDisplay() {
         // Update status
         statusBadge.textContent = 'Running';
         statusBadge.className = 'badge bg-primary text-white';
+        
+        // Check for pending reminders every 10 seconds
+        checkForPendingReminders();
         
     })
     .catch(error => {
@@ -1072,5 +1078,152 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Check for pending reminders
+function checkForPendingReminders() {
+    fetch(`/api/get_pending_reminders/{{ order.id }}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.has_pending && !document.getElementById('cleaningReminderModal').classList.contains('show')) {
+            showReminderModal(data.reminder);
+        }
+    })
+    .catch(error => {
+        console.error('Error checking reminders:', error);
+    });
+}
+
+// Show reminder modal
+function showReminderModal(reminder) {
+    document.getElementById('reminder_id').value = reminder.id;
+    document.getElementById('reminder_order_id').value = reminder.order_id;
+    document.getElementById('reminder-sequence').textContent = reminder.sequence;
+    
+    const modal = new bootstrap.Modal(document.getElementById('cleaningReminderModal'));
+    modal.show();
+}
+
+// Handle reminder photo form submission
+document.getElementById('reminderPhotoForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+    
+    fetch('/upload_reminder_photos', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('cleaningReminderModal')).hide();
+            
+            // Show success message
+            showAlert('Cleaning photos uploaded successfully!', 'success');
+            
+            // Reset form
+            this.reset();
+        } else {
+            showAlert(data.error || 'Error uploading photos', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Error uploading photos', 'error');
+    })
+    .finally(() => {
+        // Restore button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+// Handle post-process form submission
+document.getElementById('post-process-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        order_id: {{ order.id }},
+        moisture_before: parseFloat(document.getElementById('moisture-before').value),
+        moisture_after: parseFloat(document.getElementById('moisture-after').value),
+        waste_material_kg: parseFloat(document.getElementById('waste-material').value),
+        water_used_liters: parseFloat(document.getElementById('water-used').value),
+        machine_name: document.getElementById('machine-name').value,
+        operator_name: document.getElementById('post-process-operator').value,
+        operator_notes: document.getElementById('process-notes').value
+    };
+    
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Completing...';
+    
+    fetch('/submit_post_process_data', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Cleaning process completed successfully!', 'success');
+            
+            // Update calculated metrics
+            document.getElementById('moisture-reduction-display').textContent = data.moisture_reduction + '%';
+            document.getElementById('cleaning-efficiency-display').textContent = data.cleaning_efficiency + '%';
+            
+            // Redirect after short delay
+            setTimeout(() => {
+                window.location.href = '/production_orders';
+            }, 2000);
+        } else {
+            showAlert(data.error || 'Error completing process', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Error completing process', 'error');
+    })
+    .finally(() => {
+        // Restore button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+// Calculate metrics in real-time
+document.getElementById('moisture-before').addEventListener('input', calculateMetrics);
+document.getElementById('moisture-after').addEventListener('input', calculateMetrics);
+
+function calculateMetrics() {
+    const before = parseFloat(document.getElementById('moisture-before').value) || 0;
+    const after = parseFloat(document.getElementById('moisture-after').value) || 0;
+    
+    if (before > 0 && after >= 0) {
+        const reduction = before - after;
+        const efficiency = (reduction / before) * 100;
+        
+        document.getElementById('moisture-reduction-display').textContent = reduction.toFixed(2) + '%';
+        document.getElementById('cleaning-efficiency-display').textContent = efficiency.toFixed(2) + '%';
+    }
+}
+
+{% if cleaning_process and cleaning_process.timer_active %}
+// Initialize timer if cleaning process is active
+document.addEventListener('DOMContentLoaded', function() {
+    initializeTimer();
+});
+{% endif %}
 </script>
 {% endblock %}
