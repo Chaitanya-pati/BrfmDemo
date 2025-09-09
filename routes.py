@@ -1753,3 +1753,262 @@ def upload_reminder_photos():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
+# Enhanced Grinding Process Routes
+@app.route('/start_grinding/<int:order_id>', methods=['GET', 'POST'])
+def start_grinding(order_id):
+    """Start grinding process after 12-hour cleaning completion"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    # Check if 12-hour process is completed
+    if order.status != 'completed':
+        flash('12-hour cleaning must be completed before starting grinding process.', 'error')
+        return redirect(url_for('production_orders'))
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            b1_scale_operator = request.form['b1_scale_operator']
+            b1_scale_weight = float(request.form['b1_scale_weight'])
+            b1_scale_notes = request.form.get('b1_scale_notes', '')
+            grinding_machine = request.form['grinding_machine']
+            grinding_operator = request.form['grinding_operator']
+            
+            # Create grinding session
+            grinding_session = GrindingSession(
+                order_id=order_id,
+                start_time=datetime.utcnow(),
+                timer_active=True,
+                b1_scale_operator=b1_scale_operator,
+                b1_scale_handoff_time=datetime.utcnow(),
+                b1_scale_weight_kg=b1_scale_weight,
+                b1_scale_notes=b1_scale_notes,
+                grinding_machine_name=grinding_machine,
+                grinding_operator=grinding_operator,
+                total_input_kg=b1_scale_weight,
+                status='grinding'
+            )
+            
+            db.session.add(grinding_session)
+            
+            # Update order status to grinding
+            order.status = 'grinding'
+            
+            db.session.commit()
+            
+            flash(f'Grinding process started successfully! Timer is now running.', 'success')
+            return redirect(url_for('grinding_execution', order_id=order_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting grinding process: {str(e)}', 'error')
+    
+    return render_template('start_grinding.html', order=order)
+
+@app.route('/grinding_execution/<int:order_id>')
+def grinding_execution(order_id):
+    """Monitor grinding process with live timer and production ratios"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    grinding_session = GrindingSession.query.filter_by(order_id=order_id, status='grinding').first()
+    
+    if not grinding_session:
+        flash('No active grinding session found.', 'error')
+        return redirect(url_for('production_orders'))
+    
+    # Get storage areas for finished goods placement
+    storage_areas = StorageArea.query.all()
+    
+    return render_template('grinding_execution.html', 
+                         order=order, 
+                         grinding_session=grinding_session,
+                         storage_areas=storage_areas)
+
+@app.route('/stop_grinding/<int:session_id>', methods=['POST'])
+def stop_grinding(session_id):
+    """Stop grinding timer and finalize session"""
+    try:
+        grinding_session = GrindingSession.query.get_or_404(session_id)
+        
+        if not grinding_session.timer_active:
+            return jsonify({'error': 'Timer is not active'}), 400
+        
+        # Stop timer and calculate duration
+        end_time = datetime.utcnow()
+        duration_seconds = int((end_time - grinding_session.start_time).total_seconds())
+        
+        grinding_session.end_time = end_time
+        grinding_session.duration_seconds = duration_seconds
+        grinding_session.timer_active = False
+        grinding_session.status = 'completed'
+        
+        # Update order status
+        order = ProductionOrder.query.get(grinding_session.order_id)
+        order.status = 'grinding_completed'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'duration_seconds': duration_seconds,
+            'end_time': end_time.isoformat(),
+            'message': 'Grinding process completed successfully!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/grinding_timer_status/<int:order_id>')
+def get_grinding_timer_status(order_id):
+    """Get current timer status for grinding process"""
+    try:
+        grinding_session = GrindingSession.query.filter_by(
+            order_id=order_id, 
+            timer_active=True
+        ).first()
+        
+        if not grinding_session:
+            return jsonify({'timer_active': False})
+        
+        current_time = datetime.utcnow()
+        elapsed_seconds = int((current_time - grinding_session.start_time).total_seconds())
+        
+        # Manual cleaning reminder every 10 seconds
+        needs_manual_cleaning = (elapsed_seconds % 10 == 0) and elapsed_seconds > 0
+        
+        return jsonify({
+            'timer_active': True,
+            'start_time': grinding_session.start_time.isoformat(),
+            'elapsed_seconds': elapsed_seconds,
+            'b1_scale_weight': grinding_session.b1_scale_weight_kg,
+            'grinding_machine': grinding_session.grinding_machine_name,
+            'grinding_operator': grinding_session.grinding_operator,
+            'needs_manual_cleaning': needs_manual_cleaning,
+            'session_id': grinding_session.id
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/submit_production_outputs', methods=['POST'])
+def submit_production_outputs():
+    """Submit production outputs with ratio validation"""
+    try:
+        data = request.get_json()
+        session_id = data['session_id']
+        outputs = data['outputs']  # List of {product_name, product_type, quantity_kg}
+        
+        grinding_session = GrindingSession.query.get_or_404(session_id)
+        
+        total_output = 0
+        main_products_total = 0
+        bran_total = 0
+        
+        # Calculate totals and save outputs
+        for output in outputs:
+            product_output = ProductionOutput(
+                grinding_session_id=session_id,
+                product_name=output['product_name'],
+                product_type=output['product_type'],
+                quantity_kg=float(output['quantity_kg']),
+                percentage_of_total=0  # Will calculate after loop
+            )
+            
+            db.session.add(product_output)
+            
+            quantity = float(output['quantity_kg'])
+            total_output += quantity
+            
+            if output['product_type'] == 'main_product':
+                main_products_total += quantity
+            elif output['product_type'] == 'bran':
+                bran_total += quantity
+        
+        # Calculate percentages
+        main_percentage = (main_products_total / total_output * 100) if total_output > 0 else 0
+        bran_percentage = (bran_total / total_output * 100) if total_output > 0 else 0
+        
+        # Update percentages in outputs
+        for output in ProductionOutput.query.filter_by(grinding_session_id=session_id):
+            output.percentage_of_total = (output.quantity_kg / total_output * 100) if total_output > 0 else 0
+        
+        # Update grinding session
+        grinding_session.total_output_kg = total_output
+        grinding_session.main_products_kg = main_products_total
+        grinding_session.bran_kg = bran_total
+        grinding_session.main_products_percentage = main_percentage
+        grinding_session.bran_percentage = bran_percentage
+        
+        # Check for bran alert (>25%)
+        bran_alert = bran_percentage > 25.0
+        grinding_session.bran_alert_triggered = bran_alert
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'total_output_kg': total_output,
+            'main_products_percentage': round(main_percentage, 2),
+            'bran_percentage': round(bran_percentage, 2),
+            'bran_alert': bran_alert,
+            'message': 'Production outputs recorded successfully!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/upload_grinding_cleaning_photo', methods=['POST'])
+def upload_grinding_cleaning_photo():
+    """Upload manual cleaning photos during grinding (every 10 seconds)"""
+    try:
+        session_id = request.form.get('session_id')
+        photo_type = request.form.get('photo_type')  # 'before', 'after'
+        operator_name = request.form.get('operator_name', 'Operator')
+        notes = request.form.get('notes', '')
+        
+        if not session_id or not photo_type:
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Check if file was uploaded
+        if 'photo_file' not in request.files:
+            return jsonify({'error': 'No photo file uploaded'}), 400
+        
+        file = request.files['photo_file']
+        if file.filename == '' or not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid photo file'}), 400
+        
+        # Save the file
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"grinding_{photo_type}_{timestamp}_{filename}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        
+        # Create or update manual cleaning log
+        grinding_cleaning = GrindingManualCleaning(
+            grinding_session_id=int(session_id),
+            operator_name=operator_name,
+            notes=notes,
+            status='completed'
+        )
+        
+        # Set appropriate photo field
+        if photo_type == 'before':
+            grinding_cleaning.before_photo = filename
+        else:
+            grinding_cleaning.after_photo = filename
+        
+        db.session.add(grinding_cleaning)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'upload_time': datetime.utcnow().isoformat(),
+            'message': f'{photo_type.title()} photo uploaded successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
