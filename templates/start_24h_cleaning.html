@@ -1,0 +1,172 @@
+
+{% extends "base.html" %}
+
+{% block title %}Start 24-Hour Cleaning - Order {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="row align-items-center mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('production_orders') }}">Production Orders</a></li>
+                    <li class="breadcrumb-item active">Start 24-Hour Cleaning</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0 mt-2">Start 24-Hour Cleaning Process</h1>
+            <p class="text-muted mb-0">Setup and initiate the 24-hour cleaning stage</p>
+        </div>
+    </div>
+
+    <!-- Order Information -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Order Number:</strong><br>
+                            <span class="badge bg-primary fs-6">{{ order.order_number }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Product Type:</strong><br>
+                            {{ order.finished_good_type }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Quantity:</strong><br>
+                            {{ order.quantity }} tons
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Status:</strong><br>
+                            <span class="badge bg-info">Ready for Cleaning</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 24-Hour Cleaning Setup Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-play me-2"></i>Setup 24-Hour Cleaning Process</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-clock me-2"></i>24-Hour Cleaning Duration *
+                                </label>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" 
+                                                           name="duration_option" id="duration_24" value="24" checked>
+                                                    <label class="form-check-label" for="duration_24">
+                                                        <strong>24 Hours (Standard)</strong><br>
+                                                        <small class="text-muted">Standard 24-hour process</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" 
+                                                           name="duration_option" id="duration_18" value="18">
+                                                    <label class="form-check-label" for="duration_18">
+                                                        <strong>18 Hours</strong><br>
+                                                        <small class="text-muted">Shorter cleaning cycle</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" 
+                                                           name="duration_option" id="duration_test" value="0.1">
+                                                    <label class="form-check-label" for="duration_test">
+                                                        <strong>6 Minutes (Testing)</strong><br>
+                                                        <small class="text-muted">For testing purposes</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" name="duration_hours" id="duration_hours" value="24">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="cleaning_bin_id" class="form-label">
+                                    <i class="fas fa-box me-2"></i>24-Hour Cleaning Bin *
+                                </label>
+                                <select class="form-select" id="cleaning_bin_id" name="cleaning_bin_id" required>
+                                    <option value="">Select 24-Hour Cleaning Bin</option>
+                                    <option value="1">24-Hour Cleaning Bin #1 (Default)</option>
+                                    {% for bin in cleaning_bins %}
+                                    <option value="{{ bin.id }}">{{ bin.name }} (Capacity: {{ bin.capacity }}kg)</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="machine_name" class="form-label">
+                                    <i class="fas fa-cogs me-2"></i>Machine Name *
+                                </label>
+                                <input type="text" class="form-control" id="machine_name" 
+                                       name="machine_name" required placeholder="e.g., 24-Hour Cleaning Machine #1">
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="operator_name" class="form-label">
+                                    <i class="fas fa-user me-2"></i>Operator Name *
+                                </label>
+                                <input type="text" class="form-control" id="operator_name" 
+                                       name="operator_name" required placeholder="Enter operator name">
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Note:</strong> Once started, this process will run for the selected duration. 
+                            You will receive cleaning reminders every minute for manual machine cleaning.
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancel</button>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-play me-1"></i>Start 24-Hour Cleaning
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle duration radio buttons
+    const durationRadios = document.querySelectorAll('input[name="duration_option"]');
+    const durationHours = document.getElementById('duration_hours');
+    
+    durationRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            durationHours.value = this.value;
+        });
+    });
+});
+</script>
+{% endblock %}

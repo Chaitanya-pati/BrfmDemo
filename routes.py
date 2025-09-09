@@ -1223,6 +1223,85 @@ def submit_post_process_data():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
+@app.route('/start_24h_cleaning/<int:order_id>', methods=['GET', 'POST'])
+def start_24h_cleaning(order_id):
+    """Start 24-hour cleaning process"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    # Check if production plan exists and is complete
+    existing_plan = ProductionPlan.query.filter_by(order_id=order_id).first()
+    if not existing_plan or existing_plan.total_percentage != 100:
+        flash('Please complete production planning before starting cleaning stage.', 'error')
+        return redirect(url_for('production_planning', order_id=order_id))
+    
+    # Check if 24-hour cleaning already exists
+    existing_process = CleaningProcess.query.filter_by(order_id=order_id, process_type='24_hour').first()
+    if existing_process:
+        return redirect(url_for('monitor_24h_cleaning', order_id=order_id))
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            duration_hours = float(request.form.get('duration_hours', 24.0))
+            operator_name = request.form['operator_name']
+            machine_name = request.form.get('machine_name', '24-Hour Cleaning Machine')
+            cleaning_bin_id = request.form.get('cleaning_bin_id', 1)  # Default bin
+            
+            # Create 24-hour cleaning process
+            start_time = datetime.utcnow()
+            end_time = start_time + timedelta(hours=duration_hours)
+            
+            cleaning_process = CleaningProcess(
+                order_id=order_id,
+                cleaning_bin_id=cleaning_bin_id,
+                process_type='24_hour',
+                duration_hours=duration_hours,
+                start_time=start_time,
+                end_time=end_time,
+                operator_name=operator_name,
+                machine_name=machine_name,
+                status='running',
+                timer_active=True,
+                countdown_start=start_time,
+                countdown_end=end_time
+            )
+            
+            db.session.add(cleaning_process)
+            
+            # Update order status
+            order.status = 'cleaning'
+            
+            # Update cleaning bin status
+            cleaning_bin = CleaningBin.query.get(cleaning_bin_id)
+            if cleaning_bin:
+                cleaning_bin.status = 'cleaning'
+            
+            db.session.commit()
+            
+            flash(f'24-hour cleaning process started successfully! Duration: {duration_hours} hours', 'success')
+            return redirect(url_for('monitor_24h_cleaning', order_id=order_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting 24-hour cleaning: {str(e)}', 'error')
+    
+    # Get available cleaning bins
+    cleaning_bins = CleaningBin.query.filter_by(status='available').all()
+    
+    return render_template('start_24h_cleaning.html', order=order, cleaning_bins=cleaning_bins)
+
+@app.route('/monitor_24h_cleaning/<int:order_id>')
+def monitor_24h_cleaning(order_id):
+    """Monitor 24-hour cleaning process"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, process_type='24_hour', status='running').first()
+    
+    if not cleaning_process:
+        flash('No active 24-hour cleaning process found.', 'error')
+        return redirect(url_for('production_orders'))
+    
+    return render_template('monitor_24h_cleaning.html', order=order, cleaning_process=cleaning_process)
+
 @app.route('/start_12h_cleaning/<int:order_id>', methods=['GET', 'POST'])
 def start_12h_cleaning(order_id):
     """Start 12-hour cleaning process after 24-hour completion"""
@@ -1356,6 +1435,20 @@ def get_12h_timer_status(order_id):
         
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+@app.route('/unified_cleaning_process/<int:order_id>')
+def unified_cleaning_process(order_id):
+    """Unified view for both 24-hour and 12-hour cleaning processes"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    # Get existing cleaning processes
+    cleaning_24h = CleaningProcess.query.filter_by(order_id=order_id, process_type='24_hour').first()
+    cleaning_12h = CleaningProcess.query.filter_by(order_id=order_id, process_type='12_hour').first()
+    
+    return render_template('unified_cleaning_process.html', 
+                         order=order, 
+                         cleaning_24h=cleaning_24h,
+                         cleaning_12h=cleaning_12h)
 
 @app.route('/submit_12h_completion', methods=['POST'])
 def submit_12h_completion():

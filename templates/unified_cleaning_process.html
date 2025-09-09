@@ -1,0 +1,476 @@
+
+{% extends "base.html" %}
+
+{% block title %}Cleaning Process Management - Order {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="row align-items-center mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('production_orders') }}">Production Orders</a></li>
+                    <li class="breadcrumb-item active">Cleaning Process</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0 mt-2">Cleaning Process Management</h1>
+            <p class="text-muted mb-0">24-Hour and 12-Hour cleaning stages for Order {{ order.order_number }}</p>
+        </div>
+    </div>
+
+    <!-- Order Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Order Number:</strong><br>
+                            <span class="badge bg-primary fs-6">{{ order.order_number }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Product Type:</strong><br>
+                            {{ order.finished_good_type }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Quantity:</strong><br>
+                            {{ order.quantity }} tons
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Current Status:</strong><br>
+                            {% if order.status == 'planning' %}
+                                <span class="badge bg-info">Ready for 24-Hour</span>
+                            {% elif order.status == 'cleaning' %}
+                                <span class="badge bg-warning">24-Hour Cleaning</span>
+                            {% elif order.status == '24h_completed' %}
+                                <span class="badge bg-success">Ready for 12-Hour</span>
+                            {% elif order.status == '12h_cleaning' %}
+                                <span class="badge bg-primary">12-Hour Cleaning</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ order.status|title }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cleaning Process Tabs -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="cleaningTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link {% if order.status in ['planning', 'cleaning'] %}active{% endif %}" 
+                                    id="tab-24h" data-bs-toggle="tab" data-bs-target="#content-24h" 
+                                    type="button" role="tab">
+                                <i class="fas fa-clock me-2"></i>24-Hour Cleaning
+                                {% if order.status == 'cleaning' %}
+                                    <span class="badge bg-warning ms-2">Active</span>
+                                {% elif order.status == '24h_completed' %}
+                                    <span class="badge bg-success ms-2">Completed</span>
+                                {% endif %}
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link {% if order.status in ['24h_completed', '12h_cleaning'] %}active{% endif %}" 
+                                    id="tab-12h" data-bs-toggle="tab" data-bs-target="#content-12h" 
+                                    type="button" role="tab"
+                                    {% if order.status not in ['24h_completed', '12h_cleaning', 'completed'] %}disabled{% endif %}>
+                                <i class="fas fa-hourglass-half me-2"></i>12-Hour Cleaning
+                                {% if order.status == '12h_cleaning' %}
+                                    <span class="badge bg-primary ms-2">Active</span>
+                                {% elif order.status == 'completed' %}
+                                    <span class="badge bg-success ms-2">Completed</span>
+                                {% endif %}
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content" id="cleaningTabContent">
+                        <!-- 24-Hour Cleaning Tab -->
+                        <div class="tab-pane fade {% if order.status in ['planning', 'cleaning'] %}show active{% endif %}" 
+                             id="content-24h" role="tabpanel">
+                            
+                            {% if order.status == 'planning' %}
+                                <!-- 24-Hour Setup Form -->
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Ready to start the 24-hour cleaning process. Configure the settings below.
+                                </div>
+                                
+                                <form method="POST" action="{{ url_for('start_24h_cleaning', order_id=order.id) }}">
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Duration</label>
+                                            <select class="form-select" name="duration_hours">
+                                                <option value="24">24 Hours (Standard)</option>
+                                                <option value="18">18 Hours (Shorter)</option>
+                                                <option value="0.1">6 Minutes (Testing)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Operator Name</label>
+                                            <input type="text" class="form-control" name="operator_name" required>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Machine Name</label>
+                                            <input type="text" class="form-control" name="machine_name" 
+                                                   value="24-Hour Cleaning Machine" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Cleaning Bin</label>
+                                            <select class="form-select" name="cleaning_bin_id">
+                                                <option value="1">24-Hour Cleaning Bin #1</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-warning btn-lg">
+                                        <i class="fas fa-play me-2"></i>Start 24-Hour Cleaning
+                                    </button>
+                                </form>
+                                
+                            {% elif order.status == 'cleaning' %}
+                                <!-- 24-Hour Monitoring -->
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>
+                                    24-hour cleaning process is currently running.
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h3 id="countdown-24h">Loading...</h3>
+                                                <p class="text-muted">Time Remaining</p>
+                                                <div class="progress">
+                                                    <div class="progress-bar bg-warning" id="progress-24h" style="width: 0%"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h6>Manual Cleaning Status</h6>
+                                                <p id="cleaning-status-24h" class="text-muted">Monitoring...</p>
+                                                <button class="btn btn-warning w-100" 
+                                                        onclick="openManualCleaningModal({{ order.id }}, null, 'Manual Cleaning')">
+                                                    <i class="fas fa-camera me-2"></i>Log Manual Cleaning
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <a href="{{ url_for('monitor_24h_cleaning', order_id=order.id) }}" 
+                                   class="btn btn-info mt-3">
+                                    <i class="fas fa-external-link-alt me-2"></i>Open Full Monitor View
+                                </a>
+                                
+                            {% else %}
+                                <!-- 24-Hour Completed -->
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    24-hour cleaning process completed successfully!
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 12-Hour Cleaning Tab -->
+                        <div class="tab-pane fade {% if order.status in ['24h_completed', '12h_cleaning'] %}show active{% endif %}" 
+                             id="content-12h" role="tabpanel">
+                            
+                            {% if order.status == '24h_completed' %}
+                                <!-- 12-Hour Setup Form -->
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    24-hour cleaning completed! Ready to start 12-hour cleaning process.
+                                </div>
+                                
+                                <form method="POST" action="{{ url_for('start_12h_cleaning', order_id=order.id) }}">
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Duration (Hours)</label>
+                                            <select class="form-select" name="duration_hours">
+                                                <option value="12">12 Hours (Standard)</option>
+                                                <option value="8">8 Hours (Shorter)</option>
+                                                <option value="0.1">6 Minutes (Testing)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Target Moisture (%)</label>
+                                            <input type="number" class="form-control" name="target_moisture" 
+                                                   step="0.1" min="0" max="100" required>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Start Moisture (%)</label>
+                                            <input type="number" class="form-control" name="start_moisture" 
+                                                   step="0.1" min="0" max="100" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Operator Name</label>
+                                            <input type="text" class="form-control" name="operator_name" required>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Machine Name</label>
+                                            <input type="text" class="form-control" name="machine_name" 
+                                                   value="12-Hour Cleaning Machine" required>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-play me-2"></i>Start 12-Hour Cleaning
+                                    </button>
+                                </form>
+                                
+                            {% elif order.status == '12h_cleaning' %}
+                                <!-- 12-Hour Monitoring -->
+                                <div class="alert alert-primary">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>
+                                    12-hour cleaning process is currently running.
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h3 id="countdown-12h">Loading...</h3>
+                                                <p class="text-muted">Time Remaining</p>
+                                                <div class="progress">
+                                                    <div class="progress-bar bg-primary" id="progress-12h" style="width: 0%"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h6>Process Details</h6>
+                                                <p><strong>Target Moisture:</strong> <span id="target-moisture">--</span>%</p>
+                                                <p><strong>Start Moisture:</strong> <span id="start-moisture">--</span>%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <a href="{{ url_for('monitor_12h_cleaning', order_id=order.id) }}" 
+                                   class="btn btn-info mt-3">
+                                    <i class="fas fa-external-link-alt me-2"></i>Open Full Monitor View
+                                </a>
+                                
+                            {% elif order.status == 'completed' %}
+                                <!-- Both Processes Completed -->
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    All cleaning processes completed successfully!
+                                </div>
+                                
+                            {% else %}
+                                <!-- 12-Hour Not Available Yet -->
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    12-hour cleaning will be available after completing the 24-hour process.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Cleaning Modal -->
+<div class="modal fade" id="manualCleaningModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Log Manual Cleaning Activity</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="manualCleaningForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" id="manual_order_id" name="order_id">
+                    <input type="hidden" id="manual_cleaning_process_id" name="cleaning_process_id">
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Machine/Area Name *</label>
+                                <input type="text" id="manual_machine_name" name="machine_name" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Operator Name *</label>
+                                <input type="text" id="manual_operator_name" name="operator_name" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Before Cleaning Photo *</label>
+                                <input type="file" name="before_photo" class="form-control" accept="image/*" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">After Cleaning Photo *</label>
+                                <input type="file" name="after_photo" class="form-control" accept="image/*" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Cleaning Notes (Optional)</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Log Manual Cleaning
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize timers and functionality
+document.addEventListener('DOMContentLoaded', function() {
+    initializeTimers();
+    
+    // Handle manual cleaning form
+    document.getElementById('manualCleaningForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        fetch('/upload_manual_cleaning', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('manualCleaningModal')).hide();
+                showAlert('Manual cleaning logged successfully!', 'success');
+                this.reset();
+            } else {
+                showAlert(data.error || 'Error logging manual cleaning', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Error logging manual cleaning', 'error');
+        });
+    });
+});
+
+function initializeTimers() {
+    {% if order.status == 'cleaning' %}
+        // Update 24-hour timer
+        setInterval(update24hTimer, 1000);
+        update24hTimer();
+    {% elif order.status == '12h_cleaning' %}
+        // Update 12-hour timer
+        setInterval(update12hTimer, 1000);
+        update12hTimer();
+    {% endif %}
+}
+
+function update24hTimer() {
+    fetch(`/api/cleaning_timer_status/{{ order.id }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.timer_active && data.process_type === '24_hour') {
+                updateTimerDisplay('24h', data);
+            }
+        })
+        .catch(error => console.error('24h timer error:', error));
+}
+
+function update12hTimer() {
+    fetch(`/api/12h_timer_status/{{ order.id }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.timer_active) {
+                updateTimerDisplay('12h', data);
+                
+                // Update moisture displays
+                if (data.target_moisture) {
+                    document.getElementById('target-moisture').textContent = data.target_moisture;
+                }
+                if (data.start_moisture) {
+                    document.getElementById('start-moisture').textContent = data.start_moisture;
+                }
+            }
+        })
+        .catch(error => console.error('12h timer error:', error));
+}
+
+function updateTimerDisplay(type, data) {
+    const countdownElement = document.getElementById(`countdown-${type}`);
+    const progressElement = document.getElementById(`progress-${type}`);
+    
+    if (!countdownElement || !progressElement) return;
+    
+    const remainingSeconds = data.remaining_seconds;
+    const totalSeconds = data.duration_hours * 3600;
+    
+    const hours = Math.floor(remainingSeconds / 3600);
+    const minutes = Math.floor((remainingSeconds % 3600) / 60);
+    const seconds = Math.floor(remainingSeconds % 60);
+    
+    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    countdownElement.textContent = timeString;
+    
+    const progress = ((totalSeconds - remainingSeconds) / totalSeconds) * 100;
+    progressElement.style.width = progress + '%';
+}
+
+function openManualCleaningModal(orderId, cleaningProcessId, machineName) {
+    document.getElementById('manual_order_id').value = orderId;
+    document.getElementById('manual_cleaning_process_id').value = cleaningProcessId || '';
+    document.getElementById('manual_machine_name').value = machineName || 'Manual Cleaning Machine';
+    
+    new bootstrap.Modal(document.getElementById('manualCleaningModal')).show();
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.container-fluid');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

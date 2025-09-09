@@ -159,12 +159,17 @@
                                             <a href="{{ url_for('production_planning', order_id=order.id) }}" class="btn btn-sm btn-warning">
                                                 <i class="fas fa-edit me-1"></i>Continue Planning
                                             </a>
-                                            <a href="{{ url_for('production_cleaning', order_id=order.id) }}" class="btn btn-sm btn-info">
-                                                <i class="fas fa-play me-1"></i>Start Cleaning
-                                            </a>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ url_for('unified_cleaning_process', order_id=order.id) }}" class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-tasks me-1"></i>Cleaning Process (Unified)
+                                                </a>
+                                                <a href="{{ url_for('start_24h_cleaning', order_id=order.id) }}" class="btn btn-sm btn-info">
+                                                    <i class="fas fa-clock me-1"></i>24-Hour Only
+                                                </a>
+                                            </div>
                                         {% elif order.status == 'cleaning' %}
-                                            <a href="{{ url_for('production_cleaning', order_id=order.id) }}" class="btn btn-sm btn-warning">
-                                                <i class="fas fa-eye me-1"></i>Monitor Cleaning
+                                            <a href="{{ url_for('monitor_24h_cleaning', order_id=order.id) }}" class="btn btn-sm btn-warning">
+                                                <i class="fas fa-eye me-1"></i>Monitor 24-Hour Cleaning
                                             </a>
                                         {% elif order.status == '24h_completed' %}
                                             <a href="{{ url_for('start_12h_cleaning', order_id=order.id) }}" class="btn btn-sm btn-primary">
