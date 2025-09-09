@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Start Grinding Process - Wheat Processing Management{% endblock %}
+
+{% block page_title %}Start Grinding Process{% endblock %}
+{% block page_subtitle %}Order {{ order.order_number }} - {{ order.finished_good_type }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('production_orders') }}">Production Orders</a></li>
+                <li class="breadcrumb-item active">Start Grinding</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>Initialize Grinding Process
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Starting grinding process for Order <strong>{{ order.order_number }}</strong>. 
+                    This will begin the timer and record B1 scale handoff details.
+                </div>
+
+                <form method="POST">
+                    <div class="row g-3">
+                        <!-- B1 Scale Handoff Section -->
+                        <div class="col-12">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="fas fa-balance-scale me-2"></i>B1 Scale Handoff Details
+                            </h6>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="b1_scale_operator" class="form-label">B1 Scale Operator <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="b1_scale_operator" name="b1_scale_operator" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="b1_scale_weight" class="form-label">Material Weight (kg) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="b1_scale_weight" name="b1_scale_weight" 
+                                       step="0.1" min="0.1" required>
+                                <span class="input-group-text">kg</span>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="b1_scale_notes" class="form-label">B1 Scale Notes</label>
+                            <textarea class="form-control" id="b1_scale_notes" name="b1_scale_notes" rows="2" 
+                                      placeholder="Any observations or notes about the material from B1 scale..."></textarea>
+                        </div>
+
+                        <!-- Grinding Machine Section -->
+                        <div class="col-12 mt-4">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="fas fa-industry me-2"></i>Grinding Machine Assignment
+                            </h6>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="grinding_machine" class="form-label">Grinding Machine <span class="text-danger">*</span></label>
+                            <select class="form-select" id="grinding_machine" name="grinding_machine" required>
+                                <option value="">Select Grinding Machine</option>
+                                <option value="Grinding Machine #1">Grinding Machine #1</option>
+                                <option value="Grinding Machine #2">Grinding Machine #2</option>
+                                <option value="Grinding Machine #3">Grinding Machine #3</option>
+                                <option value="Roller Mill #1">Roller Mill #1</option>
+                                <option value="Roller Mill #2">Roller Mill #2</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="grinding_operator" class="form-label">Grinding Operator <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="grinding_operator" name="grinding_operator" required>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('production_orders') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Orders
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play me-2"></i>Start Grinding Process & Timer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-clipboard-list me-2"></i>Order Details
+                </h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Order Number:</strong></td>
+                        <td>{{ order.order_number }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Product Type:</strong></td>
+                        <td>{{ order.finished_good_type }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Quantity:</strong></td>
+                        <td>{{ "%.3f"|format(order.quantity) }} tons</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Status:</strong></td>
+                        <td><span class="badge bg-success">Ready for Grinding</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Created By:</strong></td>
+                        <td>{{ order.created_by }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mt-3">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Important Notes
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>Timer will start automatically when process begins</li>
+                    <li>Manual cleaning reminders every 10 seconds</li>
+                    <li>Expected ratio: Main 75-77%, Bran 23-25%</li>
+                    <li>Alert if Bran > 25%</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-focus on B1 scale operator field
+    document.getElementById('b1_scale_operator').focus();
+});
+</script>
+{% endblock %}
