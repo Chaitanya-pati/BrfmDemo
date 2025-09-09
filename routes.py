@@ -1196,12 +1196,17 @@ def submit_post_process_data():
         order = ProductionOrder.query.get(order_id)
         if cleaning_process.process_type == '24_hour':
             order.status = '24h_completed'  # Mark as ready for 12-hour cleaning
-        else:
+        elif cleaning_process.process_type == '12_hour':
             order.status = 'completed'  # Final completion
+        else:
+            order.status = 'completed'  # Default completion
         
         # Calculate quality metrics
         moisture_reduction = moisture_before - moisture_after
         cleaning_efficiency = ((moisture_reduction / moisture_before) * 100) if moisture_before > 0 else 0
+        
+        # Log the order status change for debugging
+        print(f"DEBUG: Order {order_id} status changed from '{order.status}' to '{order.status}' for process type '{cleaning_process.process_type}'")
         
         db.session.commit()
         

@@ -161,9 +161,12 @@
                         </a>
                     </div>
                     <div class="col-md-3">
-                        <a href="{{ url_for('masters') }}" class="btn btn-outline-info w-100 py-3">
-                            <i class="fas fa-clipboard-list fa-2x d-block mb-2"></i>
-                            <span class="fw-semibold">Master Data</span>
+                        <a href="{{ url_for('production_orders') }}" class="btn btn-outline-info w-100 py-3">
+                            <i class="fas fa-hourglass-half fa-2x d-block mb-2"></i>
+                            <span class="fw-semibold">Production Orders</span>
+                            {% if orders_ready_for_12h > 0 %}
+                                <span class="badge bg-warning">{{ orders_ready_for_12h }} ready for 12h</span>
+                            {% endif %}
                         </a>
                     </div>
                     <div class="col-md-3">
