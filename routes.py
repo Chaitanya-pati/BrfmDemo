@@ -2012,3 +2012,169 @@ def upload_grinding_cleaning_photo():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
+
+
+# Packaging and Storage Management Routes
+@app.route('/submit_packaging', methods=['POST'])
+def submit_packaging():
+    """Submit packaging records for finished products"""
+    try:
+        data = request.get_json()
+        session_id = data['session_id']
+        packaging_records = data['packaging_records']  # List of packaging data
+        
+        grinding_session = GrindingSession.query.get_or_404(session_id)
+        
+        for record in packaging_records:
+            packaging = PackagingRecord(
+                grinding_session_id=session_id,
+                product_name=record['product_name'],
+                bag_weight_kg=float(record['bag_weight_kg']),
+                bag_count=int(record['bag_count']),
+                total_weight_kg=float(record['bag_weight_kg']) * int(record['bag_count']),
+                operator_name=record['operator_name']
+            )
+            
+            db.session.add(packaging)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'total_records': len(packaging_records),
+            'message': 'Packaging records saved successfully!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/storage_management')
+def storage_management():
+    """Storage areas management dashboard"""
+    storage_areas = StorageArea.query.all()
+    
+    # Get recent transactions
+    recent_transactions = StorageTransaction.query.order_by(
+        StorageTransaction.transaction_time.desc()
+    ).limit(20).all()
+    
+    return render_template('storage_management.html', 
+                         storage_areas=storage_areas,
+                         recent_transactions=recent_transactions)
+
+@app.route('/storage_transaction', methods=['POST'])
+def create_storage_transaction():
+    """Create storage transaction (storage or shifting)"""
+    try:
+        data = request.get_json()
+        
+        transaction = StorageTransaction(
+            from_storage_area_id=data.get('from_storage_area_id'),
+            to_storage_area_id=data['to_storage_area_id'],
+            product_name=data['product_name'],
+            quantity_kg=float(data['quantity_kg']),
+            transaction_type=data['transaction_type'],  # 'storage' or 'shift'
+            operator_name=data['operator_name'],
+            grinding_session_id=data.get('grinding_session_id'),
+            notes=data.get('notes', '')
+        )
+        
+        db.session.add(transaction)
+        
+        # Update storage area quantities
+        to_storage = StorageArea.query.get(data['to_storage_area_id'])
+        to_storage.current_stock_kg += float(data['quantity_kg'])
+        
+        if data.get('from_storage_area_id'):
+            from_storage = StorageArea.query.get(data['from_storage_area_id'])
+            from_storage.current_stock_kg -= float(data['quantity_kg'])
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'transaction_id': transaction.id,
+            'message': f'{transaction.transaction_type.title()} transaction completed successfully!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/storage_areas')
+def get_storage_areas():
+    """Get all storage areas with current stock levels"""
+    try:
+        storage_areas = StorageArea.query.all()
+        
+        areas_data = []
+        for area in storage_areas:
+            utilization_percentage = (area.current_stock_kg / area.capacity_kg * 100) if area.capacity_kg > 0 else 0
+            
+            areas_data.append({
+                'id': area.id,
+                'name': area.name,
+                'capacity_kg': area.capacity_kg,
+                'current_stock_kg': area.current_stock_kg,
+                'available_space_kg': area.capacity_kg - area.current_stock_kg,
+                'utilization_percentage': round(utilization_percentage, 1),
+                'location': area.location
+            })
+        
+        return jsonify({
+            'success': True,
+            'storage_areas': areas_data
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/shift_stock', methods=['POST'])
+def shift_stock():
+    """Shift stock between storage areas"""
+    try:
+        data = request.get_json()
+        from_area_id = data['from_storage_area_id']
+        to_area_id = data['to_storage_area_id']
+        quantity = float(data['quantity_kg'])
+        
+        # Validate from storage has enough stock
+        from_storage = StorageArea.query.get_or_404(from_area_id)
+        if from_storage.current_stock_kg < quantity:
+            return jsonify({'error': 'Insufficient stock in source storage area'}), 400
+        
+        # Validate to storage has enough capacity
+        to_storage = StorageArea.query.get_or_404(to_area_id)
+        if (to_storage.current_stock_kg + quantity) > to_storage.capacity_kg:
+            return jsonify({'error': 'Insufficient capacity in destination storage area'}), 400
+        
+        # Create transaction record
+        transaction = StorageTransaction(
+            from_storage_area_id=from_area_id,
+            to_storage_area_id=to_area_id,
+            product_name=data['product_name'],
+            quantity_kg=quantity,
+            transaction_type='shift',
+            operator_name=data['operator_name'],
+            notes=data.get('notes', '')
+        )
+        
+        db.session.add(transaction)
+        
+        # Update storage quantities
+        from_storage.current_stock_kg -= quantity
+        to_storage.current_stock_kg += quantity
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully shifted {quantity} kg from {from_storage.name} to {to_storage.name}',
+            'transaction_id': transaction.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
