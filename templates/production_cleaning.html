@@ -333,6 +333,27 @@
                     </div>
                 </div>
 
+                <!-- Manual Cleaning Quick Action Button -->
+                <div class="mt-4 p-3 bg-warning rounded" id="quick-cleaning-section">
+                    <h6 class="mb-3"><i class="fas fa-broom me-2"></i>Manual Cleaning - Every Minute Reminder</h6>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <p class="mb-2"><strong>Current Status:</strong> <span id="cleaning-status-text">Ready for manual cleaning</span></p>
+                            <p class="mb-2"><strong>Last Manual Cleaning:</strong> <span id="last-cleaning-time">None recorded</span></p>
+                            <div class="progress mb-3">
+                                <div class="progress-bar bg-success" id="manual-cleaning-progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button type="button" class="btn btn-warning btn-lg w-100" id="quick-manual-cleaning-btn"
+                                    onclick="openManualCleaningModal({{ order.id }}, {{ cleaning_process.id if cleaning_process else 'null' }}, 'Manual Cleaning Machine')">
+                                <i class="fas fa-camera me-2"></i>Log Manual Cleaning
+                            </button>
+                            <small class="text-muted d-block mt-1">Required every minute</small>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Photo Upload Form -->
                 <div class="mt-4 p-3 bg-light rounded" id="photo-upload-section" style="display: none;">
                     <h6 class="mb-3"><i class="fas fa-upload me-2"></i>Upload Cleaning Photo</h6>
@@ -1091,18 +1112,106 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Check for pending reminders
+// Check for pending reminders - enhanced for minute-by-minute checking
 function checkForPendingReminders() {
     fetch(`/api/get_pending_reminders/{{ order.id }}`)
     .then(response => response.json())
     .then(data => {
-        if (data.has_pending && !document.getElementById('cleaningReminderModal').classList.contains('show')) {
-            showReminderModal(data.reminder);
+        if (data.has_pending) {
+            // Update the cleaning status
+            updateCleaningStatus(data.reminder);
+            
+            // Show visual reminder in the UI
+            showQuickReminderAlert(data.reminder);
+            
+            // Optionally show modal for critical reminders (every 5 minutes)
+            if (data.reminder.sequence % 5 === 0 && !document.getElementById('cleaningReminderModal').classList.contains('show')) {
+                showReminderModal(data.reminder);
+            }
+        } else {
+            // Clear reminder alerts if no pending reminders
+            hideQuickReminderAlert();
         }
     })
     .catch(error => {
         console.error('Error checking reminders:', error);
     });
+}
+
+// Update cleaning status display
+function updateCleaningStatus(reminder) {
+    const statusText = document.getElementById('cleaning-status-text');
+    const lastCleaningTime = document.getElementById('last-cleaning-time');
+    const progressBar = document.getElementById('manual-cleaning-progress');
+    const quickBtn = document.getElementById('quick-manual-cleaning-btn');
+    
+    if (statusText) {
+        statusText.textContent = `Manual cleaning required - Minute ${reminder.sequence}`;
+        statusText.className = 'text-danger fw-bold';
+    }
+    
+    if (quickBtn) {
+        quickBtn.classList.remove('btn-warning');
+        quickBtn.classList.add('btn-danger');
+        quickBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>URGENT: Log Manual Cleaning';
+    }
+}
+
+// Show quick reminder alert
+function showQuickReminderAlert(reminder) {
+    // Create or update floating reminder
+    let floatingReminder = document.getElementById('floating-reminder');
+    if (!floatingReminder) {
+        floatingReminder = document.createElement('div');
+        floatingReminder.id = 'floating-reminder';
+        floatingReminder.className = 'alert alert-warning position-fixed shadow-lg';
+        floatingReminder.style.cssText = `
+            top: 100px; 
+            right: 20px; 
+            z-index: 9999; 
+            min-width: 350px;
+            animation: pulse 2s infinite;
+        `;
+        document.body.appendChild(floatingReminder);
+    }
+    
+    floatingReminder.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-bell fa-2x me-3 text-warning"></i>
+            <div class="flex-grow-1">
+                <h6 class="mb-1">Manual Cleaning Required</h6>
+                <p class="mb-0">Minute ${reminder.sequence} - Please log cleaning activity</p>
+            </div>
+            <button type="button" class="btn btn-sm btn-warning ms-2" 
+                    onclick="openManualCleaningModal({{ order.id }}, {{ cleaning_process.id if cleaning_process else 'null' }}, 'Manual Cleaning Machine')">
+                Log Now
+            </button>
+        </div>
+    `;
+    
+    floatingReminder.style.display = 'block';
+}
+
+// Hide quick reminder alert
+function hideQuickReminderAlert() {
+    const floatingReminder = document.getElementById('floating-reminder');
+    if (floatingReminder) {
+        floatingReminder.style.display = 'none';
+    }
+    
+    const statusText = document.getElementById('cleaning-status-text');
+    const quickBtn = document.getElementById('quick-manual-cleaning-btn');
+    
+    if (statusText) {
+        statusText.textContent = 'Manual cleaning up to date';
+        statusText.className = 'text-success';
+    }
+    
+    if (quickBtn) {
+        quickBtn.classList.remove('btn-danger');
+        quickBtn.classList.add('btn-warning');
+        quickBtn.innerHTML = '<i class="fas fa-camera me-2"></i>Log Manual Cleaning';
+    }
 }
 
 // Show reminder modal
@@ -1235,7 +1344,64 @@ function calculateMetrics() {
 // Initialize timer if cleaning process is active
 document.addEventListener('DOMContentLoaded', function() {
     initializeTimer();
+    
+    // Check for reminders every 30 seconds
+    setInterval(checkPendingReminders, 30000);
+    
+    // Update cleaning progress every minute
+    setInterval(updateCleaningProgress, 60000);
+    
+    // Initial checks
+    checkPendingReminders();
+    updateCleaningProgress();
 });
+
+// Update cleaning progress display
+function updateCleaningProgress() {
+    fetch(`/api/get_cleaning_progress/{{ order.id }}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) return;
+        
+        // Update progress bar
+        const progressBar = document.getElementById('manual-cleaning-progress');
+        if (progressBar) {
+            progressBar.style.width = data.cleaning_compliance + '%';
+            progressBar.textContent = data.cleaning_compliance.toFixed(1) + '%';
+            
+            // Color code based on compliance
+            progressBar.className = 'progress-bar';
+            if (data.cleaning_compliance >= 80) {
+                progressBar.classList.add('bg-success');
+            } else if (data.cleaning_compliance >= 60) {
+                progressBar.classList.add('bg-warning');
+            } else {
+                progressBar.classList.add('bg-danger');
+            }
+        }
+        
+        // Update last cleaning time
+        const lastCleaningTime = document.getElementById('last-cleaning-time');
+        if (lastCleaningTime) {
+            if (data.last_cleaning_time) {
+                const cleaningTime = new Date(data.last_cleaning_time);
+                lastCleaningTime.textContent = cleaningTime.toLocaleTimeString() + ' by ' + (data.last_cleaning_operator || 'Unknown');
+            } else {
+                lastCleaningTime.textContent = 'No manual cleanings logged yet';
+            }
+        }
+        
+        // Update cleaning count badge
+        const countBadge = document.getElementById('manualCleaningCount');
+        if (countBadge) {
+            countBadge.textContent = `${data.manual_cleaning_count}/${data.expected_cleanings}`;
+        }
+        
+    })
+    .catch(error => {
+        console.error('Error updating cleaning progress:', error);
+    });
+}
 {% endif %}
 
 // Add event listener for manual reminder trigger button if it exists

@@ -757,26 +757,20 @@ def start_cleaning_process():
         total_minutes = int(duration_hours * 60)
         reminder_intervals = []
         
-        # Generate reminders every 30 minutes for long processes, or every 10 minutes for short processes
-        if total_minutes > 60:
-            # For processes longer than 1 hour, remind every 30 minutes
-            interval_minutes = 30
-        else:
-            # For processes 1 hour or less, remind every 10 minutes
-            interval_minutes = 10
+        # Generate reminders every minute for manual machine cleaning tracking
+        interval_minutes = 1  # Reminder every minute
         
-        # Create reminder schedule
+        # Create reminder schedule - every minute throughout the process
         current_minute = interval_minutes
         while current_minute < total_minutes:
             reminder_time = start_time + timedelta(minutes=current_minute)
             reminder_intervals.append(reminder_time)
             current_minute += interval_minutes
         
-        # Always add a final reminder 5 minutes before completion
-        if total_minutes > 5:
-            final_reminder = start_time + timedelta(minutes=total_minutes - 5)
-            if final_reminder not in reminder_intervals:
-                reminder_intervals.append(final_reminder)
+        # Always add a final reminder at completion
+        final_reminder = start_time + timedelta(minutes=total_minutes)
+        if final_reminder not in reminder_intervals:
+            reminder_intervals.append(final_reminder)
         
         # Schedule all reminders
         for reminder_time in reminder_intervals:
@@ -891,12 +885,24 @@ def send_cleaning_reminder(reminder_id):
                 logging.info(f"Cleaning process {cleaning_process.id} already completed, skipping reminder")
                 return False
             
-            # Mark reminder as sent
+            # Mark reminder as sent - this creates an active reminder every minute
             reminder.reminder_sent = True
             reminder.user_notified = 'System'
             
+            # Auto-expire previous reminders that are older than 2 minutes to avoid clutter
+            old_reminders = CleaningReminder.query.filter_by(
+                cleaning_process_id=cleaning_process.id,
+                reminder_sent=True,
+                completed=False
+            ).filter(
+                CleaningReminder.due_time < current_time - timedelta(minutes=2)
+            ).all()
+            
+            for old_reminder in old_reminders:
+                old_reminder.completed = True
+            
             db.session.commit()
-            logging.info(f"Manual cleaning reminder sent for process {cleaning_process.id}, sequence {reminder.reminder_sequence}")
+            logging.info(f"Manual cleaning reminder sent for process {cleaning_process.id}, sequence {reminder.reminder_sequence} (minute {reminder.reminder_sequence})")
             
             return True
         
@@ -1110,6 +1116,52 @@ def get_manual_cleanings(order_id):
         return jsonify({
             'manual_cleanings': cleaning_data,
             'total_manual_cleanings': len(cleaning_data)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/get_cleaning_progress/<int:order_id>')
+def get_cleaning_progress(order_id):
+    """Get cleaning progress including reminders and manual cleaning stats"""
+    try:
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id).first()
+        if not cleaning_process:
+            return jsonify({'error': 'No cleaning process found'}), 404
+        
+        current_time = datetime.utcnow()
+        
+        # Calculate process progress
+        total_minutes = cleaning_process.duration_hours * 60
+        elapsed_minutes = (current_time - cleaning_process.start_time).total_seconds() / 60
+        progress_percentage = min((elapsed_minutes / total_minutes) * 100, 100)
+        
+        # Get manual cleaning count for this process
+        manual_cleaning_count = ManualCleaningLog.query.filter_by(
+            cleaning_process_id=cleaning_process.id
+        ).count()
+        
+        # Get recent manual cleanings
+        recent_cleanings = ManualCleaningLog.query.filter_by(
+            cleaning_process_id=cleaning_process.id
+        ).order_by(ManualCleaningLog.cleaning_start_time.desc()).limit(5).all()
+        
+        last_cleaning = recent_cleanings[0] if recent_cleanings else None
+        
+        # Expected cleanings (one per minute)
+        expected_cleanings = max(1, int(elapsed_minutes))
+        cleaning_compliance = (manual_cleaning_count / expected_cleanings) * 100 if expected_cleanings > 0 else 0
+        
+        return jsonify({
+            'process_progress': round(progress_percentage, 1),
+            'elapsed_minutes': int(elapsed_minutes),
+            'total_minutes': int(total_minutes),
+            'manual_cleaning_count': manual_cleaning_count,
+            'expected_cleanings': expected_cleanings,
+            'cleaning_compliance': round(cleaning_compliance, 1),
+            'last_cleaning_time': last_cleaning.cleaning_start_time.isoformat() if last_cleaning else None,
+            'last_cleaning_operator': last_cleaning.operator_name if last_cleaning else None,
+            'timer_active': cleaning_process.timer_active
         })
         
     except Exception as e:
