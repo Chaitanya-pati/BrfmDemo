@@ -1,0 +1,511 @@
+
+{% extends "base.html" %}
+
+{% block title %}12-Hour Cleaning Monitor - Order {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-hourglass-half me-2"></i>12-Hour Cleaning Process Monitor</h2>
+                <a href="{{ url_for('production_orders') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Orders
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Information -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Order:</strong> {{ order.order_number }}</p>
+                            <p><strong>Product:</strong> {{ order.finished_good_type }}</p>
+                            <p><strong>Quantity:</strong> {{ order.quantity }} tons</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Status:</strong> <span class="badge bg-warning">12-Hour Cleaning</span></p>
+                            <p><strong>Operator:</strong> {{ cleaning_process.operator_name }}</p>
+                            <p><strong>Machine:</strong> {{ cleaning_process.machine_name }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-header">
+                    <h5 class="mb-0">Process Timer</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <i class="fas fa-clock fa-3x text-primary" id="timer-icon"></i>
+                    </div>
+                    <h3 class="text-primary" id="countdown-display">Loading...</h3>
+                    <div class="progress mb-2">
+                        <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+                    </div>
+                    <small class="text-muted" id="timer-status">Initializing...</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Details -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Moisture Targets</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h6 class="text-muted mb-1">Start</h6>
+                                <span class="fw-bold">{{ cleaning_process.start_moisture }}%</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-muted mb-1">Target</h6>
+                            <span class="fw-bold text-success">{{ cleaning_process.target_moisture }}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Process Duration</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h6 class="text-muted mb-1">Total</h6>
+                                <span class="fw-bold">{{ cleaning_process.duration_hours }}h</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-muted mb-1">Type</h6>
+                            <span class="fw-bold">12-Hour</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Manual Cleanings</h6>
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-info" id="manual-cleaning-count">0</h3>
+                    <small class="text-muted">Photos uploaded</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reminders Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Process Reminders</h5>
+                </div>
+                <div class="card-body">
+                    <div id="reminder-alerts"></div>
+                    <div id="manual-cleaning-reminder" class="alert alert-info" style="display: none;">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h6><i class="fas fa-camera me-2"></i>Manual Cleaning Required</h6>
+                                <p class="mb-0">Please capture before and after photos of the cleaning process.</p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-warning" onclick="openPhotoModal()">
+                                    <i class="fas fa-camera me-1"></i>Upload Photos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Cleaning History -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Manual Cleaning History
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="cleaning-history">
+                        <div class="text-center py-3">
+                            <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">No manual cleaning photos uploaded yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completion Form (Hidden until timer completes) -->
+    <div class="row" id="completion-section" style="display: none;">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>12-Hour Process Completion</h5>
+                </div>
+                <div class="card-body">
+                    <form id="completion-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-tint me-2"></i>Outgoing Moisture (%) *
+                                    </label>
+                                    <input type="number" id="outgoing_moisture" name="outgoing_moisture" 
+                                           class="form-control" step="0.1" min="0" max="100" required>
+                                    <div class="form-text">Final moisture content after 12-hour cleaning</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-user me-2"></i>Completion Operator
+                                    </label>
+                                    <input type="text" id="completion_operator" name="operator_name" 
+                                           class="form-control" value="{{ cleaning_process.operator_name }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-sticky-note me-2"></i>Completion Notes
+                                    </label>
+                                    <textarea id="completion_notes" name="notes" class="form-control" rows="3"
+                                              placeholder="Any observations or notes about the process"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-check me-2"></i>Complete 12-Hour Process
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Photo Upload Modal -->
+<div class="modal fade" id="photoUploadModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-camera me-2"></i>Manual Cleaning Photo Upload
+                </h5>
+                <small class="text-muted">30-Second Interval Reminder</small>
+            </div>
+            <form id="photoUploadForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="order_id" value="{{ order.id }}">
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Please upload both before and after photos of the manual cleaning process.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-3 text-primary">Before Cleaning Photo</h6>
+                            <div class="mb-3">
+                                <input type="file" name="before_photo" class="form-control" 
+                                       accept="image/*" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Before Notes</label>
+                                <textarea name="before_notes" class="form-control" rows="2"
+                                          placeholder="Describe the condition before cleaning"></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-3 text-success">After Cleaning Photo</h6>
+                            <div class="mb-3">
+                                <input type="file" name="after_photo" class="form-control" 
+                                       accept="image/*" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">After Notes</label>
+                                <textarea name="after_notes" class="form-control" rows="2"
+                                          placeholder="Describe the condition after cleaning"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Operator Name</label>
+                                <input type="text" name="operator_name" class="form-control" 
+                                       value="{{ cleaning_process.operator_name }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Cleaning Area</label>
+                                <input type="text" name="cleaning_area" class="form-control" 
+                                       placeholder="e.g., Machine exterior, Control panel, etc.">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-1"></i>Upload Photos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let timerInterval;
+let lastManualCleaningTime = 0;
+
+document.addEventListener('DOMContentLoaded', function() {
+    startTimerMonitoring();
+    loadManualCleaningHistory();
+    
+    // Set up completion form handler
+    document.getElementById('completion-form').addEventListener('submit', handleCompletion);
+    
+    // Set up photo upload form handler
+    document.getElementById('photoUploadForm').addEventListener('submit', handlePhotoUpload);
+});
+
+function startTimerMonitoring() {
+    timerInterval = setInterval(function() {
+        fetch(`/api/12h_timer_status/{{ order.id }}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.timer_active) {
+                    updateTimerDisplay(data);
+                    checkForReminders(data);
+                } else if (data.completed) {
+                    handleTimerCompletion();
+                }
+            })
+            .catch(error => console.error('Timer check error:', error));
+    }, 1000);
+}
+
+function updateTimerDisplay(data) {
+    const hours = Math.floor(data.remaining_seconds / 3600);
+    const minutes = Math.floor((data.remaining_seconds % 3600) / 60);
+    const seconds = data.remaining_seconds % 60;
+    
+    const display = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    document.getElementById('countdown-display').textContent = display;
+    
+    // Update progress bar
+    const progress = ((data.duration_hours * 3600 - data.remaining_seconds) / (data.duration_hours * 3600)) * 100;
+    document.getElementById('progress-bar').style.width = progress + '%';
+    
+    document.getElementById('timer-status').textContent = `${Math.floor(progress)}% Complete`;
+}
+
+function checkForReminders(data) {
+    // Check for pre-end reminders
+    if (data.upcoming_reminders && data.upcoming_reminders.length > 0) {
+        showPreEndReminder(data.upcoming_reminders[0]);
+    }
+    
+    // Check for manual cleaning reminder (every 30 seconds)
+    if (data.needs_manual_cleaning && data.elapsed_seconds !== lastManualCleaningTime) {
+        showManualCleaningReminder();
+        lastManualCleaningTime = data.elapsed_seconds;
+    }
+}
+
+function showPreEndReminder(message) {
+    const alertsContainer = document.getElementById('reminder-alerts');
+    const alertHtml = `
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Pre-End Reminder:</strong> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    alertsContainer.innerHTML = alertHtml;
+}
+
+function showManualCleaningReminder() {
+    document.getElementById('manual-cleaning-reminder').style.display = 'block';
+    
+    // Auto-hide after 25 seconds to prepare for next reminder
+    setTimeout(() => {
+        document.getElementById('manual-cleaning-reminder').style.display = 'none';
+    }, 25000);
+}
+
+function openPhotoModal() {
+    const modal = new bootstrap.Modal(document.getElementById('photoUploadModal'));
+    modal.show();
+}
+
+function handlePhotoUpload(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
+    
+    fetch('/upload_12h_cleaning_photo', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('photoUploadModal')).hide();
+            showAlert('Photos uploaded successfully!', 'success');
+            loadManualCleaningHistory();
+            e.target.reset();
+        } else {
+            showAlert(data.error || 'Error uploading photos', 'error');
+        }
+    })
+    .catch(error => {
+        showAlert('Error uploading photos', 'error');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+function handleTimerCompletion() {
+    clearInterval(timerInterval);
+    document.getElementById('countdown-display').textContent = '00:00:00';
+    document.getElementById('timer-status').textContent = 'Process Complete!';
+    document.getElementById('timer-icon').className = 'fas fa-check-circle fa-3x text-success';
+    document.getElementById('progress-bar').style.width = '100%';
+    document.getElementById('progress-bar').className = 'progress-bar bg-success';
+    document.getElementById('completion-section').style.display = 'block';
+    
+    showAlert('12-hour cleaning process completed! Please enter the outgoing moisture level.', 'success');
+}
+
+function handleCompletion(e) {
+    e.preventDefault();
+    
+    const formData = {
+        order_id: {{ order.id }},
+        outgoing_moisture: document.getElementById('outgoing_moisture').value,
+        operator_name: document.getElementById('completion_operator').value,
+        notes: document.getElementById('completion_notes').value
+    };
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Completing...';
+    
+    fetch('/submit_12h_completion', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            setTimeout(() => {
+                window.location.href = "{{ url_for('production_orders') }}";
+            }, 2000);
+        } else {
+            showAlert(data.error || 'Error completing process', 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        showAlert('Error completing process', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+function loadManualCleaningHistory() {
+    fetch(`/get_manual_cleanings/{{ order.id }}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('manual-cleaning-count').textContent = data.total_manual_cleanings;
+            
+            if (data.manual_cleanings.length > 0) {
+                const historyHtml = data.manual_cleanings.map(cleaning => `
+                    <div class="card mb-2">
+                        <div class="card-body py-2">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <small><strong>${cleaning.operator_name}</strong> - ${cleaning.machine_name}</small><br>
+                                    <small class="text-muted">${new Date(cleaning.cleaning_time).toLocaleString()}</small>
+                                    ${cleaning.notes ? `<br><small>${cleaning.notes}</small>` : ''}
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    ${cleaning.before_photo ? `<a href="/uploads/${cleaning.before_photo}" target="_blank" class="btn btn-sm btn-outline-primary me-1">Before</a>` : ''}
+                                    ${cleaning.after_photo ? `<a href="/uploads/${cleaning.after_photo}" target="_blank" class="btn btn-sm btn-outline-success">After</a>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('cleaning-history').innerHTML = historyHtml;
+            }
+        })
+        .catch(error => console.error('Error loading cleaning history:', error));
+}
+
+function showAlert(message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alertHtml = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Insert at top of page
+    const container = document.querySelector('.container-fluid');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+}
+</script>
+{% endblock %}

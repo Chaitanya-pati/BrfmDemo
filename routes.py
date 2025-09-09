@@ -1157,9 +1157,9 @@ def submit_post_process_data():
         operator_name = data.get('operator_name', 'Operator')
         
         # Get the cleaning process
-        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id).first()
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, status='running').first()
         if not cleaning_process:
-            return jsonify({'error': 'No cleaning process found for this order'}), 404
+            return jsonify({'error': 'No active cleaning process found for this order'}), 404
         
         # Check if timer is completed
         current_time = datetime.utcnow()
@@ -1181,12 +1181,15 @@ def submit_post_process_data():
         cleaning_process.status = 'completed'
         cleaning_process.timer_active = False
         
-        # Update order and bin status
-        order = ProductionOrder.query.get(order_id)
-        order.status = 'completed'
-        
         cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
         cleaning_bin.status = 'available'
+        
+        # Check if this was a 24-hour process - if so, enable 12-hour option
+        order = ProductionOrder.query.get(order_id)
+        if cleaning_process.process_type == '24_hour':
+            order.status = '24h_completed'  # Mark as ready for 12-hour cleaning
+        else:
+            order.status = 'completed'  # Final completion
         
         # Calculate quality metrics
         moisture_reduction = moisture_before - moisture_after
@@ -1199,7 +1202,273 @@ def submit_post_process_data():
             'completion_time': current_time.isoformat(),
             'moisture_reduction': round(moisture_reduction, 2),
             'cleaning_efficiency': round(cleaning_efficiency, 2),
-            'message': 'Post-process data submitted successfully. Cleaning process completed!'
+            'next_stage_available': cleaning_process.process_type == '24_hour',
+            'message': 'Process completed successfully!' + (' 12-hour cleaning stage is now available.' if cleaning_process.process_type == '24_hour' else '')
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/start_12h_cleaning/<int:order_id>', methods=['GET', 'POST'])
+def start_12h_cleaning(order_id):
+    """Start 12-hour cleaning process after 24-hour completion"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    # Check if 24-hour process is completed
+    if order.status != '24h_completed':
+        flash('24-hour cleaning must be completed before starting 12-hour process.', 'error')
+        return redirect(url_for('production_cleaning', order_id=order_id))
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            duration_hours = float(request.form['duration_hours'])
+            target_moisture = float(request.form['target_moisture'])
+            start_moisture = float(request.form['start_moisture'])
+            operator_name = request.form['operator_name']
+            machine_name = request.form.get('machine_name', '12-Hour Cleaning Machine')
+            cleaning_bin_id = request.form.get('cleaning_bin_id', 1)  # Default bin
+            
+            # Create 12-hour cleaning process
+            start_time = datetime.utcnow()
+            end_time = start_time + timedelta(hours=duration_hours)
+            
+            cleaning_process = CleaningProcess(
+                order_id=order_id,
+                cleaning_bin_id=cleaning_bin_id,
+                process_type='12_hour',
+                duration_hours=duration_hours,
+                start_time=start_time,
+                end_time=end_time,
+                start_moisture=start_moisture,
+                target_moisture=target_moisture,
+                operator_name=operator_name,
+                machine_name=machine_name,
+                status='running',
+                timer_active=True,
+                countdown_start=start_time,
+                countdown_end=end_time
+            )
+            
+            db.session.add(cleaning_process)
+            
+            # Update order status
+            order.status = '12h_cleaning'
+            
+            # Update cleaning bin status
+            cleaning_bin = CleaningBin.query.get(cleaning_bin_id)
+            if cleaning_bin:
+                cleaning_bin.status = 'cleaning'
+            
+            db.session.commit()
+            
+            flash(f'12-hour cleaning process started successfully! Duration: {duration_hours} hours', 'success')
+            return redirect(url_for('monitor_12h_cleaning', order_id=order_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting 12-hour cleaning: {str(e)}', 'error')
+    
+    # Get available cleaning bins
+    cleaning_bins = CleaningBin.query.filter_by(status='available').all()
+    
+    return render_template('start_12h_cleaning.html', order=order, cleaning_bins=cleaning_bins)
+
+@app.route('/monitor_12h_cleaning/<int:order_id>')
+def monitor_12h_cleaning(order_id):
+    """Monitor 12-hour cleaning process with timer and reminders"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, process_type='12_hour', status='running').first()
+    
+    if not cleaning_process:
+        flash('No active 12-hour cleaning process found.', 'error')
+        return redirect(url_for('production_orders'))
+    
+    return render_template('monitor_12h_cleaning.html', order=order, cleaning_process=cleaning_process)
+
+@app.route('/api/12h_timer_status/<int:order_id>')
+def get_12h_timer_status(order_id):
+    """Get current timer status for 12-hour cleaning process"""
+    try:
+        cleaning_process = CleaningProcess.query.filter_by(
+            order_id=order_id, 
+            process_type='12_hour',
+            timer_active=True
+        ).first()
+        
+        if not cleaning_process:
+            return jsonify({'timer_active': False})
+        
+        current_time = datetime.utcnow()
+        
+        # Check if timer has completed
+        if current_time >= cleaning_process.countdown_end:
+            return jsonify({
+                'timer_active': False,
+                'completed': True,
+                'can_proceed': True,
+                'end_time': cleaning_process.countdown_end.isoformat()
+            })
+        
+        # Calculate remaining time
+        remaining_seconds = (cleaning_process.countdown_end - current_time).total_seconds()
+        elapsed_seconds = (current_time - cleaning_process.countdown_start).total_seconds()
+        
+        # Check for pre-end reminders (configurable offsets)
+        reminder_offsets = [300, 600, 1800]  # 5min, 10min, 30min before end
+        upcoming_reminders = []
+        for offset in reminder_offsets:
+            if remaining_seconds <= offset and remaining_seconds > (offset - 60):
+                upcoming_reminders.append(f"{offset//60} minutes until completion")
+        
+        # Manual cleaning reminder every 30 seconds
+        needs_manual_cleaning = int(elapsed_seconds) % 30 == 0 and int(elapsed_seconds) > 0
+        
+        return jsonify({
+            'timer_active': True,
+            'completed': False,
+            'can_proceed': False,
+            'process_type': cleaning_process.process_type,
+            'start_time': cleaning_process.countdown_start.isoformat(),
+            'end_time': cleaning_process.countdown_end.isoformat(),
+            'remaining_seconds': int(remaining_seconds),
+            'elapsed_seconds': int(elapsed_seconds),
+            'duration_hours': cleaning_process.duration_hours,
+            'target_moisture': cleaning_process.target_moisture,
+            'start_moisture': cleaning_process.start_moisture,
+            'upcoming_reminders': upcoming_reminders,
+            'needs_manual_cleaning': needs_manual_cleaning
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/submit_12h_completion', methods=['POST'])
+def submit_12h_completion():
+    """Submit 12-hour cleaning completion data"""
+    try:
+        data = request.get_json()
+        order_id = data['order_id']
+        outgoing_moisture = float(data['outgoing_moisture'])
+        operator_name = data.get('operator_name', 'Operator')
+        notes = data.get('notes', '')
+        
+        # Get the 12-hour cleaning process
+        cleaning_process = CleaningProcess.query.filter_by(
+            order_id=order_id, 
+            process_type='12_hour',
+            status='running'
+        ).first()
+        
+        if not cleaning_process:
+            return jsonify({'error': 'No active 12-hour cleaning process found'}), 404
+        
+        # Check if timer is completed
+        current_time = datetime.utcnow()
+        if current_time < cleaning_process.countdown_end:
+            return jsonify({'error': 'Cannot submit completion data until timer finishes'}), 400
+        
+        # Update cleaning process with completion data
+        cleaning_process.moisture_after = outgoing_moisture
+        cleaning_process.completed_by = operator_name
+        cleaning_process.completion_time = current_time
+        cleaning_process.post_process_notes = notes
+        cleaning_process.status = 'completed'
+        cleaning_process.timer_active = False
+        
+        # Update order status to final completion
+        order = ProductionOrder.query.get(order_id)
+        order.status = 'completed'
+        
+        # Update cleaning bin status
+        cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
+        if cleaning_bin:
+            cleaning_bin.status = 'available'
+        
+        # Calculate moisture reduction efficiency
+        moisture_reduction = cleaning_process.start_moisture - outgoing_moisture
+        target_achieved = abs(outgoing_moisture - cleaning_process.target_moisture) <= 1.0
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'completion_time': current_time.isoformat(),
+            'outgoing_moisture': outgoing_moisture,
+            'moisture_reduction': round(moisture_reduction, 2),
+            'target_achieved': target_achieved,
+            'message': '12-hour cleaning process completed successfully!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/upload_12h_cleaning_photo', methods=['POST'])
+def upload_12h_cleaning_photo():
+    """Upload manual cleaning photos for 12-hour process"""
+    try:
+        order_id = request.form.get('order_id')
+        photo_type = request.form.get('photo_type')  # 'before', 'after'
+        operator_name = request.form.get('operator_name', 'Operator')
+        notes = request.form.get('notes', '')
+        
+        if not order_id or not photo_type:
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Check if file was uploaded
+        if 'photo_file' not in request.files:
+            return jsonify({'error': 'No photo file uploaded'}), 400
+        
+        file = request.files['photo_file']
+        if file.filename == '' or not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid photo file'}), 400
+        
+        # Save the file
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"12h_{photo_type}_{timestamp}_{filename}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        
+        # Create manual cleaning log
+        cleaning_process = CleaningProcess.query.filter_by(
+            order_id=int(order_id), 
+            process_type='12_hour',
+            status='running'
+        ).first()
+        
+        if cleaning_process:
+            # Check if we have both before and after photos for this minute
+            current_minute = int((datetime.utcnow() - cleaning_process.start_time).total_seconds() // 60)
+            
+            manual_cleaning = ManualCleaningLog(
+                order_id=int(order_id),
+                cleaning_process_id=cleaning_process.id,
+                machine_name='12-Hour Cleaning Manual',
+                operator_name=operator_name,
+                cleaning_start_time=datetime.utcnow(),
+                cleaning_end_time=datetime.utcnow(),
+                duration_minutes=0.5,
+                notes=f"Minute {current_minute}: {notes}",
+                status='completed'
+            )
+            
+            # Set appropriate photo field
+            if photo_type == 'before':
+                manual_cleaning.before_photo = filename
+            else:
+                manual_cleaning.after_photo = filename
+            
+            db.session.add(manual_cleaning)
+            db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'upload_time': datetime.utcnow().isoformat(),
+            'message': f'{photo_type.title()} photo uploaded successfully'
         })
         
     except Exception as e:

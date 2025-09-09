@@ -1,0 +1,202 @@
+
+{% extends "base.html" %}
+
+{% block title %}Start 12-Hour Cleaning - Order {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-hourglass-half me-2"></i>12-Hour Cleaning Process Setup</h2>
+                <a href="{{ url_for('production_cleaning', order_id=order.id) }}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Cleaning
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Order Information - Stage 2: 12-Hour Cleaning</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Order Number:</strong><br>
+                            <span class="badge bg-primary fs-6">{{ order.order_number }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Product Type:</strong><br>
+                            {{ order.finished_good_type }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Quantity:</strong><br>
+                            {{ order.quantity }} tons
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Status:</strong><br>
+                            <span class="badge bg-warning">24-Hour Completed</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>24-Hour Cleaning Completed!</strong> 
+                The wheat has completed the 24-hour cleaning process and is now ready for the final 12-hour cleaning step.
+            </div>
+        </div>
+    </div>
+
+    <!-- 12-Hour Cleaning Setup Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-play me-2"></i>Setup 12-Hour Cleaning Process</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="cleaning_bin_id" class="form-label">
+                                    <i class="fas fa-box me-2"></i>12-Hour Cleaning Bin *
+                                </label>
+                                <select class="form-select" id="cleaning_bin_id" name="cleaning_bin_id" required>
+                                    <option value="">Select 12-Hour Cleaning Bin</option>
+                                    {% for bin in cleaning_bins %}
+                                    <option value="{{ bin.id }}">{{ bin.name }} (Capacity: {{ bin.capacity }}kg)</option>
+                                    {% endfor %}
+                                    <option value="1" selected>Default 12-Hour Bin #1</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="machine_name" class="form-label">
+                                    <i class="fas fa-cogs me-2"></i>Machine Name *
+                                </label>
+                                <input type="text" class="form-control" id="machine_name" 
+                                       name="machine_name" value="12-Hour Cleaning Machine #1" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="start_moisture" class="form-label">
+                                    <i class="fas fa-tint me-2"></i>Current Moisture Level (%) *
+                                </label>
+                                <input type="number" class="form-control" id="start_moisture" 
+                                       name="start_moisture" step="0.1" min="0" max="100" required
+                                       placeholder="Enter current moisture level">
+                                <div class="form-text">Moisture level after 24-hour cleaning</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="target_moisture" class="form-label">
+                                    <i class="fas fa-bullseye me-2"></i>Target Moisture Level (%) *
+                                </label>
+                                <input type="number" class="form-control" id="target_moisture" 
+                                       name="target_moisture" step="0.1" min="0" max="100" required
+                                       placeholder="Enter target moisture level">
+                                <div class="form-text">Desired moisture level after 12-hour process</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-clock me-2"></i>12-Hour Cleaning Duration *
+                                </label>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" 
+                                                           name="duration_hours" id="duration_12" value="12" checked>
+                                                    <label class="form-check-label" for="duration_12">
+                                                        <strong>12 Hours (Standard)</strong><br>
+                                                        <small class="text-muted">Standard 12-hour process</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" 
+                                                           name="duration_hours" id="duration_6" value="6">
+                                                    <label class="form-check-label" for="duration_6">
+                                                        <strong>6 Hours (Testing)</strong><br>
+                                                        <small class="text-muted">Shorter duration for testing</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" 
+                                                           name="duration_hours" id="duration_2" value="2">
+                                                    <label class="form-check-label" for="duration_2">
+                                                        <strong>2 Hours (Quick Test)</strong><br>
+                                                        <small class="text-muted">Quick testing duration</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" 
+                                                           name="duration_hours" id="duration_01" value="0.1">
+                                                    <label class="form-check-label" for="duration_01">
+                                                        <strong>6 Minutes (Demo)</strong><br>
+                                                        <small class="text-muted">Demo/development testing</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="operator_name" class="form-label">
+                                    <i class="fas fa-user me-2"></i>Operator Name *
+                                </label>
+                                <input type="text" class="form-control" id="operator_name" 
+                                       name="operator_name" required>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Important:</strong> This is the final cleaning step before grinding. 
+                            Once started, the timer will begin counting down and you will receive:
+                            <ul class="mb-0 mt-2">
+                                <li>Pre-end reminders (30 min, 10 min, 5 min before completion)</li>
+                                <li>Manual cleaning reminders every 30 seconds with photo requirements</li>
+                                <li>Locked progression until timer completes</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-play me-2"></i>Start 12-Hour Cleaning Process
+                            </button>
+                            <a href="{{ url_for('production_cleaning', order_id=order.id) }}" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

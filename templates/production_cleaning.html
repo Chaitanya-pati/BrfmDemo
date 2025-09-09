@@ -191,7 +191,6 @@
             </div>
         </div>
     </div>
-</div>
 {% endif %}
 
 <!-- Cleaning Process Timer -->
@@ -260,7 +259,6 @@
             </div>
         </div>
     </div>
-</div>
 {% endif %}
 
 <!-- Active Cleaning Process Timer -->
@@ -436,7 +434,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Water Added to Bins (liters)</label>
+                                        <label class="form-label">Water Used to Bins (liters)</label>
                                         <input type="number" class="form-control" id="water-used" 
                                                step="0.1" min="0" required>
                                         <small class="form-text text-muted">Water added to bins during cleaning</small>
@@ -1113,17 +1111,17 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Check for pending reminders - enhanced for minute-by-minute checking
-function checkForPendingReminders() {
+function checkPendingReminders() {
     fetch(`/api/get_pending_reminders/{{ order.id }}`)
     .then(response => response.json())
     .then(data => {
         if (data.has_pending) {
             // Update the cleaning status
             updateCleaningStatus(data.reminder);
-            
+
             // Show visual reminder in the UI
             showQuickReminderAlert(data.reminder);
-            
+
             // Optionally show modal for critical reminders (every 5 minutes)
             if (data.reminder.sequence % 5 === 0 && !document.getElementById('cleaningReminderModal').classList.contains('show')) {
                 showReminderModal(data.reminder);
@@ -1144,12 +1142,12 @@ function updateCleaningStatus(reminder) {
     const lastCleaningTime = document.getElementById('last-cleaning-time');
     const progressBar = document.getElementById('manual-cleaning-progress');
     const quickBtn = document.getElementById('quick-manual-cleaning-btn');
-    
+
     if (statusText) {
         statusText.textContent = `Manual cleaning required - Minute ${reminder.sequence}`;
         statusText.className = 'text-danger fw-bold';
     }
-    
+
     if (quickBtn) {
         quickBtn.classList.remove('btn-warning');
         quickBtn.classList.add('btn-danger');
@@ -1174,7 +1172,7 @@ function showQuickReminderAlert(reminder) {
         `;
         document.body.appendChild(floatingReminder);
     }
-    
+
     floatingReminder.innerHTML = `
         <div class="d-flex align-items-center">
             <i class="fas fa-bell fa-2x me-3 text-warning"></i>
@@ -1188,7 +1186,7 @@ function showQuickReminderAlert(reminder) {
             </button>
         </div>
     `;
-    
+
     floatingReminder.style.display = 'block';
 }
 
@@ -1198,15 +1196,15 @@ function hideQuickReminderAlert() {
     if (floatingReminder) {
         floatingReminder.style.display = 'none';
     }
-    
+
     const statusText = document.getElementById('cleaning-status-text');
     const quickBtn = document.getElementById('quick-manual-cleaning-btn');
-    
+
     if (statusText) {
         statusText.textContent = 'Manual cleaning up to date';
         statusText.className = 'text-success';
     }
-    
+
     if (quickBtn) {
         quickBtn.classList.remove('btn-danger');
         quickBtn.classList.add('btn-warning');
@@ -1344,20 +1342,20 @@ function calculateMetrics() {
 // Initialize timer if cleaning process is active
 document.addEventListener('DOMContentLoaded', function() {
     initializeTimer();
-    
+
     // Check for reminders every 30 seconds
     setInterval(checkPendingReminders, 30000);
-    
+
     // Update cleaning progress every minute
     setInterval(updateCleaningProgress, 60000);
-    
+
     // Show reminder popup every minute
     setInterval(showMinutelyReminderPopup, 60000);
-    
+
     // Initial checks
     checkPendingReminders();
     updateCleaningProgress();
-    
+
     // Show first reminder after 30 seconds
     setTimeout(showMinutelyReminderPopup, 30000);
 });
@@ -1368,13 +1366,13 @@ function updateCleaningProgress() {
     .then(response => response.json())
     .then(data => {
         if (data.error) return;
-        
+
         // Update progress bar
         const progressBar = document.getElementById('manual-cleaning-progress');
         if (progressBar) {
             progressBar.style.width = data.cleaning_compliance + '%';
             progressBar.textContent = data.cleaning_compliance.toFixed(1) + '%';
-            
+
             // Color code based on compliance
             progressBar.className = 'progress-bar';
             if (data.cleaning_compliance >= 80) {
@@ -1385,7 +1383,7 @@ function updateCleaningProgress() {
                 progressBar.classList.add('bg-danger');
             }
         }
-        
+
         // Update last cleaning time
         const lastCleaningTime = document.getElementById('last-cleaning-time');
         if (lastCleaningTime) {
@@ -1396,13 +1394,13 @@ function updateCleaningProgress() {
                 lastCleaningTime.textContent = 'No manual cleanings logged yet';
             }
         }
-        
+
         // Update cleaning count badge
         const countBadge = document.getElementById('manualCleaningCount');
         if (countBadge) {
             countBadge.textContent = `${data.manual_cleaning_count}/${data.expected_cleanings}`;
         }
-        
+
     })
     .catch(error => {
         console.error('Error updating cleaning progress:', error);
@@ -1541,7 +1539,7 @@ function loadCleaningReminders() {
                     const currentTime = new Date();
                     const cleaningStartTime = new Date('{{ cleaning_process.start_time.isoformat() if cleaning_process else "" }}');
                     const elapsedMinutes = Math.floor((currentTime - cleaningStartTime) / 60000);
-                    
+
                     // Show reminder popup
                     showReminderPopupMessage(elapsedMinutes + 1);
                 }
@@ -1593,14 +1591,14 @@ function loadCleaningReminders() {
             `;
             document.body.appendChild(reminderPopup);
         }
-        
+
         // Update minute number
         document.getElementById('reminderMinuteNumber').textContent = minuteNumber;
-        
+
         // Show the popup
         const modal = new bootstrap.Modal(reminderPopup);
         modal.show();
-        
+
         // Auto-dismiss after 15 seconds if user doesn't interact
         setTimeout(() => {
             const modalInstance = bootstrap.Modal.getInstance(reminderPopup);
@@ -1608,7 +1606,7 @@ function loadCleaningReminders() {
                 modalInstance.hide();
             }
         }, 15000);
-        
+
         // Also show a toast notification
         showToastReminder(minuteNumber);
     }
@@ -1623,7 +1621,7 @@ function loadCleaningReminders() {
             toastContainer.style.zIndex = '9999';
             document.body.appendChild(toastContainer);
         }
-        
+
         // Create toast
         const toastId = 'reminderToast_' + Date.now();
         const toastElement = document.createElement('div');
@@ -1639,16 +1637,16 @@ function loadCleaningReminders() {
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
         `;
-        
+
         toastContainer.appendChild(toastElement);
-        
+
         // Show toast
         const toast = new bootstrap.Toast(toastElement, {
             autohide: true,
             delay: 8000
         });
         toast.show();
-        
+
         // Remove toast element after it's hidden
         toastElement.addEventListener('hidden.bs.toast', () => {
             toastElement.remove();
