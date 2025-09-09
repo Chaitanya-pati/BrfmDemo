@@ -558,6 +558,99 @@ class B1ScaleCleaningLog(db.Model):
     # Relationship with grinding process
     grinding_process = db.relationship('GrindingProcess', backref='b1_cleaning_logs')
 
+# Enhanced Grinding Process Models
+class GrindingSession(db.Model):
+    """Enhanced grinding session linked to production orders"""
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    start_time = db.Column(db.DateTime, nullable=False)
+    end_time = db.Column(db.DateTime)
+    duration_seconds = db.Column(db.Integer)  # Total duration in seconds
+    timer_active = db.Column(db.Boolean, default=False)
+    
+    # B1 Scale handoff details
+    b1_scale_operator = db.Column(db.String(100), nullable=False)
+    b1_scale_handoff_time = db.Column(db.DateTime, default=datetime.utcnow)
+    b1_scale_weight_kg = db.Column(db.Float, nullable=False)
+    b1_scale_notes = db.Column(db.Text)
+    
+    # Grinding machine details
+    grinding_machine_name = db.Column(db.String(100), nullable=False)
+    grinding_operator = db.Column(db.String(100), nullable=False)
+    
+    # Production ratios
+    total_input_kg = db.Column(db.Float, nullable=False)
+    total_output_kg = db.Column(db.Float, default=0)
+    main_products_kg = db.Column(db.Float, default=0)
+    bran_kg = db.Column(db.Float, default=0)
+    main_products_percentage = db.Column(db.Float, default=0)
+    bran_percentage = db.Column(db.Float, default=0)
+    bran_alert_triggered = db.Column(db.Boolean, default=False)
+    
+    status = db.Column(db.String(20), default='preparing')  # preparing, grinding, completed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    production_order = db.relationship('ProductionOrder', backref='grinding_sessions')
+
+class GrindingManualCleaning(db.Model):
+    """Manual cleaning reminders during grinding process (every 10 seconds)"""
+    id = db.Column(db.Integer, primary_key=True)
+    grinding_session_id = db.Column(db.Integer, db.ForeignKey('grinding_session.id'), nullable=False)
+    reminder_time = db.Column(db.DateTime, default=datetime.utcnow)
+    operator_name = db.Column(db.String(100), nullable=False)
+    before_photo = db.Column(db.String(255))
+    after_photo = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')  # pending, completed
+    
+    # Relationships
+    grinding_session = db.relationship('GrindingSession', backref='manual_cleanings')
+
+class ProductionOutput(db.Model):
+    """Track specific product outputs from grinding"""
+    id = db.Column(db.Integer, primary_key=True)
+    grinding_session_id = db.Column(db.Integer, db.ForeignKey('grinding_session.id'), nullable=False)
+    product_name = db.Column(db.String(100), nullable=False)  # Maida, Suji, Chakki Ata, etc.
+    product_type = db.Column(db.String(20), nullable=False)  # main_product, bran
+    quantity_kg = db.Column(db.Float, nullable=False)
+    percentage_of_total = db.Column(db.Float, nullable=False)
+    
+    # Relationships
+    grinding_session = db.relationship('GrindingSession', backref='production_outputs')
+
+class PackagingRecord(db.Model):
+    """Record packaging details for finished products"""
+    id = db.Column(db.Integer, primary_key=True)
+    grinding_session_id = db.Column(db.Integer, db.ForeignKey('grinding_session.id'), nullable=False)
+    product_name = db.Column(db.String(100), nullable=False)
+    bag_weight_kg = db.Column(db.Float, nullable=False)  # 25, 30, 50 kg
+    bag_count = db.Column(db.Integer, nullable=False)
+    total_weight_kg = db.Column(db.Float, nullable=False)
+    packaging_time = db.Column(db.DateTime, default=datetime.utcnow)
+    operator_name = db.Column(db.String(100), nullable=False)
+    
+    # Relationships
+    grinding_session = db.relationship('GrindingSession', backref='packaging_records')
+
+class StorageTransaction(db.Model):
+    """Enhanced storage management with shifting and tracking"""
+    id = db.Column(db.Integer, primary_key=True)
+    from_storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'))
+    to_storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=False)
+    product_name = db.Column(db.String(100), nullable=False)
+    quantity_kg = db.Column(db.Float, nullable=False)
+    transaction_type = db.Column(db.String(20), nullable=False)  # storage, shift
+    transaction_time = db.Column(db.DateTime, default=datetime.utcnow)
+    operator_name = db.Column(db.String(100), nullable=False)
+    grinding_session_id = db.Column(db.Integer, db.ForeignKey('grinding_session.id'))
+    notes = db.Column(db.Text)
+    
+    # Relationships
+    from_storage = db.relationship('StorageArea', foreign_keys=[from_storage_area_id], backref='outbound_transactions')
+    to_storage = db.relationship('StorageArea', foreign_keys=[to_storage_area_id], backref='inbound_transactions')
+    grinding_session = db.relationship('GrindingSession', backref='storage_transactions')
+
 # Enhanced Storage with 4 storage areas as requested
 class ProductStorageTransfer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
