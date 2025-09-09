@@ -829,42 +829,15 @@ def cleaning_timer_status(order_id):
         return jsonify({'error': str(e)}), 400
 
 def schedule_cleaning_reminder(process_id, due_time):
-    """Schedule a cleaning reminder"""
+    """Schedule a cleaning reminder - simplified version"""
     try:
-        # Get the next reminder sequence number
-        existing_reminders = CleaningReminder.query.filter_by(
-            cleaning_process_id=process_id
-        ).count()
-        
-        reminder = CleaningReminder(
-            cleaning_process_id=process_id,
-            due_time=due_time,
-            reminder_sequence=existing_reminders + 1
-        )
-        
-        db.session.add(reminder)
-        db.session.commit()
-        
-        # Add job to scheduler
-        from app import scheduler
-        try:
-            scheduler.add_job(
-                id=f'cleaning_reminder_{reminder.id}',
-                func=send_cleaning_reminder,
-                args=[reminder.id],
-                trigger='date',
-                run_date=due_time
-            )
-            logging.info(f"Scheduled cleaning reminder {reminder.id} for {due_time}")
-        except Exception as scheduler_error:
-            logging.error(f"Error adding job to scheduler: {scheduler_error}")
-            # Continue even if scheduler fails
-        
+        # For now, just log that we would schedule a reminder
+        # The frontend will handle minute-by-minute popups
+        logging.info(f"Would schedule cleaning reminder for process {process_id} at {due_time}")
         return True
         
     except Exception as e:
         logging.error(f"Error scheduling reminder: {e}")
-        db.session.rollback()
         return False
 
 def send_cleaning_reminder(reminder_id):
@@ -1235,7 +1208,7 @@ def submit_post_process_data():
 
 @app.route('/api/get_pending_reminders/<int:order_id>')
 def get_pending_reminders(order_id):
-    """Get pending reminders for a cleaning process"""
+    """Get pending reminders for a cleaning process - simplified version"""
     try:
         cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, timer_active=True).first()
         
@@ -1244,41 +1217,19 @@ def get_pending_reminders(order_id):
         
         current_time = datetime.utcnow()
         
-        # Find reminders that are due now (sent but not completed)
-        pending_reminders = CleaningReminder.query.filter_by(
-            cleaning_process_id=cleaning_process.id,
-            reminder_sent=True,
-            completed=False
-        ).filter(
-            CleaningReminder.due_time <= current_time
-        ).order_by(CleaningReminder.due_time.desc()).all()
+        # Calculate elapsed minutes since process started
+        elapsed_minutes = (current_time - cleaning_process.start_time).total_seconds() / 60
         
-        if pending_reminders:
-            # Return the most recent pending reminder
-            latest_reminder = pending_reminders[0]
-            return jsonify({
-                'has_pending': True,
-                'reminder': {
-                    'id': latest_reminder.id,
-                    'order_id': order_id,
-                    'sequence': latest_reminder.reminder_sequence,
-                    'due_time': latest_reminder.due_time.isoformat()
-                },
-                'total_pending': len(pending_reminders)
-            })
-        
-        # Check for upcoming reminders (within next 2 minutes)
-        upcoming_reminders = CleaningReminder.query.filter_by(
-            cleaning_process_id=cleaning_process.id,
-            reminder_sent=False
-        ).filter(
-            CleaningReminder.due_time <= current_time + timedelta(minutes=2),
-            CleaningReminder.due_time > current_time
-        ).count()
-        
+        # Always return that reminders are needed every minute during active process
         return jsonify({
-            'has_pending': False,
-            'upcoming_reminders': upcoming_reminders
+            'has_pending': True,
+            'reminder': {
+                'id': f'minute_{int(elapsed_minutes)}',
+                'order_id': order_id,
+                'sequence': int(elapsed_minutes) + 1,
+                'due_time': current_time.isoformat()
+            },
+            'elapsed_minutes': int(elapsed_minutes)
         })
         
     except Exception as e:

@@ -1351,9 +1351,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update cleaning progress every minute
     setInterval(updateCleaningProgress, 60000);
     
+    // Show reminder popup every minute
+    setInterval(showMinutelyReminderPopup, 60000);
+    
     // Initial checks
     checkPendingReminders();
     updateCleaningProgress();
+    
+    // Show first reminder after 30 seconds
+    setTimeout(showMinutelyReminderPopup, 30000);
 });
 
 // Update cleaning progress display
@@ -1523,6 +1529,130 @@ function loadCleaningReminders() {
             .catch(error => {
                 console.error('Error checking pending reminders:', error);
             });
+    }
+
+    function showMinutelyReminderPopup() {
+        // Check if cleaning process is still active
+        fetch(`/api/cleaning_timer_status/{{ order.id }}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.timer_active) {
+                    // Calculate current minute
+                    const currentTime = new Date();
+                    const cleaningStartTime = new Date('{{ cleaning_process.start_time.isoformat() if cleaning_process else "" }}');
+                    const elapsedMinutes = Math.floor((currentTime - cleaningStartTime) / 60000);
+                    
+                    // Show reminder popup
+                    showReminderPopupMessage(elapsedMinutes + 1);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking timer status:', error);
+            });
+    }
+
+    function showReminderPopupMessage(minuteNumber) {
+        // Create popup modal if it doesn't exist
+        let reminderPopup = document.getElementById('minutelyReminderPopup');
+        if (!reminderPopup) {
+            reminderPopup = document.createElement('div');
+            reminderPopup.id = 'minutelyReminderPopup';
+            reminderPopup.className = 'modal fade';
+            reminderPopup.setAttribute('tabindex', '-1');
+            reminderPopup.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-warning">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title">
+                                <i class="fas fa-bell me-2"></i>Manual Cleaning Reminder
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-broom fa-3x text-warning mb-3"></i>
+                            </div>
+                            <h6 class="text-primary">Time for Manual Machine Cleaning!</h6>
+                            <p class="mb-3">Minute <span id="reminderMinuteNumber">#</span> - Please perform manual cleaning of the machine</p>
+                            <div class="alert alert-info">
+                                <small><i class="fas fa-info-circle me-1"></i>
+                                Manual cleaning is required every minute during the 24-hour process for optimal results.</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                Remind Later
+                            </button>
+                            <button type="button" class="btn btn-warning" data-bs-dismiss="modal" 
+                                    onclick="openManualCleaningModal({{ order.id }}, {{ cleaning_process.id if cleaning_process else 'null' }}, 'Manual Cleaning Machine')">
+                                <i class="fas fa-camera me-1"></i>Log Cleaning Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(reminderPopup);
+        }
+        
+        // Update minute number
+        document.getElementById('reminderMinuteNumber').textContent = minuteNumber;
+        
+        // Show the popup
+        const modal = new bootstrap.Modal(reminderPopup);
+        modal.show();
+        
+        // Auto-dismiss after 15 seconds if user doesn't interact
+        setTimeout(() => {
+            const modalInstance = bootstrap.Modal.getInstance(reminderPopup);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        }, 15000);
+        
+        // Also show a toast notification
+        showToastReminder(minuteNumber);
+    }
+
+    function showToastReminder(minuteNumber) {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toastContainer';
+            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+            toastContainer.style.zIndex = '9999';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Create toast
+        const toastId = 'reminderToast_' + Date.now();
+        const toastElement = document.createElement('div');
+        toastElement.id = toastId;
+        toastElement.className = 'toast align-items-center text-bg-warning border-0';
+        toastElement.setAttribute('role', 'alert');
+        toastElement.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-bell me-2"></i>
+                    <strong>Minute ${minuteNumber}:</strong> Manual cleaning reminder!
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        
+        toastContainer.appendChild(toastElement);
+        
+        // Show toast
+        const toast = new bootstrap.Toast(toastElement, {
+            autohide: true,
+            delay: 8000
+        });
+        toast.show();
+        
+        // Remove toast element after it's hidden
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
     }
 
     function showReminderAlert(reminder) {
