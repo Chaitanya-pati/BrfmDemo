@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block title %}Monitor 24-Hour Cleaning - Order {{ order.order_number }}{% endblock %}
@@ -249,15 +248,45 @@
     </div>
 </div>
 
+<!-- Cleaning Reminder Modal (for 24-hour process) -->
+<div class="modal fade" id="cleaningReminderModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Manual Cleaning Reminder</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <i class="fas fa-exclamation-triangle fa-4x text-warning mb-3"></i>
+                <h4>Time for manual cleaning!</h4>
+                <p>Please perform manual cleaning for minute <strong id="reminderMinuteNumber"></strong>.</p>
+                <p class="text-muted">This reminder will close automatically.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">OK</button>
+                <button type="button" class="btn btn-primary" id="log-cleaning-reminder-btn">Log Cleaning Now</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+// Global variables for modals and intervals
+let timerInterval;
+let reminderCheckInterval;
+let currentReminderModal = null;
+let manualCleaningModal = null;
+let cleaningReminderModal = null;
+let lastReminderMinute = -1;
+
 // Timer functionality
 function initializeTimer() {
     updateTimer();
     setInterval(updateTimer, 1000);
-    
+
     // Check for manual cleaning reminders every minute
     setInterval(checkManualCleaningReminder, 60000);
-    
+
     // Load initial manual cleaning history
     loadManualCleaningHistory();
 }
@@ -279,20 +308,20 @@ function updateTimerDisplay(data) {
     const countdownDisplay = document.getElementById('countdown-display');
     const progressBar = document.getElementById('progress-bar');
     const timerStatus = document.getElementById('timer-status');
-    
+
     const remainingSeconds = data.remaining_seconds;
     const totalSeconds = data.duration_hours * 3600;
-    
+
     const hours = Math.floor(remainingSeconds / 3600);
     const minutes = Math.floor((remainingSeconds % 3600) / 60);
     const seconds = Math.floor(remainingSeconds % 60);
-    
+
     const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     countdownDisplay.textContent = timeString;
-    
+
     const progress = ((totalSeconds - remainingSeconds) / totalSeconds) * 100;
     progressBar.style.width = progress + '%';
-    
+
     timerStatus.textContent = 'Running - Manual cleaning required every minute';
 }
 
@@ -308,7 +337,7 @@ function checkManualCleaningReminder() {
     const currentTime = new Date();
     const minutes = currentTime.getMinutes();
     const seconds = currentTime.getSeconds();
-    
+
     // Show reminder at the start of every minute
     if (seconds < 5) {
         showManualCleaningReminder();
@@ -319,18 +348,18 @@ function showManualCleaningReminder() {
     // Update cleaning status
     const statusText = document.getElementById('cleaning-status-text');
     const quickBtn = document.getElementById('quick-manual-cleaning-btn');
-    
+
     if (statusText) {
         statusText.textContent = 'Manual cleaning reminder - Time to clean!';
         statusText.className = 'text-danger fw-bold';
     }
-    
+
     if (quickBtn) {
         quickBtn.classList.add('btn-danger');
         quickBtn.classList.remove('btn-warning');
         quickBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>LOG CLEANING NOW!';
     }
-    
+
     // Reset after 30 seconds
     setTimeout(() => {
         if (statusText) {
@@ -350,21 +379,21 @@ function openManualCleaningModal(orderId, cleaningProcessId, machineName) {
     document.getElementById('manual_order_id').value = orderId;
     document.getElementById('manual_cleaning_process_id').value = cleaningProcessId;
     document.getElementById('manual_machine_name').value = machineName || 'Manual Cleaning Machine';
-    
+
     new bootstrap.Modal(document.getElementById('manualCleaningModal')).show();
 }
 
 // Handle manual cleaning form submission
 document.getElementById('manualCleaningForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const formData = new FormData(this);
     const submitBtn = this.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
-    
+
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-    
+
     fetch('/upload_manual_cleaning', {
         method: 'POST',
         body: formData
@@ -405,7 +434,7 @@ function loadManualCleaningHistory() {
 
 function updateManualCleaningHistory(cleanings) {
     const historyDiv = document.getElementById('manualCleaningHistory');
-    
+
     if (cleanings.length === 0) {
         historyDiv.innerHTML = `
             <div class="text-center py-4">
@@ -415,7 +444,7 @@ function updateManualCleaningHistory(cleanings) {
         `;
         return;
     }
-    
+
     let html = '<div class="row">';
     cleanings.forEach(cleaning => {
         html += `
@@ -451,14 +480,14 @@ function updateManualCleaningHistory(cleanings) {
         `;
     });
     html += '</div>';
-    
+
     historyDiv.innerHTML = html;
 }
 
 // Post-process form submission
 document.getElementById('post-process-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const formData = {
         order_id: {{ order.id }},
         moisture_before: parseFloat(document.getElementById('moisture-before').value),
@@ -469,13 +498,13 @@ document.getElementById('post-process-form').addEventListener('submit', function
         operator_name: document.getElementById('post-process-operator').value,
         operator_notes: document.getElementById('process-notes').value
     };
-    
+
     const submitBtn = this.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
-    
+
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Completing...';
-    
+
     fetch('/submit_post_process_data', {
         method: 'POST',
         headers: {
@@ -511,10 +540,10 @@ function showAlert(message, type) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     const container = document.querySelector('.container-fluid');
     container.insertBefore(alertDiv, container.firstChild);
-    
+
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
@@ -522,9 +551,81 @@ function showAlert(message, type) {
     }, 5000);
 }
 
-// Initialize timer when page loads
+// Initialize timer and reminders when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    manualCleaningModal = new bootstrap.Modal(document.getElementById('manualCleaningModal'));
+    cleaningReminderModal = new bootstrap.Modal(document.getElementById('cleaningReminderModal'));
+
+    // Initialize timer for 24-hour process
     initializeTimer();
+
+    // Start reminder checks for 24-hour process
+    startReminderChecks();
+
+    // Load initial manual cleaning history
+    loadManualCleaningHistory();
+
+    // Additional setup for 12-hour process if this template were to be used for it
+    // For now, this is primarily for the 24-hour process
 });
-</script>
-{% endblock %}
+
+
+// --- Functions related to 24-hour cleaning reminder system ---
+
+function startReminderChecks() {
+    reminderCheckInterval = setInterval(checkForReminders, 10000); // Check every 10 seconds
+}
+
+function checkForReminders() {
+    fetch(`/api/get_pending_reminders/{{ order.id }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.has_pending && data.reminder) {
+                const reminderMinute = data.reminder.sequence;
+
+                // Only show reminder once per minute
+                if (reminderMinute !== lastReminderMinute && reminderMinute > 0) {
+                    lastReminderMinute = reminderMinute;
+                    showCleaningReminder(reminderMinute);
+                }
+
+                // Update progress info
+                updateCleaningProgress();
+            }
+        })
+        .catch(error => console.error('Error checking reminders:', error));
+}
+
+function showCleaningReminder(minute) {
+    document.getElementById('reminderMinuteNumber').textContent = minute;
+
+    if (cleaningReminderModal) {
+        cleaningReminderModal.show();
+
+        // Auto-hide reminder after 30 seconds
+        setTimeout(() => {
+            if (cleaningReminderModal._isShown) {
+                cleaningReminderModal.hide();
+            }
+        }, 30000);
+    }
+}
+
+function updateCleaningProgress() {
+    // Placeholder for updating a visual progress indicator if needed
+    // For now, we'll rely on the reminder modal
+}
+
+// Handler for logging cleaning from the reminder modal
+document.getElementById('log-cleaning-reminder-btn').addEventListener('click', function() {
+    if (manualCleaningModal) {
+        manualCleaningModal.show();
+        if (cleaningReminderModal._isShown) {
+            cleaningReminderModal.hide();
+        }
+    }
+});
+
+// Placeholder for any 12-hour specific logic if needed in the future
+// Currently, this template is for the 24-hour process.
+// The user requested the 12-hour process use the same form, which is handled by the shared modal.

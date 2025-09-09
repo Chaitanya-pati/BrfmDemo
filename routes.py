@@ -1583,7 +1583,7 @@ def upload_12h_cleaning_photo():
 
 @app.route('/api/get_pending_reminders/<int:order_id>')
 def get_pending_reminders(order_id):
-    """Get pending reminders for a cleaning process - simplified version"""
+    """Get pending reminders for a cleaning process - improved version"""
     try:
         cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, timer_active=True).first()
         
@@ -1594,17 +1594,27 @@ def get_pending_reminders(order_id):
         
         # Calculate elapsed minutes since process started
         elapsed_minutes = (current_time - cleaning_process.start_time).total_seconds() / 60
+        current_minute = int(elapsed_minutes)
         
-        # Always return that reminders are needed every minute during active process
+        # Only show reminder every minute during active process
+        if current_minute > 0 and elapsed_minutes >= current_minute:
+            return jsonify({
+                'has_pending': True,
+                'reminder': {
+                    'id': f'minute_{current_minute}',
+                    'order_id': order_id,
+                    'sequence': current_minute,
+                    'due_time': current_time.isoformat(),
+                    'message': f'Manual cleaning required - Minute {current_minute}',
+                    'process_type': cleaning_process.process_type
+                },
+                'elapsed_minutes': current_minute,
+                'show_popup': True
+            })
+        
         return jsonify({
-            'has_pending': True,
-            'reminder': {
-                'id': f'minute_{int(elapsed_minutes)}',
-                'order_id': order_id,
-                'sequence': int(elapsed_minutes) + 1,
-                'due_time': current_time.isoformat()
-            },
-            'elapsed_minutes': int(elapsed_minutes)
+            'has_pending': False,
+            'elapsed_minutes': current_minute
         })
         
     except Exception as e:
