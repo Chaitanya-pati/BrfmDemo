@@ -11,22 +11,30 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
 
 @app.route('/')
 def index():
-    """Main dashboard - production functionality removed"""
-    # Dashboard data without production references
+    """Main dashboard with production functionality"""
+    # Dashboard data
     pending_vehicles = Vehicle.query.filter_by(status='pending').count()
     quality_check_vehicles = Vehicle.query.filter_by(status='quality_check').count()
     pending_dispatches = Dispatch.query.filter_by(status='loaded').count()
     
+    # Production order stats
+    active_orders = ProductionOrder.query.filter_by(status='cleaning').count()
+    orders_ready_for_12h = ProductionOrder.query.filter_by(status='24h_completed').count()
+    orders_in_12h = ProductionOrder.query.filter_by(status='12h_cleaning').count()
+    
     # Recent activities
     recent_vehicles = Vehicle.query.order_by(Vehicle.created_at.desc()).limit(5).all()
+    recent_orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).limit(5).all()
     
     return render_template('index.html', 
                          pending_vehicles=pending_vehicles,
                          quality_check_vehicles=quality_check_vehicles,
-                         active_orders=0,  # Production orders removed
+                         active_orders=active_orders,
+                         orders_ready_for_12h=orders_ready_for_12h,
+                         orders_in_12h=orders_in_12h,
                          pending_dispatches=pending_dispatches,
                          recent_vehicles=recent_vehicles,
-                         recent_orders=[])  # Production orders removed
+                         recent_orders=recent_orders)
 
 @app.route('/vehicle_entry', methods=['GET', 'POST'])
 def vehicle_entry():

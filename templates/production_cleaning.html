@@ -101,7 +101,7 @@
                                         <td>{{ item.percentage }}%</td>
                                         <td>{{ "%.3f"|format(item.calculated_tons) }} tons</td>
                                         <td>
-                                            <button class="btn btn-sm btn-outline-primary start-transfer-btn" 
+                                            <button class="btn btn-sm btn-outline-primary start-transfer-btn"
                                                     data-precleaning-bin-id="{{ item.precleaning_bin.id }}"
                                                     data-quantity="{{ item.calculated_tons }}">
                                                 <i class="fas fa-play me-1"></i>Start Transfer
@@ -177,7 +177,7 @@
                                 </td>
                                 <td>
                                     {% if job.status == 'in_progress' %}
-                                        <button class="btn btn-sm btn-outline-success complete-transfer-btn" 
+                                        <button class="btn btn-sm btn-outline-success complete-transfer-btn"
                                                 data-job-id="{{ job.job_id }}">
                                             <i class="fas fa-check me-1"></i>Complete
                                         </button>
@@ -408,7 +408,7 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Moisture Before (%)</label>
-                                        <input type="number" class="form-control" id="moisture-before" 
+                                        <input type="number" class="form-control" id="moisture-before"
                                                step="0.1" min="0" max="100" required>
                                         <small class="form-text text-muted">Initial moisture content percentage</small>
                                     </div>
@@ -416,7 +416,7 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Moisture After (%)</label>
-                                        <input type="number" class="form-control" id="moisture-after" 
+                                        <input type="number" class="form-control" id="moisture-after"
                                                step="0.1" min="0" max="100" required>
                                         <small class="form-text text-muted">Final moisture content percentage</small>
                                     </div>
@@ -427,7 +427,7 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Waste Collected (kg)</label>
-                                        <input type="number" class="form-control" id="waste-material" 
+                                        <input type="number" class="form-control" id="waste-material"
                                                step="0.1" min="0" required>
                                         <small class="form-text text-muted">Total waste collected during cleaning</small>
                                     </div>
@@ -435,7 +435,7 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Water Used to Bins (liters)</label>
-                                        <input type="number" class="form-control" id="water-used" 
+                                        <input type="number" class="form-control" id="water-used"
                                                step="0.1" min="0" required>
                                         <small class="form-text text-muted">Water added to bins during cleaning</small>
                                     </div>
@@ -447,20 +447,20 @@
                             <h6 class="mb-3 text-primary">Process Information</h6>
                             <div class="mb-3">
                                 <label class="form-label">Machine Name</label>
-                                <input type="text" class="form-control" id="machine-name" 
+                                <input type="text" class="form-control" id="machine-name"
                                        placeholder="Enter machine name" required>
                                 <small class="form-text text-muted">Name of the machine used for cleaning</small>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label">Operator Name</label>
-                                <input type="text" class="form-control" id="post-process-operator" 
+                                <input type="text" class="form-control" id="post-process-operator"
                                        value="Cleaning Operator" required>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label">Process Notes</label>
-                                <textarea class="form-control" id="process-notes" rows="4" 
+                                <textarea class="form-control" id="process-notes" rows="4"
                                           placeholder="Add any observations, issues, or special notes about the cleaning process..."></textarea>
                             </div>
                         </div>
@@ -548,7 +548,7 @@
 
                     <div class="mb-3">
                         <label class="form-label">Cleaning Notes (Optional)</label>
-                        <textarea name="notes" class="form-control" rows="3" 
+                        <textarea name="notes" class="form-control" rows="3"
                                   placeholder="Add notes about the cleaning process, issues found, etc..."></textarea>
                     </div>
 
@@ -615,13 +615,13 @@
                             <h6 class="mb-3 text-primary">Before Cleaning Photo</h6>
                             <div class="mb-3">
                                 <label class="form-label">Select Before Photo</label>
-                                <input type="file" class="form-control" id="before-photo-input" 
+                                <input type="file" class="form-control" id="before-photo-input"
                                        accept="image/*" name="before_photo" required>
                                 <small class="form-text text-muted">Photo before starting cleaning</small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Before Photo Notes</label>
-                                <textarea class="form-control" id="before-notes" name="before_notes" 
+                                <textarea class="form-control" id="before-notes" name="before_notes"
                                           rows="3" placeholder="Describe the condition before cleaning..."></textarea>
                             </div>
                         </div>
@@ -630,13 +630,13 @@
                             <h6 class="mb-3 text-success">After Cleaning Photo</h6>
                             <div class="mb-3">
                                 <label class="form-label">Select After Photo</label>
-                                <input type="file" class="form-control" id="after-photo-input" 
+                                <input type="file" class="form-control" id="after-photo-input"
                                        accept="image/*" name="after_photo" required>
                                 <small class="form-text text-muted">Photo after completing cleaning</small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">After Photo Notes</label>
-                                <textarea class="form-control" id="after-notes" name="after_notes" 
+                                <textarea class="form-control" id="after-notes" name="after_notes"
                                           rows="3" placeholder="Describe the condition after cleaning..."></textarea>
                             </div>
                         </div>
@@ -646,7 +646,7 @@
                         <div class="col-12">
                             <div class="mb-3">
                                 <label class="form-label">Machine/Area Cleaned</label>
-                                <input type="text" class="form-control" id="cleaning-area" name="cleaning_area" 
+                                <input type="text" class="form-control" id="cleaning-area" name="cleaning_area"
                                        placeholder="Enter machine name or area cleaned" required>
                             </div>
                         </div>
@@ -1164,9 +1164,9 @@ function showQuickReminderAlert(reminder) {
         floatingReminder.id = 'floating-reminder';
         floatingReminder.className = 'alert alert-warning position-fixed shadow-lg';
         floatingReminder.style.cssText = `
-            top: 100px; 
-            right: 20px; 
-            z-index: 9999; 
+            top: 100px;
+            right: 20px;
+            z-index: 9999;
             min-width: 350px;
             animation: pulse 2s infinite;
         `;
@@ -1180,7 +1180,7 @@ function showQuickReminderAlert(reminder) {
                 <h6 class="mb-1">Manual Cleaning Required</h6>
                 <p class="mb-0">Minute ${reminder.sequence} - Please log cleaning activity</p>
             </div>
-            <button type="button" class="btn btn-sm btn-warning ms-2" 
+            <button type="button" class="btn btn-sm btn-warning ms-2"
                     onclick="openManualCleaningModal({{ order.id }}, {{ cleaning_process.id if cleaning_process else 'null' }}, 'Manual Cleaning Machine')">
                 Log Now
             </button>
@@ -1581,7 +1581,7 @@ function loadCleaningReminders() {
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                                 Remind Later
                             </button>
-                            <button type="button" class="btn btn-warning" data-bs-dismiss="modal" 
+                            <button type="button" class="btn btn-warning" data-bs-dismiss="modal"
                                     onclick="openManualCleaningModal({{ order.id }}, {{ cleaning_process.id if cleaning_process else 'null' }}, 'Manual Cleaning Machine')">
                                 <i class="fas fa-camera me-1"></i>Log Cleaning Now
                             </button>
