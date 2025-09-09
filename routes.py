@@ -1243,9 +1243,14 @@ def start_24h_cleaning(order_id):
         try:
             # Get form data
             duration_hours = float(request.form.get('duration_hours', 24.0))
-            operator_name = request.form['operator_name']
+            operator_name = request.form.get('operator_name')
             machine_name = request.form.get('machine_name', '24-Hour Cleaning Machine')
-            cleaning_bin_id = request.form.get('cleaning_bin_id', 1)  # Default bin
+            cleaning_bin_id = int(request.form.get('cleaning_bin_id', 1))  # Default bin
+            
+            # Validate required fields
+            if not operator_name:
+                flash('Operator name is required.', 'error')
+                return render_template('start_24h_cleaning.html', order=order, cleaning_bins=CleaningBin.query.filter_by(status='available').all())
             
             # Create 24-hour cleaning process
             start_time = datetime.utcnow()
