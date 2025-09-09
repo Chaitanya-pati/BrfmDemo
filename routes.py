@@ -1475,10 +1475,17 @@ def submit_12h_completion():
         if not cleaning_process:
             return jsonify({'error': 'No active 12-hour cleaning process found'}), 404
         
-        # Check if timer is completed
+        # Check if timer is completed - allow completion if timer has finished OR if manually triggered
         current_time = datetime.utcnow()
-        if current_time < cleaning_process.countdown_end:
-            return jsonify({'error': 'Cannot submit completion data until timer finishes'}), 400
+        timer_completed = current_time >= cleaning_process.countdown_end
+        
+        # Allow completion if timer is done OR if this is a manual completion
+        if not timer_completed and not data.get('force_completion', False):
+            remaining_minutes = (cleaning_process.countdown_end - current_time).total_seconds() / 60
+            return jsonify({
+                'error': f'Timer not completed yet. {remaining_minutes:.1f} minutes remaining. Please wait or contact supervisor.',
+                'remaining_minutes': remaining_minutes
+            }), 400
         
         # Update cleaning process with completion data
         cleaning_process.moisture_after = outgoing_moisture

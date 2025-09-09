@@ -650,12 +650,20 @@ function handlePhotoUpload(e) {
 
 function handleTimerCompletion() {
     clearInterval(timerInterval);
+    clearInterval(reminderCheckInterval);
+    
     document.getElementById('countdown-display').textContent = '00:00:00';
     document.getElementById('timer-status').textContent = 'Process Complete!';
     document.getElementById('timer-icon').className = 'fas fa-check-circle fa-3x text-success';
     document.getElementById('progress-bar').style.width = '100%';
     document.getElementById('progress-bar').className = 'progress-bar bg-success';
-    document.getElementById('completion-section').style.display = 'block';
+    
+    // Show completion section
+    const completionSection = document.getElementById('completion-section');
+    if (completionSection) {
+        completionSection.style.display = 'block';
+        completionSection.scrollIntoView({ behavior: 'smooth' });
+    }
 
     showAlert('12-hour cleaning process completed! Please enter the outgoing moisture level.', 'success');
 }
@@ -686,10 +694,48 @@ function handleCompletion(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            clearInterval(timerInterval);
+            clearInterval(reminderCheckInterval);
             showAlert(data.message, 'success');
             setTimeout(() => {
                 window.location.href = "{{ url_for('production_orders') }}";
             }, 2000);
+        } else if (data.remaining_minutes && data.remaining_minutes > 0) {
+            // Timer not completed yet - ask for confirmation
+            if (confirm(`Timer has ${data.remaining_minutes.toFixed(1)} minutes remaining. Do you want to force completion anyway?`)) {
+                // Retry with force completion flag
+                const forceData = {...formData, force_completion: true};
+                fetch('/submit_12h_completion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(forceData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        clearInterval(timerInterval);
+                        clearInterval(reminderCheckInterval);
+                        showAlert(data.message, 'success');
+                        setTimeout(() => {
+                            window.location.href = "{{ url_for('production_orders') }}";
+                        }, 2000);
+                    } else {
+                        showAlert(data.error || 'Error completing process', 'error');
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                })
+                .catch(error => {
+                    showAlert('Error completing process', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                });
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
         } else {
             showAlert(data.error || 'Error completing process', 'error');
             submitBtn.disabled = false;
@@ -697,6 +743,7 @@ function handleCompletion(e) {
         }
     })
     .catch(error => {
+        console.error('Completion error:', error);
         showAlert('Error completing process', 'error');
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
@@ -786,6 +833,12 @@ function startReminderChecks() {
 document.addEventListener('DOMContentLoaded', function() {
     initializeTimer();
     loadManualCleaningHistory();
+    
+    // Add completion form handler
+    const completionForm = document.getElementById('completion-form');
+    if (completionForm) {
+        completionForm.addEventListener('submit', handleCompletion);
+    }
 });
 
 </script>
