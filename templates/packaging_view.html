@@ -1,0 +1,354 @@
+
+{% extends "base.html" %}
+
+{% block title %}Packaging Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-box me-2 text-primary"></i>Packaging Management</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPackagingModal">
+                    <i class="fas fa-plus me-2"></i>Add Packaging
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Area Stock Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Storage Areas Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for area in storage_areas %}
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">{{ area.name }}</h6>
+                                    <p class="mb-1">
+                                        <strong>{{ area.current_stock_kg }} kg</strong> / {{ area.capacity_kg }} kg
+                                    </p>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar" style="width: {{ (area.current_stock_kg / area.capacity_kg * 100) if area.capacity_kg > 0 else 0 }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ ((area.current_stock_kg / area.capacity_kg * 100) if area.capacity_kg > 0 else 0)|round(1) }}% utilized</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Packaging Records -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Packaging Records</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_packaging %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Bag Size</th>
+                                    <th>Bag Count</th>
+                                    <th>Total Weight</th>
+                                    <th>Operator</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for package in recent_packaging %}
+                                <tr>
+                                    <td>{{ package.product_name }}</td>
+                                    <td>{{ package.bag_weight_kg }} kg</td>
+                                    <td>{{ package.bag_count }} bags</td>
+                                    <td>{{ package.total_weight_kg }} kg</td>
+                                    <td>{{ package.operator_name }}</td>
+                                    <td>{{ package.packaging_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No packaging records found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Packaging Modal -->
+<div class="modal fade" id="addPackagingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-box me-2"></i>Add Packaging</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="packagingForm">
+                    <!-- Storage Area Selection -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Storage Area</label>
+                            <select class="form-select" id="storage_area_select" required>
+                                <option value="">Select storage area...</option>
+                                {% for area in storage_areas %}
+                                <option value="{{ area.id }}">{{ area.name }} ({{ area.current_stock_kg }}/{{ area.capacity_kg }} kg)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Operator Name</label>
+                            <input type="text" class="form-control" id="operator_name" required>
+                        </div>
+                    </div>
+
+                    <!-- Available Products in Selected Storage -->
+                    <div class="mb-3" id="available_products_section" style="display: none;">
+                        <h6>Available Products in Selected Storage Area:</h6>
+                        <div id="available_products_list" class="alert alert-info">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Packaging Table -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6>Packaging Items</h6>
+                            <button type="button" class="btn btn-sm btn-success" onclick="addPackagingRow()">
+                                <i class="fas fa-plus me-1"></i>Add Item
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="packaging_table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Bag Size</th>
+                                        <th>Number of Bags</th>
+                                        <th>Total Weight (kg)</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="packaging_tbody">
+                                    <!-- Rows will be added dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="alert alert-secondary">
+                        <strong>Summary:</strong>
+                        <span id="total_items">0</span> items, 
+                        <span id="total_weight">0</span> kg total weight
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitPackaging()">
+                    <i class="fas fa-save me-1"></i>Save Packaging
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let packagingRowCount = 0;
+
+// Load available products when storage area is selected
+document.getElementById('storage_area_select').addEventListener('change', function() {
+    const storageAreaId = this.value;
+    if (storageAreaId) {
+        fetch(`/api/storage_area_products/${storageAreaId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const section = document.getElementById('available_products_section');
+                    const list = document.getElementById('available_products_list');
+                    
+                    if (data.available_products.length > 0) {
+                        let html = '<strong>Available products:</strong><br>';
+                        data.available_products.forEach(product => {
+                            html += `• ${product.product_name}: ${product.available_quantity_kg} kg<br>`;
+                        });
+                        list.innerHTML = html;
+                        section.style.display = 'block';
+                    } else {
+                        list.innerHTML = '<strong>No products currently available in this storage area.</strong>';
+                        section.style.display = 'block';
+                    }
+                } else {
+                    console.error('Error loading products:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    } else {
+        document.getElementById('available_products_section').style.display = 'none';
+    }
+});
+
+function addPackagingRow() {
+    packagingRowCount++;
+    const tbody = document.getElementById('packaging_tbody');
+    
+    const row = document.createElement('tr');
+    row.id = `packaging_row_${packagingRowCount}`;
+    row.innerHTML = `
+        <td>
+            <select class="form-select product-select" name="product_name" required>
+                <option value="">Select product...</option>
+                {% for product in products %}
+                <option value="{{ product.name }}">{{ product.name }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td>
+            <select class="form-select bag-size-select" name="bag_weight_kg" required onchange="calculateRowTotal(${packagingRowCount})">
+                <option value="">Bag size...</option>
+                <option value="5">5 kg</option>
+                <option value="25">25 kg</option>
+                <option value="50">50 kg</option>
+            </select>
+        </td>
+        <td>
+            <input type="number" class="form-control bag-count-input" name="bag_count" min="1" required onchange="calculateRowTotal(${packagingRowCount})">
+        </td>
+        <td>
+            <input type="number" class="form-control total-weight-input" name="total_weight_kg" readonly>
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removePackagingRow(${packagingRowCount})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(row);
+    updateSummary();
+}
+
+function removePackagingRow(rowId) {
+    const row = document.getElementById(`packaging_row_${rowId}`);
+    if (row) {
+        row.remove();
+        updateSummary();
+    }
+}
+
+function calculateRowTotal(rowId) {
+    const row = document.getElementById(`packaging_row_${rowId}`);
+    const bagWeight = parseFloat(row.querySelector('.bag-size-select').value) || 0;
+    const bagCount = parseInt(row.querySelector('.bag-count-input').value) || 0;
+    const totalWeight = bagWeight * bagCount;
+    
+    row.querySelector('.total-weight-input').value = totalWeight.toFixed(2);
+    updateSummary();
+}
+
+function updateSummary() {
+    const rows = document.querySelectorAll('#packaging_tbody tr');
+    let totalItems = rows.length;
+    let totalWeight = 0;
+    
+    rows.forEach(row => {
+        const weight = parseFloat(row.querySelector('.total-weight-input').value) || 0;
+        totalWeight += weight;
+    });
+    
+    document.getElementById('total_items').textContent = totalItems;
+    document.getElementById('total_weight').textContent = totalWeight.toFixed(2);
+}
+
+function submitPackaging() {
+    const storageAreaId = document.getElementById('storage_area_select').value;
+    const operatorName = document.getElementById('operator_name').value;
+    
+    if (!storageAreaId || !operatorName) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+    
+    const rows = document.querySelectorAll('#packaging_tbody tr');
+    if (rows.length === 0) {
+        alert('Please add at least one packaging item.');
+        return;
+    }
+    
+    const packagingItems = [];
+    let isValid = true;
+    
+    rows.forEach(row => {
+        const productName = row.querySelector('.product-select').value;
+        const bagWeight = row.querySelector('.bag-size-select').value;
+        const bagCount = row.querySelector('.bag-count-input').value;
+        
+        if (!productName || !bagWeight || !bagCount) {
+            isValid = false;
+            return;
+        }
+        
+        packagingItems.push({
+            product_name: productName,
+            bag_weight_kg: parseFloat(bagWeight),
+            bag_count: parseInt(bagCount),
+            storage_area_id: storageAreaId,
+            operator_name: operatorName
+        });
+    });
+    
+    if (!isValid) {
+        alert('Please fill in all fields for each packaging item.');
+        return;
+    }
+    
+    // Submit data
+    fetch('/packaging_view', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            packaging_items: packagingItems
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Packaging saved successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while saving packaging.');
+    });
+}
+
+// Add initial row
+document.addEventListener('DOMContentLoaded', function() {
+    addPackagingRow();
+});
+</script>
+{% endblock %}

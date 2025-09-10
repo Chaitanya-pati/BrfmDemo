@@ -2178,6 +2178,109 @@ def shift_stock():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
+@app.route('/packaging_view', methods=['GET', 'POST'])
+def packaging_view():
+    """Simplified packaging view with dynamic table"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            packaging_items = data['packaging_items']
+            
+            for item in packaging_items:
+                # Create packaging record
+                packaging = PackagingRecord(
+                    grinding_session_id=item.get('grinding_session_id'),
+                    product_name=item['product_name'],
+                    bag_weight_kg=float(item['bag_weight_kg']),
+                    bag_count=int(item['bag_count']),
+                    total_weight_kg=float(item['bag_weight_kg']) * int(item['bag_count']),
+                    operator_name=item['operator_name']
+                )
+                
+                db.session.add(packaging)
+                
+                # Create storage transaction
+                storage_transaction = StorageTransaction(
+                    to_storage_area_id=int(item['storage_area_id']),
+                    product_name=item['product_name'],
+                    quantity_kg=packaging.total_weight_kg,
+                    transaction_type='storage',
+                    operator_name=item['operator_name'],
+                    notes=f"Packaged {item['bag_count']} bags of {item['bag_weight_kg']}kg each"
+                )
+                
+                db.session.add(storage_transaction)
+                
+                # Update storage area stock
+                storage_area = StorageArea.query.get(item['storage_area_id'])
+                if storage_area:
+                    storage_area.current_stock_kg += packaging.total_weight_kg
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Successfully packaged {len(packaging_items)} products'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 400
+    
+    # Get data for the template
+    products = Product.query.all()
+    storage_areas = StorageArea.query.all()
+    recent_packaging = PackagingRecord.query.order_by(PackagingRecord.packaging_time.desc()).limit(10).all()
+    
+    return render_template('packaging_view.html', 
+                         products=products, 
+                         storage_areas=storage_areas,
+                         recent_packaging=recent_packaging)
+
+@app.route('/api/storage_area_products/<int:storage_area_id>')
+def get_storage_area_products(storage_area_id):
+    """Get products available in a specific storage area"""
+    try:
+        # Get recent transactions for this storage area
+        transactions = StorageTransaction.query.filter_by(
+            to_storage_area_id=storage_area_id
+        ).order_by(StorageTransaction.transaction_time.desc()).limit(50).all()
+        
+        # Group by product name and calculate quantities
+        product_quantities = {}
+        for transaction in transactions:
+            product_name = transaction.product_name
+            if product_name not in product_quantities:
+                product_quantities[product_name] = 0
+            product_quantities[product_name] += transaction.quantity_kg
+        
+        # Get outbound transactions to subtract
+        outbound_transactions = StorageTransaction.query.filter_by(
+            from_storage_area_id=storage_area_id
+        ).all()
+        
+        for transaction in outbound_transactions:
+            product_name = transaction.product_name
+            if product_name in product_quantities:
+                product_quantities[product_name] -= transaction.quantity_kg
+        
+        # Format response
+        available_products = []
+        for product_name, quantity in product_quantities.items():
+            if quantity > 0:
+                available_products.append({
+                    'product_name': product_name,
+                    'available_quantity_kg': round(quantity, 2)
+                })
+        
+        return jsonify({
+            'success': True,
+            'available_products': available_products
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
 @app.route('/api/storage_contents/<int:storage_area_id>')
 def get_storage_contents(storage_area_id):
     """Get contents of a specific storage area"""
