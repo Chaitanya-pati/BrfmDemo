@@ -160,7 +160,7 @@ class MachineCleaningReminder(db.Model):
     reminder_sent = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # machine relationship removed - ProductionMachine model deleted
 
 class CleaningConfirmation(db.Model):
@@ -173,7 +173,7 @@ class CleaningConfirmation(db.Model):
     before_photo = db.Column(db.String(255))
     after_photo = db.Column(db.String(255))
     notes = db.Column(db.Text)
-    
+
     reminder = db.relationship('MachineCleaningReminder', backref=db.backref('confirmations', lazy=True))
 
 class CleaningMachine(db.Model):
@@ -323,7 +323,7 @@ class ProductionOrder(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     responsible_person = db.Column(db.String(100))
     notification_sent = db.Column(db.Boolean, default=False)
-    
+
     # Add other fields that exist in the database
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
@@ -331,7 +331,7 @@ class ProductionOrder(db.Model):
     priority = db.Column(db.String(20), default='normal')
     description = db.Column(db.Text)
     target_completion = db.Column(db.DateTime)
-    
+
     # Relationships
     customer = db.relationship('Customer', backref='production_orders')
     product = db.relationship('Product', backref='production_orders')
@@ -345,7 +345,7 @@ class ProductionPlan(db.Model):
     is_locked = db.Column(db.Boolean, default=False)
     created_by = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     plan_items = db.relationship('ProductionPlanItem', backref='production_plan', lazy=True)
 
@@ -356,7 +356,7 @@ class ProductionPlanItem(db.Model):
     precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=False)
     percentage = db.Column(db.Float, nullable=False)
     calculated_tons = db.Column(db.Float)
-    
+
     # Relationships
     precleaning_bin = db.relationship('PrecleaningBin', backref='plan_items')
 
@@ -370,7 +370,7 @@ class CleaningReminder(db.Model):
     reminder_sequence = db.Column(db.Integer, default=1)  # 1, 2, 3... for multiple reminders
     photo_uploaded = db.Column(db.Boolean, default=False)  # Track if photo has been uploaded
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationship
     cleaning_process = db.relationship('CleaningProcess', backref='cleaning_reminders')
 
@@ -408,7 +408,7 @@ class CleaningProcess(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, running, completed, paused
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Timer persistence fields
     timer_active = db.Column(db.Boolean, default=False)
     countdown_start = db.Column(db.DateTime)  # When countdown started
@@ -423,11 +423,11 @@ class CleaningProcess(db.Model):
     reminder_sent_10min = db.Column(db.Boolean, default=False, nullable=True)
     reminder_sent_30min = db.Column(db.Boolean, default=False, nullable=True)
     # next_process_job_id removed - production functionality deleted
-    
+
     # Additional tracking for 12-hour process start parameters
     start_parameters_captured = db.Column(db.Boolean, default=False)
     completion_parameters_captured = db.Column(db.Boolean, default=False)
-    
+
     # Post-process data capture fields (to match requirements exactly)
     moisture_before = db.Column(db.Float)  # Moisture before processing
     moisture_after = db.Column(db.Float)   # Moisture after processing
@@ -567,17 +567,17 @@ class GrindingSession(db.Model):
     end_time = db.Column(db.DateTime)
     duration_seconds = db.Column(db.Integer)  # Total duration in seconds
     timer_active = db.Column(db.Boolean, default=False)
-    
+
     # B1 Scale handoff details
     b1_scale_operator = db.Column(db.String(100), nullable=False)
     b1_scale_handoff_time = db.Column(db.DateTime, default=datetime.utcnow)
     b1_scale_weight_kg = db.Column(db.Float, nullable=False)
     b1_scale_notes = db.Column(db.Text)
-    
+
     # Grinding machine details
     grinding_machine_name = db.Column(db.String(100), nullable=False)
     grinding_operator = db.Column(db.String(100), nullable=False)
-    
+
     # Production ratios
     total_input_kg = db.Column(db.Float, nullable=False)
     total_output_kg = db.Column(db.Float, default=0)
@@ -586,10 +586,10 @@ class GrindingSession(db.Model):
     main_products_percentage = db.Column(db.Float, default=0)
     bran_percentage = db.Column(db.Float, default=0)
     bran_alert_triggered = db.Column(db.Boolean, default=False)
-    
+
     status = db.Column(db.String(20), default='preparing')  # preparing, grinding, completed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     production_order = db.relationship('ProductionOrder', backref='grinding_sessions')
 
@@ -603,7 +603,7 @@ class GrindingManualCleaning(db.Model):
     after_photo = db.Column(db.String(255))
     notes = db.Column(db.Text)
     status = db.Column(db.String(20), default='pending')  # pending, completed
-    
+
     # Relationships
     grinding_session = db.relationship('GrindingSession', backref='manual_cleanings')
 
@@ -615,23 +615,25 @@ class ProductionOutput(db.Model):
     product_type = db.Column(db.String(20), nullable=False)  # main_product, bran
     quantity_kg = db.Column(db.Float, nullable=False)
     percentage_of_total = db.Column(db.Float, nullable=False)
-    
+
     # Relationships
     grinding_session = db.relationship('GrindingSession', backref='production_outputs')
 
 class PackagingRecord(db.Model):
     """Record packaging details for finished products"""
     id = db.Column(db.Integer, primary_key=True)
-    grinding_session_id = db.Column(db.Integer, db.ForeignKey('grinding_session.id'), nullable=False)
+    grinding_session_id = db.Column(db.Integer, db.ForeignKey('grinding_session.id'), nullable=True)
     product_name = db.Column(db.String(100), nullable=False)
-    bag_weight_kg = db.Column(db.Float, nullable=False)  # 25, 30, 50 kg
+    bag_weight_kg = db.Column(db.Float, nullable=False)
     bag_count = db.Column(db.Integer, nullable=False)
     total_weight_kg = db.Column(db.Float, nullable=False)
     packaging_time = db.Column(db.DateTime, default=datetime.utcnow)
     operator_name = db.Column(db.String(100), nullable=False)
-    
+    storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=True)
+
     # Relationships
     grinding_session = db.relationship('GrindingSession', backref='packaging_records')
+    storage_area = db.relationship('StorageArea', backref='packaging_records')
 
 class StorageTransaction(db.Model):
     """Enhanced storage management with shifting and tracking"""
@@ -645,7 +647,7 @@ class StorageTransaction(db.Model):
     operator_name = db.Column(db.String(100), nullable=False)
     grinding_session_id = db.Column(db.Integer, db.ForeignKey('grinding_session.id'))
     notes = db.Column(db.Text)
-    
+
     # Relationships
     from_storage = db.relationship('StorageArea', foreign_keys=[from_storage_area_id], backref='outbound_transactions')
     to_storage = db.relationship('StorageArea', foreign_keys=[to_storage_area_id], backref='inbound_transactions')
@@ -740,10 +742,10 @@ class TransferJob(db.Model):
     operator_name = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     production_order = db.relationship('ProductionOrder', backref='transfer_jobs')
-    precleaning_bin = db.relationship('PrecleaningBin', backref='outgoing_transfers')  
+    precleaning_bin = db.relationship('PrecleaningBin', backref='outgoing_transfers')
     cleaning_bin = db.relationship('CleaningBin', backref='incoming_transfers')
 
 class CleaningReminderPhoto(db.Model):
@@ -755,7 +757,7 @@ class CleaningReminderPhoto(db.Model):
     uploaded_by = db.Column(db.String(100), nullable=False)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     notes = db.Column(db.Text)
-    
+
     # Relationship
     reminder = db.relationship('CleaningReminder', backref='photos')
 
@@ -774,7 +776,7 @@ class ManualCleaningLog(db.Model):
     notes = db.Column(db.Text)
     status = db.Column(db.String(20), default='completed')  # completed, in_progress
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     production_order = db.relationship('ProductionOrder', backref='manual_cleanings')
     cleaning_process = db.relationship('CleaningProcess', backref='manual_cleaning_logs')

@@ -1,6 +1,7 @@
+
 {% extends "base.html" %}
 
-{% block title %}Packing Process - Job {{ job.job_number }}{% endblock %}
+{% block title %}Packing Process - Order {{ order.order_number }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid fade-in">
@@ -11,11 +12,11 @@
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <h4 class="mb-0">
-                            <i class="fas fa-box me-2"></i>Packing Process - {{ job.job_number }}
+                            <i class="fas fa-box me-2"></i>Packing Process - {{ order.order_number }}
                         </h4>
                         <div class="d-flex gap-2">
-                            <a href="{{ url_for('production_execution') }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left me-1"></i>Back to Jobs
+                            <a href="{{ url_for('production_orders') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Orders
                             </a>
                         </div>
                     </div>
@@ -24,26 +25,26 @@
         </div>
     </div>
 
-    <!-- Job Information -->
+    <!-- Order Information -->
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Job Information</h5>
+                    <h5 class="mb-0">Order Information</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3">
-                            <p><strong>Order:</strong> {{ job.order.order_number }}</p>
-                            <p><strong>Product:</strong> {{ job.order.product }}</p>
+                            <p><strong>Order Number:</strong> {{ order.order_number }}</p>
+                            <p><strong>Finished Good Type:</strong> {{ order.finished_good_type }}</p>
                         </div>
                         <div class="col-md-3">
-                            <p><strong>Quantity:</strong> {{ job.order.quantity }} tons</p>
-                            <p><strong>Customer:</strong> {{ job.order.customer }}</p>
+                            <p><strong>Quantity:</strong> {{ order.quantity }} tons</p>
+                            <p><strong>Status:</strong> <span class="badge bg-success">{{ order.status.title() }}</span></p>
                         </div>
                         <div class="col-md-3">
-                            <p><strong>Status:</strong> <span class="badge bg-success">{{ job.status.title() }}</span></p>
-                            <p><strong>Stage:</strong> Final Packing & Storage</p>
+                            <p><strong>Created By:</strong> {{ order.created_by }}</p>
+                            <p><strong>Created At:</strong> {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
                         </div>
                         <div class="col-md-3">
                             <div class="text-center">
@@ -51,6 +52,42 @@
                                 <h6>Ready for Packing</h6>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Areas Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Storage Areas Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="storageOverview">
+                        {% for area in storage_areas %}
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-info storage-area-card" data-area-id="{{ area.id }}">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0">{{ area.name }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>Capacity:</strong> {{ area.capacity_kg }} kg</p>
+                                    <p class="mb-1"><strong>Current Stock:</strong> {{ area.current_stock_kg }} kg</p>
+                                    <p class="mb-2"><strong>Available:</strong> {{ area.capacity_kg - area.current_stock_kg }} kg</p>
+                                    <div class="progress mb-2">
+                                        {% set utilization = (area.current_stock_kg / area.capacity_kg * 100) if area.capacity_kg > 0 else 0 %}
+                                        <div class="progress-bar" style="width: {{ utilization }}%">{{ utilization|round(1) }}%</div>
+                                    </div>
+                                    <div id="areaContents{{ area.id }}" class="area-contents">
+                                        <small class="text-muted">Click to view contents</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -71,9 +108,15 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data" id="packingForm">
-                        <div class="mb-3">
-                            <label class="form-label">Operator Name *</label>
-                            <input type="text" name="operator_name" class="form-control" required>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Operator Name *</label>
+                                <input type="text" name="operator_name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Packing Date</label>
+                                <input type="datetime-local" name="packing_date" class="form-control" value="{{ datetime.now().strftime('%Y-%m-%dT%H:%M') }}">
+                            </div>
                         </div>
 
                         <!-- Products Packing Section -->
@@ -83,7 +126,7 @@
                             <div class="product-row mb-4 p-3 border rounded" data-row="0">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <h6 class="mb-0">Product 1</h6>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeProductRow(0)">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeProductRow(0)" style="display: none;">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
@@ -91,22 +134,25 @@
                                 <div class="row">
                                     <div class="col-md-3">
                                         <div class="mb-3">
-                                            <label class="form-label">Product *</label>
-                                            <select name="product_id" class="form-select" required>
+                                            <label class="form-label">Product Type *</label>
+                                            <select name="product_name" class="form-select" required>
                                                 <option value="">Select product...</option>
-                                                {% for product in products %}
-                                                <option value="{{ product.id }}">{{ product.name }}</option>
-                                                {% endfor %}
+                                                <option value="Maida">Maida</option>
+                                                <option value="Suji">Suji</option>
+                                                <option value="Chakki Ata">Chakki Ata</option>
+                                                <option value="Refined Flour">Refined Flour</option>
+                                                <option value="Wheat Bran">Wheat Bran</option>
+                                                <option value="Other">Other</option>
                                             </select>
                                         </div>
                                     </div>
                                     <div class="col-md-2">
                                         <div class="mb-3">
-                                            <label class="form-label">Bag Weight (kg) *</label>
+                                            <label class="form-label">Bag Weight *</label>
                                             <select name="bag_weight" class="form-select bag-weight" required onchange="calculateTotal(0)">
                                                 <option value="">Select...</option>
+                                                <option value="5">5 kg</option>
                                                 <option value="25">25 kg</option>
-                                                <option value="30">30 kg</option>
                                                 <option value="50">50 kg</option>
                                             </select>
                                         </div>
@@ -119,18 +165,18 @@
                                     </div>
                                     <div class="col-md-2">
                                         <div class="mb-3">
-                                            <label class="form-label">Total Packed (kg)</label>
-                                            <input type="text" class="form-control total-packed" readonly>
+                                            <label class="form-label">Total Weight (kg)</label>
+                                            <input type="text" class="form-control total-weight" readonly>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="mb-3">
-                                            <label class="form-label">Storage Area</label>
-                                            <select name="storage_area_id" class="form-select">
+                                            <label class="form-label">Storage Area *</label>
+                                            <select name="storage_area_id" class="form-select storage-select" required onchange="showStorageContents(this, 0)">
                                                 <option value="">Select storage...</option>
                                                 {% for area in storage_areas %}
-                                                <option value="{{ area.id }}">
-                                                    {{ area.name }} ({{ area.current_stock_kg }}/{{ area.capacity_kg }} kg)
+                                                <option value="{{ area.id }}" data-capacity="{{ area.capacity_kg }}" data-current="{{ area.current_stock_kg }}">
+                                                    {{ area.name }} (Available: {{ area.capacity_kg - area.current_stock_kg }} kg)
                                                 </option>
                                                 {% endfor %}
                                             </select>
@@ -139,11 +185,12 @@
                                 </div>
                                 
                                 <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Stored in Shallow (kg)</label>
-                                            <input type="number" name="shallow_storage" class="form-control" step="0.01" min="0" value="0">
-                                            <small class="form-text text-muted">Quantity stored in shallow storage</small>
+                                    <div class="col-md-12">
+                                        <div class="selected-storage-info" id="storageInfo0" style="display: none;">
+                                            <div class="alert alert-info">
+                                                <h6>Storage Area Contents:</h6>
+                                                <div id="storageContents0"></div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -151,7 +198,7 @@
                         </div>
 
                         <!-- Photo Documentation -->
-                        <div class="row">
+                        <div class="row mb-4">
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Packing Process Photo</label>
@@ -168,21 +215,17 @@
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-3 text-center">
+                                    <div class="col-md-4 text-center">
                                         <h4 id="totalBags" class="text-primary">0</h4>
                                         <small class="text-muted">Total Bags</small>
                                     </div>
-                                    <div class="col-md-3 text-center">
-                                        <h4 id="totalPacked" class="text-success">0 kg</h4>
-                                        <small class="text-muted">Total Packed</small>
+                                    <div class="col-md-4 text-center">
+                                        <h4 id="totalWeight" class="text-success">0 kg</h4>
+                                        <small class="text-muted">Total Weight</small>
                                     </div>
-                                    <div class="col-md-3 text-center">
-                                        <h4 id="totalShallow" class="text-info">0 kg</h4>
-                                        <small class="text-muted">Shallow Storage</small>
-                                    </div>
-                                    <div class="col-md-3 text-center">
-                                        <h4 id="grandTotal" class="text-dark">0 kg</h4>
-                                        <small class="text-muted">Grand Total</small>
+                                    <div class="col-md-4 text-center">
+                                        <h4 id="totalProducts" class="text-info">0</h4>
+                                        <small class="text-muted">Product Types</small>
                                     </div>
                                 </div>
                             </div>
@@ -192,10 +235,10 @@
                             <i class="fas fa-info-circle me-2"></i>
                             <strong>Packing Guidelines:</strong>
                             <ul class="mb-0 mt-2">
-                                <li>Standard bag weights: 25kg, 30kg, and 50kg</li>
-                                <li>Products can be stored in designated storage areas</li>
-                                <li>Shallow storage is for bulk storage of finished goods</li>
-                                <li>Storage areas have capacity limits - check availability before assigning</li>
+                                <li>Available bag weights: 5kg, 25kg, and 50kg</li>
+                                <li>Select storage area to view current contents and available capacity</li>
+                                <li>Ensure total weight doesn't exceed storage area capacity</li>
+                                <li>All fields marked with * are required</li>
                             </ul>
                         </div>
 
@@ -231,22 +274,25 @@ function addProductRow() {
         <div class="row">
             <div class="col-md-3">
                 <div class="mb-3">
-                    <label class="form-label">Product *</label>
-                    <select name="product_id" class="form-select" required>
+                    <label class="form-label">Product Type *</label>
+                    <select name="product_name" class="form-select" required>
                         <option value="">Select product...</option>
-                        {% for product in products %}
-                        <option value="{{ product.id }}">{{ product.name }}</option>
-                        {% endfor %}
+                        <option value="Maida">Maida</option>
+                        <option value="Suji">Suji</option>
+                        <option value="Chakki Ata">Chakki Ata</option>
+                        <option value="Refined Flour">Refined Flour</option>
+                        <option value="Wheat Bran">Wheat Bran</option>
+                        <option value="Other">Other</option>
                     </select>
                 </div>
             </div>
             <div class="col-md-2">
                 <div class="mb-3">
-                    <label class="form-label">Bag Weight (kg) *</label>
+                    <label class="form-label">Bag Weight *</label>
                     <select name="bag_weight" class="form-select bag-weight" required onchange="calculateTotal(${productRowCount})">
                         <option value="">Select...</option>
+                        <option value="5">5 kg</option>
                         <option value="25">25 kg</option>
-                        <option value="30">30 kg</option>
                         <option value="50">50 kg</option>
                     </select>
                 </div>
@@ -259,18 +305,18 @@ function addProductRow() {
             </div>
             <div class="col-md-2">
                 <div class="mb-3">
-                    <label class="form-label">Total Packed (kg)</label>
-                    <input type="text" class="form-control total-packed" readonly>
+                    <label class="form-label">Total Weight (kg)</label>
+                    <input type="text" class="form-control total-weight" readonly>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="mb-3">
-                    <label class="form-label">Storage Area</label>
-                    <select name="storage_area_id" class="form-select">
+                    <label class="form-label">Storage Area *</label>
+                    <select name="storage_area_id" class="form-select storage-select" required onchange="showStorageContents(this, ${productRowCount})">
                         <option value="">Select storage...</option>
                         {% for area in storage_areas %}
-                        <option value="{{ area.id }}">
-                            {{ area.name }} ({{ area.current_stock_kg }}/{{ area.capacity_kg }} kg)
+                        <option value="{{ area.id }}" data-capacity="{{ area.capacity_kg }}" data-current="{{ area.current_stock_kg }}">
+                            {{ area.name }} (Available: {{ area.capacity_kg - area.current_stock_kg }} kg)
                         </option>
                         {% endfor %}
                     </select>
@@ -279,11 +325,12 @@ function addProductRow() {
         </div>
         
         <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label">Stored in Shallow (kg)</label>
-                    <input type="number" name="shallow_storage" class="form-control" step="0.01" min="0" value="0" onchange="updateSummary()">
-                    <small class="form-text text-muted">Quantity stored in shallow storage</small>
+            <div class="col-md-12">
+                <div class="selected-storage-info" id="storageInfo${productRowCount}" style="display: none;">
+                    <div class="alert alert-info">
+                        <h6>Storage Area Contents:</h6>
+                        <div id="storageContents${productRowCount}"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -294,7 +341,7 @@ function addProductRow() {
 
 function removeProductRow(rowIndex) {
     const row = document.querySelector(`[data-row="${rowIndex}"]`);
-    if (row) {
+    if (row && productRowCount > 1) {
         row.remove();
         updateSummary();
     }
@@ -306,35 +353,126 @@ function calculateTotal(rowIndex) {
     const bagCount = parseFloat(row.querySelector('.bag-count').value) || 0;
     const total = bagWeight * bagCount;
     
-    row.querySelector('.total-packed').value = total.toFixed(2);
+    row.querySelector('.total-weight').value = total.toFixed(2);
     updateSummary();
+}
+
+function showStorageContents(selectElement, rowIndex) {
+    const storageAreaId = selectElement.value;
+    const storageInfo = document.getElementById(`storageInfo${rowIndex}`);
+    const storageContents = document.getElementById(`storageContents${rowIndex}`);
+    
+    if (!storageAreaId) {
+        storageInfo.style.display = 'none';
+        return;
+    }
+    
+    // Show storage info
+    storageInfo.style.display = 'block';
+    
+    // Fetch storage contents via API
+    fetch(`/api/storage_contents/${storageAreaId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let contentsHtml = '<div class="row">';
+                contentsHtml += `<div class="col-md-6">
+                    <strong>Capacity:</strong> ${data.storage_area.capacity_kg} kg<br>
+                    <strong>Current Stock:</strong> ${data.storage_area.current_stock_kg} kg<br>
+                    <strong>Available Space:</strong> ${data.storage_area.available_space_kg} kg
+                </div>`;
+                
+                if (data.contents && data.contents.length > 0) {
+                    contentsHtml += '<div class="col-md-6"><strong>Current Contents:</strong><ul>';
+                    data.contents.forEach(item => {
+                        contentsHtml += `<li>${item.product_name}: ${item.total_quantity} kg (${item.bag_count} bags)</li>`;
+                    });
+                    contentsHtml += '</ul></div>';
+                } else {
+                    contentsHtml += '<div class="col-md-6"><em>Storage area is empty</em></div>';
+                }
+                contentsHtml += '</div>';
+                
+                storageContents.innerHTML = contentsHtml;
+            } else {
+                storageContents.innerHTML = '<span class="text-danger">Error loading storage contents</span>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            storageContents.innerHTML = '<span class="text-danger">Error loading storage contents</span>';
+        });
+    
+    // Highlight selected storage area card
+    document.querySelectorAll('.storage-area-card').forEach(card => {
+        card.classList.remove('border-success');
+        card.classList.add('border-info');
+    });
+    
+    const selectedCard = document.querySelector(`[data-area-id="${storageAreaId}"]`);
+    if (selectedCard) {
+        selectedCard.classList.remove('border-info');
+        selectedCard.classList.add('border-success');
+    }
 }
 
 function updateSummary() {
     const rows = document.querySelectorAll('.product-row');
     let totalBags = 0;
-    let totalPacked = 0;
-    let totalShallow = 0;
+    let totalWeight = 0;
+    let productTypes = new Set();
     
     rows.forEach(row => {
         const bagCount = parseFloat(row.querySelector('.bag-count').value) || 0;
-        const packed = parseFloat(row.querySelector('.total-packed').value) || 0;
-        const shallow = parseFloat(row.querySelector('input[name="shallow_storage"]').value) || 0;
+        const weight = parseFloat(row.querySelector('.total-weight').value) || 0;
+        const productName = row.querySelector('select[name="product_name"]').value;
         
         totalBags += bagCount;
-        totalPacked += packed;
-        totalShallow += shallow;
+        totalWeight += weight;
+        if (productName) {
+            productTypes.add(productName);
+        }
     });
     
     document.getElementById('totalBags').textContent = totalBags;
-    document.getElementById('totalPacked').textContent = totalPacked.toFixed(2) + ' kg';
-    document.getElementById('totalShallow').textContent = totalShallow.toFixed(2) + ' kg';
-    document.getElementById('grandTotal').textContent = (totalPacked + totalShallow).toFixed(2) + ' kg';
+    document.getElementById('totalWeight').textContent = totalWeight.toFixed(2) + ' kg';
+    document.getElementById('totalProducts').textContent = productTypes.size;
 }
 
 // Initialize summary on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateSummary();
+    
+    // Add click handlers for storage area cards
+    document.querySelectorAll('.storage-area-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const areaId = this.dataset.areaId;
+            showStorageAreaDetails(areaId);
+        });
+    });
 });
+
+function showStorageAreaDetails(areaId) {
+    const contentsDiv = document.getElementById(`areaContents${areaId}`);
+    
+    fetch(`/api/storage_contents/${areaId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.contents && data.contents.length > 0) {
+                let html = '<small><strong>Contents:</strong><br>';
+                data.contents.forEach(item => {
+                    html += `• ${item.product_name}: ${item.total_quantity} kg<br>`;
+                });
+                html += '</small>';
+                contentsDiv.innerHTML = html;
+            } else {
+                contentsDiv.innerHTML = '<small class="text-muted">Empty storage area</small>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contentsDiv.innerHTML = '<small class="text-danger">Error loading contents</small>';
+        });
+}
 </script>
 {% endblock %}

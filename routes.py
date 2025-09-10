@@ -2178,3 +2178,116 @@ def shift_stock():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
+@app.route('/api/storage_contents/<int:storage_area_id>')
+def get_storage_contents(storage_area_id):
+    """Get contents of a specific storage area"""
+    try:
+        storage_area = StorageArea.query.get_or_404(storage_area_id)
+        
+        # Get packing records for this storage area
+        packing_records = PackagingRecord.query.filter_by(
+            storage_area_id=storage_area_id
+        ).all()
+        
+        # Group by product name and sum quantities
+        contents = {}
+        for record in packing_records:
+            if record.product_name not in contents:
+                contents[record.product_name] = {
+                    'product_name': record.product_name,
+                    'total_quantity': 0,
+                    'bag_count': 0
+                }
+            contents[record.product_name]['total_quantity'] += record.total_weight_kg
+            contents[record.product_name]['bag_count'] += record.bag_count
+        
+        contents_list = list(contents.values())
+        
+        return jsonify({
+            'success': True,
+            'storage_area': {
+                'id': storage_area.id,
+                'name': storage_area.name,
+                'capacity_kg': storage_area.capacity_kg,
+                'current_stock_kg': storage_area.current_stock_kg,
+                'available_space_kg': storage_area.capacity_kg - storage_area.current_stock_kg
+            },
+            'contents': contents_list
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/packing_execution/<int:order_id>', methods=['GET', 'POST'])
+def packing_execution(order_id):
+    """Execute packing process for production order"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    if request.method == 'POST':
+        try:
+            operator_name = request.form['operator_name']
+            
+            # Handle photo upload
+            packing_photo = None
+            if 'packing_photo' in request.files:
+                file = request.files['packing_photo']
+                if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"packing_{timestamp}_{filename}"
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    packing_photo = filename
+            
+            # Process multiple products
+            product_names = request.form.getlist('product_name')
+            bag_weights = request.form.getlist('bag_weight')
+            bag_counts = request.form.getlist('bag_count')
+            storage_area_ids = request.form.getlist('storage_area_id')
+            
+            total_packed = 0
+            
+            for i in range(len(product_names)):
+                if product_names[i] and bag_weights[i] and bag_counts[i] and storage_area_ids[i]:
+                    bag_weight = float(bag_weights[i])
+                    bag_count = int(bag_counts[i])
+                    total_weight = bag_weight * bag_count
+                    
+                    # Create packaging record
+                    packaging = PackagingRecord(
+                        grinding_session_id=None,  # Not linked to grinding session in this case
+                        product_name=product_names[i],
+                        bag_weight_kg=bag_weight,
+                        bag_count=bag_count,
+                        total_weight_kg=total_weight,
+                        operator_name=operator_name,
+                        storage_area_id=int(storage_area_ids[i])
+                    )
+                    
+                    db.session.add(packaging)
+                    
+                    # Update storage area stock
+                    storage_area = StorageArea.query.get(int(storage_area_ids[i]))
+                    if storage_area:
+                        storage_area.current_stock_kg += total_weight
+                    
+                    total_packed += total_weight
+            
+            # Update order status
+            order.status = 'packing_completed'
+            
+            db.session.commit()
+            
+            flash(f'Packing process completed successfully! Total packed: {total_packed:.2f} kg', 'success')
+            return redirect(url_for('production_orders'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error completing packing process: {str(e)}', 'error')
+    
+    # Get storage areas for display
+    storage_areas = StorageArea.query.all()
+    
+    return render_template('packing_execution.html', 
+                         order=order,
+                         storage_areas=storage_areas)
+
