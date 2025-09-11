@@ -321,12 +321,10 @@ class ProductionOrder(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, planning, in_production, completed
     created_by = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    responsible_person = db.Column(db.String(100))
-    notification_sent = db.Column(db.Boolean, default=False)
 
     # Add other fields that exist in the database
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
+    product = db.Column(db.String(100))  # Column name is 'product' not 'product_id'
     deadline = db.Column(db.DateTime)
     priority = db.Column(db.String(20), default='normal')
     description = db.Column(db.Text)
@@ -334,7 +332,6 @@ class ProductionOrder(db.Model):
 
     # Relationships
     customer = db.relationship('Customer', backref='production_orders')
-    product = db.relationship('Product', backref='production_orders')
     production_plans = db.relationship('ProductionPlan', backref='production_order', lazy=True)
 
 class ProductionPlan(db.Model):
@@ -620,9 +617,9 @@ class ProductionOutput(db.Model):
     grinding_session = db.relationship('GrindingSession', backref='production_outputs')
 
 class PackagingRecord(db.Model):
-    """Record packaging details for finished products"""
+    """Record packaging details for finished products linked to production orders"""
     id = db.Column(db.Integer, primary_key=True)
-    grinding_session_id = db.Column(db.Integer, db.ForeignKey('grinding_session.id'), nullable=True)
+    production_order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
     product_name = db.Column(db.String(100), nullable=False)
     bag_weight_kg = db.Column(db.Float, nullable=False)
     bag_count = db.Column(db.Integer, nullable=False)
@@ -630,9 +627,10 @@ class PackagingRecord(db.Model):
     packaging_time = db.Column(db.DateTime, default=datetime.utcnow)
     operator_name = db.Column(db.String(100), nullable=False)
     storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=True)
+    process_stage = db.Column(db.String(50), nullable=False, default='packaging')  # packaging, quality_check, dispatch_ready
 
     # Relationships
-    grinding_session = db.relationship('GrindingSession', backref='packaging_records')
+    production_order = db.relationship('ProductionOrder', backref='packaging_records')
     storage_area = db.relationship('StorageArea', backref='packaging_records')
 
 class StorageTransaction(db.Model):

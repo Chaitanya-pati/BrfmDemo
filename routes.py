@@ -422,7 +422,7 @@ def production_orders():
             order.quantity = float(request.form['quantity_tons'])
             order.finished_good_type = request.form['finished_goods_type']
             order.created_by = request.form.get('created_by', 'Admin')
-            order.responsible_person = request.form.get('responsible_person', 'Production Manager')
+            # responsible_person field removed - using created_by instead
             
             db.session.add(order)
             db.session.commit()
@@ -430,16 +430,14 @@ def production_orders():
             # Send notification to responsible person
             notify_responsible_person(
                 order.order_number,
-                order.responsible_person,
+                order.created_by,
                 order.finished_good_type,
                 order.quantity
             )
             
-            # Mark notification as sent
-            order.notification_sent = True
-            db.session.commit()
+            # Notification sent successfully
             
-            flash(f'Production Order {order.order_number} created successfully! Notification sent to {order.responsible_person}.', 'success')
+            flash(f'Production Order {order.order_number} created successfully! Notification sent to {order.created_by}.', 'success')
             return redirect(url_for('production_orders'))
             
         except Exception as e:
@@ -2178,23 +2176,27 @@ def shift_stock():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
-@app.route('/packaging_view', methods=['GET', 'POST'])
-def packaging_view():
-    """Simplified packaging view with dynamic table"""
+@app.route('/packaging_view/<int:production_order_id>', methods=['GET', 'POST'])
+def packaging_view(production_order_id):
+    """Production order packaging view with process tracking"""
+    production_order = ProductionOrder.query.get_or_404(production_order_id)
+    
     if request.method == 'POST':
         try:
             data = request.get_json()
             packaging_items = data['packaging_items']
             
             for item in packaging_items:
-                # Create packaging record
+                # Create packaging record linked to production order
                 packaging = PackagingRecord(
-                    grinding_session_id=item.get('grinding_session_id'),
+                    production_order_id=production_order_id,
                     product_name=item['product_name'],
                     bag_weight_kg=float(item['bag_weight_kg']),
                     bag_count=int(item['bag_count']),
                     total_weight_kg=float(item['bag_weight_kg']) * int(item['bag_count']),
-                    operator_name=item['operator_name']
+                    operator_name=item['operator_name'],
+                    storage_area_id=int(item['storage_area_id']),
+                    process_stage=item.get('process_stage', 'packaging')
                 )
                 
                 db.session.add(packaging)
@@ -2206,7 +2208,7 @@ def packaging_view():
                     quantity_kg=packaging.total_weight_kg,
                     transaction_type='storage',
                     operator_name=item['operator_name'],
-                    notes=f"Packaged {item['bag_count']} bags of {item['bag_weight_kg']}kg each"
+                    notes=f"Production Order #{production_order.order_number}: Packaged {item['bag_count']} bags of {item['bag_weight_kg']}kg each - Stage: {item.get('process_stage', 'packaging')}"
                 )
                 
                 db.session.add(storage_transaction)
@@ -2216,11 +2218,15 @@ def packaging_view():
                 if storage_area:
                     storage_area.current_stock_kg += packaging.total_weight_kg
             
+            # Update production order status to packaging if not already completed
+            if production_order.status != 'completed':
+                production_order.status = 'packaging'
+            
             db.session.commit()
             
             return jsonify({
                 'success': True,
-                'message': f'Successfully packaged {len(packaging_items)} products'
+                'message': f'Successfully packaged {len(packaging_items)} products for Order #{production_order.order_number}'
             })
             
         except Exception as e:
@@ -2230,12 +2236,24 @@ def packaging_view():
     # Get data for the template
     products = Product.query.all()
     storage_areas = StorageArea.query.all()
+    order_packaging = PackagingRecord.query.filter_by(
+        production_order_id=production_order_id
+    ).order_by(PackagingRecord.packaging_time.desc()).all()
     recent_packaging = PackagingRecord.query.order_by(PackagingRecord.packaging_time.desc()).limit(10).all()
     
     return render_template('packaging_view.html', 
+                         production_order=production_order,
                          products=products, 
                          storage_areas=storage_areas,
+                         order_packaging=order_packaging,
                          recent_packaging=recent_packaging)
+
+# Backward compatibility redirect for old packaging view
+@app.route('/packaging_view', methods=['GET'])
+def packaging_view_redirect():
+    """Redirect old packaging view to production orders page"""
+    flash('Please select a production order to access packaging.', 'info')
+    return redirect(url_for('production_orders'))
 
 @app.route('/api/storage_area_products/<int:storage_area_id>')
 def get_storage_area_products(storage_area_id):

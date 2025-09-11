@@ -1,14 +1,57 @@
 
 {% extends "base.html" %}
 
-{% block title %}Packaging Management{% endblock %}
+{% block title %}Production Order Packaging{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Production Order Header -->
+    {% if production_order %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-box me-2"></i>Production Order Packaging</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Order Number:</strong><br>
+                            <span class="h5 text-primary">#{{ production_order.order_number }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Product Type:</strong><br>
+                            {{ production_order.finished_good_type }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Quantity:</strong><br>
+                            {{ production_order.quantity }} kg
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Status:</strong><br>
+                            <span class="badge bg-{% if production_order.status == 'packaging' %}warning{% elif production_order.status == 'completed' %}success{% else %}secondary{% endif %}">
+                                {{ production_order.status.title() }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <strong>Created By:</strong> {{ production_order.created_by }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Created:</strong> {{ production_order.created_at.strftime('%Y-%m-%d %H:%M') }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fas fa-box me-2 text-primary"></i>Packaging Management</h2>
+                <h2><i class="fas fa-boxes me-2 text-primary"></i>Packaging Process</h2>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPackagingModal">
                     <i class="fas fa-plus me-2"></i>Add Packaging
                 </button>
@@ -55,36 +98,65 @@
                     <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Packaging Records</h5>
                 </div>
                 <div class="card-body">
-                    {% if recent_packaging %}
                     <div class="table-responsive">
                         <table class="table table-striped">
                             <thead>
                                 <tr>
+                                    <th>Order #</th>
                                     <th>Product</th>
                                     <th>Bag Size</th>
                                     <th>Bag Count</th>
                                     <th>Total Weight</th>
+                                    <th>Process Stage</th>
                                     <th>Operator</th>
                                     <th>Date</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for package in recent_packaging %}
+                                {% if order_packaging %}
+                                    {% for package in order_packaging %}
+                                    <tr class="table-success">
+                                        <td><strong>{{ package.production_order.order_number }}</strong></td>
+                                        <td>{{ package.product_name }}</td>
+                                        <td>{{ package.bag_weight_kg }} kg</td>
+                                        <td>{{ package.bag_count }} bags</td>
+                                        <td>{{ package.total_weight_kg }} kg</td>
+                                        <td>
+                                            <span class="badge bg-{% if package.process_stage == 'packaging' %}warning{% elif package.process_stage == 'quality_check' %}info{% elif package.process_stage == 'dispatch_ready' %}success{% else %}secondary{% endif %}">
+                                                {{ package.process_stage.replace('_', ' ').title() }}
+                                            </span>
+                                        </td>
+                                        <td>{{ package.operator_name }}</td>
+                                        <td>{{ package.packaging_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if recent_packaging %}
+                                    {% for package in recent_packaging %}
+                                    <tr>
+                                        <td>{{ package.production_order.order_number if package.production_order else 'N/A' }}</td>
+                                        <td>{{ package.product_name }}</td>
+                                        <td>{{ package.bag_weight_kg }} kg</td>
+                                        <td>{{ package.bag_count }} bags</td>
+                                        <td>{{ package.total_weight_kg }} kg</td>
+                                        <td>
+                                            <span class="badge bg-{% if package.process_stage == 'packaging' %}warning{% elif package.process_stage == 'quality_check' %}info{% elif package.process_stage == 'dispatch_ready' %}success{% else %}secondary{% endif %}">
+                                                {{ package.process_stage.replace('_', ' ').title() if package.process_stage else 'Packaging' }}
+                                            </span>
+                                        </td>
+                                        <td>{{ package.operator_name }}</td>
+                                        <td>{{ package.packaging_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if not order_packaging and not recent_packaging %}
                                 <tr>
-                                    <td>{{ package.product_name }}</td>
-                                    <td>{{ package.bag_weight_kg }} kg</td>
-                                    <td>{{ package.bag_count }} bags</td>
-                                    <td>{{ package.total_weight_kg }} kg</td>
-                                    <td>{{ package.operator_name }}</td>
-                                    <td>{{ package.packaging_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td colspan="8" class="text-muted text-center py-4">No packaging records found.</td>
                                 </tr>
-                                {% endfor %}
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
-                    {% else %}
-                    <p class="text-muted text-center py-4">No packaging records found.</p>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -101,9 +173,9 @@
             </div>
             <div class="modal-body">
                 <form id="packagingForm">
-                    <!-- Storage Area Selection -->
+                    <!-- Storage Area and Process Selection -->
                     <div class="row mb-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label">Storage Area</label>
                             <select class="form-select" id="storage_area_select" required>
                                 <option value="">Select storage area...</option>
@@ -112,7 +184,15 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <label class="form-label">Process Stage</label>
+                            <select class="form-select" id="process_stage" required>
+                                <option value="packaging">Packaging</option>
+                                <option value="quality_check">Quality Check</option>
+                                <option value="dispatch_ready">Dispatch Ready</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label">Operator Name</label>
                             <input type="text" class="form-control" id="operator_name" required>
                         </div>
@@ -282,8 +362,9 @@ function updateSummary() {
 function submitPackaging() {
     const storageAreaId = document.getElementById('storage_area_select').value;
     const operatorName = document.getElementById('operator_name').value;
+    const processStage = document.getElementById('process_stage').value;
     
-    if (!storageAreaId || !operatorName) {
+    if (!storageAreaId || !operatorName || !processStage) {
         alert('Please fill in all required fields.');
         return;
     }
@@ -312,7 +393,8 @@ function submitPackaging() {
             bag_weight_kg: parseFloat(bagWeight),
             bag_count: parseInt(bagCount),
             storage_area_id: storageAreaId,
-            operator_name: operatorName
+            operator_name: operatorName,
+            process_stage: processStage
         });
     });
     
@@ -321,8 +403,12 @@ function submitPackaging() {
         return;
     }
     
+    // Get the production order ID from the current URL
+    const pathSegments = window.location.pathname.split('/');
+    const productionOrderId = pathSegments[pathSegments.indexOf('packaging_view') + 1];
+    
     // Submit data
-    fetch('/packaging_view', {
+    fetch(`/packaging_view/${productionOrderId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
