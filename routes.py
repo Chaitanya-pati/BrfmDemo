@@ -1281,7 +1281,12 @@ def start_24h_cleaning(order_id):
             flash(f'Error starting 24-hour cleaning: {str(e)}', 'error')
     
     # Get available cleaning bins
-    cleaning_bins = CleaningBin.query.filter_by(status='available').all()
+    try:
+        cleaning_bins = CleaningBin.query.filter_by(status='available').all()
+    except Exception:
+        # Handle database issues gracefully
+        db.session.rollback()
+        cleaning_bins = []
     
     return render_template('start_24h_cleaning.html', order=order, cleaning_bins=cleaning_bins)
 
