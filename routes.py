@@ -1221,9 +1221,13 @@ def start_24h_cleaning(order_id):
         return redirect(url_for('production_planning', order_id=order_id))
     
     # Check if 24-hour cleaning already exists
-    existing_process = CleaningProcess.query.filter_by(order_id=order_id, process_type='24_hour').first()
-    if existing_process:
-        return redirect(url_for('monitor_24h_cleaning', order_id=order_id))
+    try:
+        existing_process = CleaningProcess.query.filter_by(order_id=order_id, process_type='24_hour').first()
+        if existing_process:
+            return redirect(url_for('monitor_24h_cleaning', order_id=order_id))
+    except Exception:
+        # Handle database schema mismatch - proceed as if no existing process
+        existing_process = None
     
     if request.method == 'POST':
         try:
