@@ -352,6 +352,7 @@ class ProductionPlanItem(db.Model):
     precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=False)
     percentage = db.Column(db.Float, nullable=False)
     calculated_tons = db.Column(db.Float)
+    quantity = db.Column(db.Float, nullable=False)
 
     # Relationships
     precleaning_bin = db.relationship('PrecleaningBin', backref='plan_items')

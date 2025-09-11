@@ -521,7 +521,8 @@ def production_planning(order_id):
                     plan_id=plan.id,
                     precleaning_bin_id=bin_id,
                     percentage=percentage,
-                    calculated_tons=calculated_tons
+                    calculated_tons=calculated_tons,
+                    quantity=calculated_tons  # Add the quantity field
                 )
                 db.session.add(plan_item)
             
