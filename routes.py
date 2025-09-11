@@ -1230,6 +1230,9 @@ def start_24h_cleaning(order_id):
         existing_process = None
     
     if request.method == 'POST':
+        # Ensure clean database session for this operation
+        db.session.rollback()
+        
         try:
             # Get form data
             duration_hours = float(request.form.get('duration_hours', 24.0))
