@@ -506,7 +506,8 @@ def production_planning(order_id):
                 plan = existing_plan
             else:
                 plan = ProductionPlan(
-                    order_id=order_id
+                    order_id=order_id,
+                    planned_by='Production Planner'  # Default value, you can make this dynamic
                 )
                 db.session.add(plan)
                 db.session.flush()  # Get plan ID

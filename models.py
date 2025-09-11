@@ -338,6 +338,7 @@ class ProductionPlan(db.Model):
     """Production planning with bin percentages"""
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    planned_by = db.Column(db.String(100), nullable=False)
     total_percentage = db.Column(db.Float, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
