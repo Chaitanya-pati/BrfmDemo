@@ -450,7 +450,11 @@ def production_orders():
     # Get cleaning processes for each order
     cleaning_status = {}
     for order in orders:
-        cleaning_process = CleaningProcess.query.filter_by(order_id=order.id).first()
+        # Handle potential database schema mismatches gracefully
+        try:
+            cleaning_process = CleaningProcess.query.filter_by(order_id=order.id).first()
+        except Exception:
+            cleaning_process = None
         if cleaning_process:
             cleaning_status[order.id] = cleaning_process
     
@@ -464,6 +468,11 @@ def production_cleaning_overview():
         orders_with_cleaning = db.session.query(ProductionOrder, CleaningProcess)\
             .outerjoin(CleaningProcess, ProductionOrder.id == CleaningProcess.order_id)\
             .order_by(ProductionOrder.created_at.desc()).all()
+    except Exception:
+        # Handle potential database schema mismatches
+        orders = ProductionOrder.query.order_by(ProductionOrder.created_at.desc()).all()
+        for order in orders:
+            order.cleaning_process = None
         
         # Get active cleaning processes
         active_processes = CleaningProcess.query.filter(
