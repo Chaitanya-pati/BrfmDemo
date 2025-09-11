@@ -506,8 +506,7 @@ def production_planning(order_id):
                 plan = existing_plan
             else:
                 plan = ProductionPlan(
-                    order_id=order_id,
-                    created_by=request.form.get('created_by', 'Production Manager')
+                    order_id=order_id
                 )
                 db.session.add(plan)
                 db.session.flush()  # Get plan ID
