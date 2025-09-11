@@ -406,34 +406,17 @@ class CleaningProcess(db.Model):
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Timer persistence fields
-    timer_active = db.Column(db.Boolean, default=False)
-    countdown_start = db.Column(db.DateTime)  # When countdown started
-    countdown_end = db.Column(db.DateTime)    # When countdown should end
-
-    # Enhanced tracking fields for step requirements
-    buffer_time_minutes = db.Column(db.Float, default=0.0)  # Buffer timing for total duration
-    buffer_start_time = db.Column(db.DateTime)  # When buffer time started
-    buffer_end_time = db.Column(db.DateTime)    # When buffer time ended
+    # Note: timer_active, countdown_start, countdown_end, buffer_* fields removed due to database schema mismatch
     is_locked = db.Column(db.Boolean, default=True, nullable=True)  # Locks access during cleaning
     reminder_sent_5min = db.Column(db.Boolean, default=False, nullable=True)
     reminder_sent_10min = db.Column(db.Boolean, default=False, nullable=True)
     reminder_sent_30min = db.Column(db.Boolean, default=False, nullable=True)
     # next_process_job_id removed - production functionality deleted
 
-    # Additional tracking for 12-hour process start parameters
-    start_parameters_captured = db.Column(db.Boolean, default=False)
-    completion_parameters_captured = db.Column(db.Boolean, default=False)
-
-    # Post-process data capture fields (to match requirements exactly)
-    moisture_before = db.Column(db.Float)  # Moisture before processing
-    moisture_after = db.Column(db.Float)   # Moisture after processing
-    waste_material_kg = db.Column(db.Float)  # Waste collected in kg
-    water_used_liters = db.Column(db.Float)  # Water added to bins in liters
-    machine_efficiency = db.Column(db.Float)  # Machine efficiency percentage
-    post_process_notes = db.Column(db.Text)   # Process notes
-    completed_by = db.Column(db.String(100))  # Who completed the process
-    completion_time = db.Column(db.DateTime)  # When process was marked complete
+    # Note: Additional tracking fields removed due to database schema mismatch
+    # (start_parameters_captured, completion_parameters_captured, moisture_before/after, 
+    #  waste_material_kg, water_used_liters, machine_efficiency, post_process_notes, 
+    #  completed_by, completion_time)
 
     # Relationships
     production_order = db.relationship('ProductionOrder', backref='cleaning_processes')
