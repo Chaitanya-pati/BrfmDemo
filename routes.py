@@ -1258,10 +1258,7 @@ def start_24h_cleaning(order_id):
                 end_time=end_time,
                 operator_name=operator_name,
                 machine_name=machine_name,
-                status='running',
-                timer_active=True,
-                countdown_start=start_time,
-                countdown_end=end_time
+                status='running'
             )
             
             db.session.add(cleaning_process)
