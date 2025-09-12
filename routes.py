@@ -1162,17 +1162,16 @@ def submit_post_process_data():
         # Get machine name
         machine_name = data.get('machine_name', '')
         
-        # Update cleaning process with post-process data
-        cleaning_process.moisture_before = moisture_before
-        cleaning_process.moisture_after = moisture_after
-        cleaning_process.waste_material_kg = waste_material_kg
-        cleaning_process.water_used_liters = water_used_liters
+        # Update cleaning process with post-process data (using correct field names)
+        cleaning_process.start_moisture = moisture_before  # Store as start_moisture
+        cleaning_process.end_moisture = moisture_after     # Store as end_moisture  
+        cleaning_process.waste_collected_kg = waste_material_kg  # Store as waste_collected_kg
+        cleaning_process.water_added_liters = water_used_liters  # Store as water_added_liters
         cleaning_process.machine_name = machine_name
-        cleaning_process.post_process_notes = operator_notes
-        cleaning_process.completed_by = operator_name
-        cleaning_process.completion_time = current_time
+        cleaning_process.notes = operator_notes  # Store as notes (not post_process_notes)
+        cleaning_process.operator_name = operator_name  # Store as operator_name
+        cleaning_process.actual_end_time = current_time  # Store as actual_end_time
         cleaning_process.status = 'completed'
-        cleaning_process.timer_active = False
         
         cleaning_bin = CleaningBin.query.get(cleaning_process.cleaning_bin_id)
         cleaning_bin.status = 'available'
@@ -2607,6 +2606,7 @@ def build_order_timeline(order):
                     'storage_area': getattr(record.storage_area, 'name', 'Unknown') if record.storage_area else 'Unknown'
                 })
         except Exception as e:
+            import logging
             logging.warning(f"Error fetching packaging records: {e}")
         
         # 7. Storage Levels (current levels across all storage areas with error handling)
@@ -2623,6 +2623,7 @@ def build_order_timeline(order):
                     'utilization_percent': utilization
                 })
         except Exception as e:
+            import logging
             logging.warning(f"Error fetching storage levels: {e}")
         
         # 8. Machine Cleaning Logs (for grinding stage)
