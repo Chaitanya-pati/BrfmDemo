@@ -62,44 +62,35 @@
                     <form method="POST">
                         <div class="row mb-4">
                             <div class="col-12">
-                                <label class="form-label fw-bold">
-                                    <i class="fas fa-clock me-2"></i>24-Hour Cleaning Duration *
+                                <label for="duration_hours" class="form-label fw-bold">
+                                    <i class="fas fa-clock me-2"></i>Cleaning Duration (in hours) *
                                 </label>
                                 <div class="card">
                                     <div class="card-body">
                                         <div class="row">
-                                            <div class="col-md-4">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" 
-                                                           name="duration_option" id="duration_24" value="24" checked>
-                                                    <label class="form-check-label" for="duration_24">
-                                                        <strong>24 Hours (Standard)</strong><br>
-                                                        <small class="text-muted">Standard 24-hour process</small>
-                                                    </label>
+                                            <div class="col-md-6">
+                                                <input type="number" 
+                                                       class="form-control" 
+                                                       id="duration_hours" 
+                                                       name="duration_hours" 
+                                                       min="0.01" 
+                                                       max="48" 
+                                                       step="0.01" 
+                                                       value="24" 
+                                                       required>
+                                                <div class="form-text">
+                                                    Enter duration in hours (e.g., 24 for 24 hours, 0.1 for 6 minutes, 0.05 for 3 minutes)
                                                 </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" 
-                                                           name="duration_option" id="duration_18" value="18">
-                                                    <label class="form-check-label" for="duration_18">
-                                                        <strong>18 Hours</strong><br>
-                                                        <small class="text-muted">Shorter cleaning cycle</small>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" 
-                                                           name="duration_option" id="duration_test" value="0.1">
-                                                    <label class="form-check-label" for="duration_test">
-                                                        <strong>6 Minutes (Testing)</strong><br>
-                                                        <small class="text-muted">For testing purposes</small>
-                                                    </label>
+                                            <div class="col-md-6">
+                                                <div class="alert alert-info mb-0">
+                                                    <strong>Common values:</strong><br>
+                                                    • 24 hours = Standard process<br>
+                                                    • 0.1 hours = 6 minutes (testing)<br>
+                                                    • 0.05 hours = 3 minutes (quick test)
                                                 </div>
                                             </div>
                                         </div>
-                                        <input type="hidden" name="duration_hours" id="duration_hours" value="24">
                                     </div>
                                 </div>
                             </div>

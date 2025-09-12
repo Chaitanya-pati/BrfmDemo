@@ -1251,6 +1251,7 @@ def start_24h_cleaning(order_id):
             
             cleaning_process = CleaningProcess(
                 order_id=order_id,
+                job_id=order_id,  # Use order_id as job_id for production orders
                 cleaning_bin_id=cleaning_bin_id,
                 process_type='24_hour',
                 duration_hours=duration_hours,
@@ -1328,6 +1329,7 @@ def start_12h_cleaning(order_id):
             
             cleaning_process = CleaningProcess(
                 order_id=order_id,
+                job_id=order_id,  # Use order_id as job_id for production orders
                 cleaning_bin_id=cleaning_bin_id,
                 process_type='12_hour',
                 duration_hours=duration_hours,
@@ -1337,10 +1339,7 @@ def start_12h_cleaning(order_id):
                 target_moisture=target_moisture,
                 operator_name=operator_name,
                 machine_name=machine_name,
-                status='running',
-                timer_active=True,
-                countdown_start=start_time,
-                countdown_end=end_time
+                status='running'
             )
             
             db.session.add(cleaning_process)

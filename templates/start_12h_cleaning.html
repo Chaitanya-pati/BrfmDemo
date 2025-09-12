@@ -112,50 +112,33 @@
 
                         <div class="row mb-4">
                             <div class="col-12">
-                                <label class="form-label fw-bold">
-                                    <i class="fas fa-clock me-2"></i>12-Hour Cleaning Duration *
+                                <label for="duration_hours" class="form-label fw-bold">
+                                    <i class="fas fa-clock me-2"></i>12-Hour Cleaning Duration (in hours) *
                                 </label>
                                 <div class="card">
                                     <div class="card-body">
                                         <div class="row">
-                                            <div class="col-md-3">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" 
-                                                           name="duration_hours" id="duration_12" value="12" checked>
-                                                    <label class="form-check-label" for="duration_12">
-                                                        <strong>12 Hours (Standard)</strong><br>
-                                                        <small class="text-muted">Standard 12-hour process</small>
-                                                    </label>
+                                            <div class="col-md-6">
+                                                <input type="number" 
+                                                       class="form-control" 
+                                                       id="duration_hours" 
+                                                       name="duration_hours" 
+                                                       min="0.01" 
+                                                       max="24" 
+                                                       step="0.01" 
+                                                       value="12" 
+                                                       required>
+                                                <div class="form-text">
+                                                    Enter duration in hours (e.g., 12 for 12 hours, 0.1 for 6 minutes, 0.05 for 3 minutes)
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" 
-                                                           name="duration_hours" id="duration_6" value="6">
-                                                    <label class="form-check-label" for="duration_6">
-                                                        <strong>6 Hours (Testing)</strong><br>
-                                                        <small class="text-muted">Shorter duration for testing</small>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" 
-                                                           name="duration_hours" id="duration_2" value="2">
-                                                    <label class="form-check-label" for="duration_2">
-                                                        <strong>2 Hours (Quick Test)</strong><br>
-                                                        <small class="text-muted">Quick testing duration</small>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" 
-                                                           name="duration_hours" id="duration_01" value="0.1">
-                                                    <label class="form-check-label" for="duration_01">
-                                                        <strong>6 Minutes (Demo)</strong><br>
-                                                        <small class="text-muted">Demo/development testing</small>
-                                                    </label>
+                                            <div class="col-md-6">
+                                                <div class="alert alert-info mb-0">
+                                                    <strong>Common values:</strong><br>
+                                                    • 12 hours = Standard process<br>
+                                                    • 6 hours = Testing duration<br>
+                                                    • 0.1 hours = 6 minutes (demo)<br>
+                                                    • 0.05 hours = 3 minutes (quick test)
                                                 </div>
                                             </div>
                                         </div>

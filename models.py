@@ -389,6 +389,7 @@ class CleaningBin(db.Model):
 class CleaningProcess(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)  # Link to production order
+    job_id = db.Column(db.Integer, nullable=True)  # Required by database but can be null for production orders
     cleaning_bin_id = db.Column(db.Integer, db.ForeignKey('cleaning_bin.id'))
     process_type = db.Column(db.String(20), nullable=False)  # '24_hour', '12_hour', 'custom'
     duration_hours = db.Column(db.Float, nullable=False)
