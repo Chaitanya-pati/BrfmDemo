@@ -1251,7 +1251,7 @@ def start_24h_cleaning(order_id):
             
             cleaning_process = CleaningProcess(
                 order_id=order_id,
-                job_id=order_id,  # Use order_id as job_id for production orders
+                job_id=None,  # Set to None for production orders (only used for traditional jobs)
                 cleaning_bin_id=cleaning_bin_id,
                 process_type='24_hour',
                 duration_hours=duration_hours,
@@ -1329,7 +1329,7 @@ def start_12h_cleaning(order_id):
             
             cleaning_process = CleaningProcess(
                 order_id=order_id,
-                job_id=order_id,  # Use order_id as job_id for production orders
+                job_id=None,  # Set to None for production orders (only used for traditional jobs)
                 cleaning_bin_id=cleaning_bin_id,
                 process_type='12_hour',
                 duration_hours=duration_hours,
