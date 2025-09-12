@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block title %}Grinding Execution - Wheat Processing Management{% endblock %}
@@ -86,7 +85,7 @@
                         <i class="fas fa-camera me-1"></i>Upload Photos
                     </button>
                 </div>
-                
+
                 <div id="photoUploadSection" style="display: none;">
                     <form id="cleaningPhotoForm" enctype="multipart/form-data">
                         <input type="hidden" id="sessionId" value="{{ grinding_session.id }}">
@@ -112,108 +111,125 @@
     </div>
 </div>
 
-<!-- Production Outputs -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-pie me-2"></i>Production Outputs & Ratios
-                </h5>
-                <span class="badge bg-light text-dark">Target: Main 75-77%, Bran 23-25%</span>
-            </div>
-            <div class="card-body">
-                <form id="productionOutputsForm">
-                    <div class="row">
-                        <div class="col-lg-6">
-                            <h6 class="text-primary">Main Products</h6>
-                            <div class="row g-2">
-                                <div class="col-md-6">
-                                    <label class="form-label">Maida (kg):</label>
-                                    <input type="number" class="form-control main-product" data-product="Maida" step="0.1" min="0">
+<!-- Production Outputs Section -->
+                    <div class="card mt-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Production Outputs & Ratios</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Main Products -->
+                                <div class="col-md-8">
+                                    <h6 class="text-muted mb-3">Main Products</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Maida (kg):</label>
+                                            <input type="number" class="form-control product-input" data-type="main_product" step="0.01" min="0">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Suji (kg):</label>
+                                            <input type="number" class="form-control product-input" data-type="main_product" step="0.01" min="0">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Chakki Ata (kg):</label>
+                                            <input type="number" class="form-control product-input" data-type="main_product" step="0.01" min="0">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Tandoori Ata (kg):</label>
+                                            <input type="number" class="form-control product-input" data-type="main_product" step="0.01" min="0">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">DP Maida (kg):</label>
+                                            <input type="number" class="form-control product-input" data-type="main_product" step="0.01" min="0">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Loto Maida (kg):</label>
+                                            <input type="number" class="form-control product-input" data-type="main_product" step="0.01" min="0">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Nestle Maida (kg):</label>
+                                            <input type="number" class="form-control product-input" data-type="main_product" step="0.01" min="0">
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Suji (kg):</label>
-                                    <input type="number" class="form-control main-product" data-product="Suji" step="0.1" min="0">
+
+                                <!-- Bran Products -->
+                                <div class="col-md-4">
+                                    <h6 class="text-muted mb-3">Bran Products</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">Wheat Bran (kg):</label>
+                                        <input type="number" class="form-control product-input" data-type="bran" step="0.01" min="0">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Fine Bran (kg):</label>
+                                        <input type="number" class="form-control product-input" data-type="bran" step="0.01" min="0">
+                                    </div>
+
+                                    <!-- Production Summary -->
+                                    <div class="mt-4">
+                                        <h6 class="text-muted mb-2">Production Summary</h6>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <div class="text-center p-2 bg-primary text-white rounded">
+                                                    <div class="fw-bold">Main Products</div>
+                                                    <div id="main-products-percentage">0%</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-center p-2 bg-warning text-dark rounded">
+                                                    <div class="fw-bold">Bran</div>
+                                                    <div id="bran-percentage">0%</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="small text-muted mt-2 text-center">
+                                            Target: Main 75-77%, Bran 23-25%
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Chakki Ata (kg):</label>
-                                    <input type="number" class="form-control main-product" data-product="Chakki Ata" step="0.1" min="0">
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-4">
+                                <div>
+                                    <button type="button" class="btn btn-primary" onclick="calculateRatios()">
+                                        <i class="fas fa-calculator me-2"></i>Calculate Ratios
+                                    </button>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Tandoori Ata (kg):</label>
-                                    <input type="number" class="form-control main-product" data-product="Tandoori Ata" step="0.1" min="0">
+                                <div>
+                                    <button type="button" class="btn btn-success" onclick="saveProductionData()" id="save-production-btn" disabled>
+                                        <i class="fas fa-save me-2"></i>Save Production Data
+                                    </button>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">DP Maida (kg):</label>
-                                    <input type="number" class="form-control main-product" data-product="DP Maida" step="0.1" min="0">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Loto Maida (kg):</label>
-                                    <input type="number" class="form-control main-product" data-product="Loto Maida" step="0.1" min="0">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Nestle Maida (kg):</label>
-                                    <input type="number" class="form-control main-product" data-product="Nestle Maida" step="0.1" min="0">
-                                </div>
+                            </div>
+
+                            <!-- Bran Alert -->
+                            <div id="bran-alert" class="alert alert-warning mt-3 d-none">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>High Bran Alert:</strong> Bran percentage is above 25%. Please review grinding parameters.
                             </div>
                         </div>
-                        
-                        <div class="col-lg-6">
-                            <h6 class="text-warning">Bran Products</h6>
-                            <div class="row g-2">
-                                <div class="col-md-6">
-                                    <label class="form-label">Wheat Bran (kg):</label>
-                                    <input type="number" class="form-control bran-product" data-product="Wheat Bran" step="0.1" min="0">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Fine Bran (kg):</label>
-                                    <input type="number" class="form-control bran-product" data-product="Fine Bran" step="0.1" min="0">
-                                </div>
+                    </div>
+
+                    <!-- Next Steps Section -->
+                    <div class="card mt-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="fas fa-arrow-right me-2"></i>Next Steps</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                After saving production data, proceed to the dedicated packaging module for bagging and storage allocation.
                             </div>
-                            
-                            <div class="mt-3">
-                                <h6>Production Summary</h6>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <div class="card bg-primary text-white">
-                                            <div class="card-body text-center p-2">
-                                                <small>Main Products</small>
-                                                <h6 id="mainPercentage" class="mb-0">0%</h6>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="card bg-warning text-dark">
-                                            <div class="card-body text-center p-2">
-                                                <small>Bran</small>
-                                                <h6 id="branPercentage" class="mb-0">0%</h6>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div id="branAlert" class="alert alert-danger mt-2" style="display: none;">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    <strong>Alert:</strong> Bran percentage exceeds 25%!
+
+                            <div id="next-steps-section" style="display: none;">
+                                <div class="d-flex justify-content-center">
+                                    <a href="/packaging_view/{{ order.id }}" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-boxes me-2"></i>Continue to Packaging
+                                    </a>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="mt-3 text-center">
-                        <button type="button" class="btn btn-primary" onclick="calculateRatios()">
-                            <i class="fas fa-calculator me-2"></i>Calculate Ratios
-                        </button>
-                        <button type="button" class="btn btn-success ms-2" onclick="submitOutputs()">
-                            <i class="fas fa-save me-2"></i>Save Production Data
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- JavaScript for Timer and Functionality -->
 <script>
@@ -236,10 +252,10 @@ function updateTimer() {
                 const hours = Math.floor(elapsed / 3600);
                 const minutes = Math.floor((elapsed % 3600) / 60);
                 const seconds = elapsed % 60;
-                
+
                 document.getElementById('grindingTimer').textContent = 
                     `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                
+
                 // Check for manual cleaning reminder
                 if (data.needs_manual_cleaning) {
                     showCleaningReminder();
@@ -307,12 +323,12 @@ function uploadCleaningPhotos() {
     const beforePhoto = document.getElementById('beforePhoto').files[0];
     const afterPhoto = document.getElementById('afterPhoto').files[0];
     const operatorName = document.getElementById('operatorName').value;
-    
+
     if (!beforePhoto || !afterPhoto) {
         alert('Please select both before and after photos');
         return;
     }
-    
+
     // Upload before photo
     uploadPhoto('before', beforePhoto, operatorName);
     // Upload after photo
@@ -325,7 +341,7 @@ function uploadPhoto(type, file, operatorName) {
     formData.append('photo_type', type);
     formData.append('operator_name', operatorName);
     formData.append('photo_file', file);
-    
+
     fetch('/upload_grinding_cleaning_photo', {
         method: 'POST',
         body: formData
@@ -352,28 +368,28 @@ function uploadPhoto(type, file, operatorName) {
 function calculateRatios() {
     let mainTotal = 0;
     let branTotal = 0;
-    
+
     // Calculate main products total
     document.querySelectorAll('.main-product').forEach(input => {
         const value = parseFloat(input.value) || 0;
         mainTotal += value;
     });
-    
+
     // Calculate bran products total
     document.querySelectorAll('.bran-product').forEach(input => {
         const value = parseFloat(input.value) || 0;
         branTotal += value;
     });
-    
+
     const totalOutput = mainTotal + branTotal;
-    
+
     if (totalOutput > 0) {
         const mainPercentage = (mainTotal / totalOutput * 100).toFixed(1);
         const branPercentage = (branTotal / totalOutput * 100).toFixed(1);
-        
+
         document.getElementById('mainPercentage').textContent = mainPercentage + '%';
         document.getElementById('branPercentage').textContent = branPercentage + '%';
-        
+
         // Show bran alert if > 25%
         const branAlert = document.getElementById('branAlert');
         if (parseFloat(branPercentage) > 25.0) {
@@ -386,7 +402,7 @@ function calculateRatios() {
 
 function submitOutputs() {
     const outputs = [];
-    
+
     // Collect main products
     document.querySelectorAll('.main-product').forEach(input => {
         const quantity = parseFloat(input.value) || 0;
@@ -398,7 +414,7 @@ function submitOutputs() {
             });
         }
     });
-    
+
     // Collect bran products
     document.querySelectorAll('.bran-product').forEach(input => {
         const quantity = parseFloat(input.value) || 0;
@@ -410,12 +426,12 @@ function submitOutputs() {
             });
         }
     });
-    
+
     if (outputs.length === 0) {
         alert('Please enter at least one product quantity');
         return;
     }
-    
+
     fetch('/submit_production_outputs', {
         method: 'POST',
         headers: {
@@ -429,7 +445,16 @@ function submitOutputs() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(`Production outputs saved!\nMain Products: ${data.main_products_percentage}%\nBran: ${data.bran_percentage}%${data.bran_alert ? '\n\nWARNING: Bran percentage exceeds 25%!' : ''}`);
+            alert('Production outputs saved successfully!');
+
+            // Show next steps section
+            document.getElementById('next-steps-section').style.display = 'block';
+
+            // Disable production data form
+            document.querySelectorAll('.product-input').forEach(input => {
+                input.disabled = true;
+            });
+            document.getElementById('save-production-btn').disabled = true;
         } else {
             alert('Error saving outputs: ' + data.error);
         }
@@ -443,7 +468,7 @@ function submitOutputs() {
 // Auto-calculate ratios when inputs change
 document.addEventListener('DOMContentLoaded', function() {
     startTimer();
-    
+
     // Add event listeners to all product inputs
     document.querySelectorAll('.main-product, .bran-product').forEach(input => {
         input.addEventListener('input', calculateRatios);
