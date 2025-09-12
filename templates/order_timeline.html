@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+
+{% block title %}Order Timeline - Wheat Processing{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-timeline me-2"></i>Order Timeline Tracking
+            </h1>
+            <p class="text-muted">Search and track complete order lifecycle from creation to finished goods</p>
+        </div>
+    </div>
+
+    <!-- Search Form -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 fw-bold text-primary">
+                <i class="fas fa-search me-2"></i>Search Order
+            </h6>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="row g-3">
+                <div class="col-md-8">
+                    <label for="order_id" class="form-label">Order ID or Order Number</label>
+                    <input type="text" class="form-control" id="order_id" name="order_id" 
+                           placeholder="Enter Order ID (e.g., 123) or Order Number (e.g., PRO20250912001)"
+                           value="{{ request.form.get('order_id', '') }}">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Search Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if order %}
+    <!-- Order Timeline -->
+    <div class="row">
+        <!-- Order Basics -->
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-primary">
+                        <i class="fas fa-info-circle me-2"></i>Order Basics - {{ order.order_number }}
+                    </h6>
+                    <span class="badge bg-{{ 'success' if order.status == 'completed' else 'warning' if order.status in ['in_progress', 'active'] else 'secondary' }} text-white fs-6">
+                        {{ order.status|title }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Quantity:</strong></p>
+                            <p class="text-muted">{{ "%.2f"|format(timeline_data.order_basics.quantity_tons) if timeline_data.order_basics.quantity_tons is not none else 'N/A' }} tons</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Finished Good Type:</strong></p>
+                            <p class="text-muted">{{ timeline_data.order_basics.finished_good_type }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Customer:</strong></p>
+                            <p class="text-muted">{{ timeline_data.order_basics.customer or 'N/A' }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Product:</strong></p>
+                            <p class="text-muted">{{ timeline_data.order_basics.product or 'N/A' }}</p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Created:</strong></p>
+                            <p class="text-muted">{{ timeline_data.order_basics.created_at.strftime('%Y-%m-%d %H:%M') if timeline_data.order_basics.created_at else 'N/A' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Planning Stage -->
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-primary">
+                        <i class="fas fa-clipboard-list me-2"></i>Planning Stage
+                    </h6>
+                    <span class="badge bg-{{ 'success' if timeline_data.planning.status == 'Completed' else 'danger' }} text-white fs-6">
+                        {{ timeline_data.planning.status }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    {% if timeline_data.planning.allocations %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Pre-cleaning Bin</th>
+                                        <th>Percentage</th>
+                                        <th>Tons</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for allocation in timeline_data.planning.allocations %}
+                                    <tr>
+                                        <td>{{ allocation.bin_name }}</td>
+                                        <td>{{ "%.1f"|format(allocation.percentage) }}%</td>
+                                        <td>{{ "%.2f"|format(allocation.tons) }} tons</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">No planning allocations found. Planning stage not completed.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 24-Hour Cleaning Stage -->
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-primary">
+                        <i class="fas fa-clock me-2"></i>24-Hour Cleaning Stage
+                    </h6>
+                    <span class="badge bg-{{ 'success' if timeline_data.cleaning_24h.status == 'Completed' else 'warning' if timeline_data.cleaning_24h.status == 'Active' else 'danger' }} text-white fs-6">
+                        {{ timeline_data.cleaning_24h.status }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    {% if timeline_data.cleaning_24h.countdown_status %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-hourglass-half me-2"></i>
+                            <strong>Live Countdown:</strong> {{ "%.1f"|format(timeline_data.cleaning_24h.countdown_status.hours_remaining) if timeline_data.cleaning_24h.countdown_status.hours_remaining is not none else 'N/A' }} hours remaining
+                            (Expected completion: {{ timeline_data.cleaning_24h.countdown_status.end_time.strftime('%Y-%m-%d %H:%M') if timeline_data.cleaning_24h.countdown_status.end_time else 'N/A' }})
+                        </div>
+                    {% endif %}
+
+                    <!-- Process Data -->
+                    {% if timeline_data.cleaning_24h.process_data %}
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>Machine:</strong></p>
+                            <p class="text-muted">{{ timeline_data.cleaning_24h.process_data.machine_name or 'N/A' }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>Operator:</strong></p>
+                            <p class="text-muted">{{ timeline_data.cleaning_24h.process_data.operator_name or 'N/A' }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>Start Time:</strong></p>
+                            <p class="text-muted">{{ timeline_data.cleaning_24h.process_data.start_time.strftime('%Y-%m-%d %H:%M') if timeline_data.cleaning_24h.process_data.start_time else 'N/A' }}</p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Start Moisture:</strong></p>
+                            <p class="text-muted">{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.start_moisture) if timeline_data.cleaning_24h.process_data.start_moisture is not none else 'N/A' }}%</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Water Added:</strong></p>
+                            <p class="text-muted">{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.water_added_liters) if timeline_data.cleaning_24h.process_data.water_added_liters is not none else 'N/A' }} L</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Waste Collected:</strong></p>
+                            <p class="text-muted">{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.waste_collected_kg) if timeline_data.cleaning_24h.process_data.waste_collected_kg is not none else 'N/A' }} kg</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>End Moisture:</strong></p>
+                            <p class="text-muted">{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.end_moisture) if timeline_data.cleaning_24h.process_data.end_moisture is not none else 'N/A' %}%</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Transfer Jobs -->
+                    {% if timeline_data.cleaning_24h.transfers %}
+                    <h6 class="fw-bold mb-2">Transfer Jobs</h6>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Job ID</th>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                    <th>Quantity (tons)</th>
+                                    <th>Operator</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transfer in timeline_data.cleaning_24h.transfers %}
+                                <tr>
+                                    <td>{{ transfer.job_id }}</td>
+                                    <td>{{ transfer.start_time.strftime('%H:%M') if transfer.start_time else 'N/A' }}</td>
+                                    <td>{{ transfer.end_time.strftime('%H:%M') if transfer.end_time else 'Ongoing' }}</td>
+                                    <td>{{ "%.2f"|format(transfer.quantity_tons) }}</td>
+                                    <td>{{ transfer.operator_name }}</td>
+                                    <td><span class="badge bg-{{ 'success' if transfer.status == 'completed' else 'warning' }} text-white">{{ transfer.status }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    <!-- Manual Cleaning Logs -->
+                    {% if timeline_data.cleaning_24h.manual_cleaning_logs %}
+                    <h6 class="fw-bold mb-2">Manual Cleaning Logs (1-minute intervals)</h6>
+                    <div class="row">
+                        {% for log in timeline_data.cleaning_24h.manual_cleaning_logs %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="card-title mb-0">{{ log.machine_name }}</h6>
+                                        <small class="text-muted">{{ log.cleaning_start_time.strftime('%H:%M') if log.cleaning_start_time else 'N/A' }}</small>
+                                    </div>
+                                    <p class="card-text small">
+                                        <strong>Operator:</strong> {{ log.operator_name }}<br>
+                                        <strong>Duration:</strong> {{ log.duration_minutes }} min<br>
+                                        {% if log.notes %}<strong>Notes:</strong> {{ log.notes }}{% endif %}
+                                    </p>
+                                    {% if log.before_photo or log.after_photo %}
+                                    <div class="row g-2">
+                                        {% if log.before_photo %}
+                                        <div class="col-6">
+                                            <a href="{{ url_for('uploaded_file', filename=log.before_photo) }}" target="_blank">
+                                                <img src="{{ url_for('uploaded_file', filename=log.before_photo) }}" class="img-fluid rounded" alt="Before">
+                                            </a>
+                                            <small class="d-block text-center text-muted">Before</small>
+                                        </div>
+                                        {% endif %}
+                                        {% if log.after_photo %}
+                                        <div class="col-6">
+                                            <a href="{{ url_for('uploaded_file', filename=log.after_photo) }}" target="_blank">
+                                                <img src="{{ url_for('uploaded_file', filename=log.after_photo) }}" class="img-fluid rounded" alt="After">
+                                            </a>
+                                            <small class="d-block text-center text-muted">After</small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 12-Hour Cleaning Stage -->
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-primary">
+                        <i class="fas fa-hourglass-half me-2"></i>12-Hour Cleaning Stage
+                    </h6>
+                    <span class="badge bg-{{ 'success' if timeline_data.cleaning_12h.status == 'Completed' else 'warning' if timeline_data.cleaning_12h.status == 'Active' else 'danger' }} text-white fs-6">
+                        {{ timeline_data.cleaning_12h.status }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    {% if timeline_data.cleaning_12h.countdown_status %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-hourglass-half me-2"></i>
+                            <strong>Live Countdown:</strong> {{ "%.1f"|format(timeline_data.cleaning_12h.countdown_status.hours_remaining) if timeline_data.cleaning_12h.countdown_status.hours_remaining is not none else 'N/A' }} hours remaining
+                            (Expected completion: {{ timeline_data.cleaning_12h.countdown_status.end_time.strftime('%Y-%m-%d %H:%M') if timeline_data.cleaning_12h.countdown_status.end_time else 'N/A' }})
+                        </div>
+                    {% endif %}
+
+                    <!-- Moisture Comparison -->
+                    {% if timeline_data.cleaning_12h.target_moisture or timeline_data.cleaning_12h.outgoing_moisture %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Target Moisture</h5>
+                                    <h3 class="text-primary">{{ "%.1f"|format(timeline_data.cleaning_12h.target_moisture) if timeline_data.cleaning_12h.target_moisture is not none else 'N/A' }}%</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Outgoing Moisture</h5>
+                                    <h3 class="text-success">{{ "%.1f"|format(timeline_data.cleaning_12h.outgoing_moisture) if timeline_data.cleaning_12h.outgoing_moisture is not none else 'N/A' %}%</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Manual Cleaning Logs for 12h -->
+                    {% if timeline_data.cleaning_12h.manual_cleaning_logs %}
+                    <h6 class="fw-bold mb-2">Manual Cleaning Logs (30-second intervals)</h6>
+                    <div class="row">
+                        {% for log in timeline_data.cleaning_12h.manual_cleaning_logs %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="card-title mb-0">{{ log.machine_name }}</h6>
+                                        <small class="text-muted">{{ log.cleaning_start_time.strftime('%H:%M:%S') if log.cleaning_start_time else 'N/A' }}</small>
+                                    </div>
+                                    <p class="card-text small">
+                                        <strong>Operator:</strong> {{ log.operator_name }}<br>
+                                        <strong>Duration:</strong> {{ log.duration_minutes }} min
+                                    </p>
+                                    {% if log.before_photo or log.after_photo %}
+                                    <div class="row g-1">
+                                        {% if log.before_photo %}
+                                        <div class="col-6">
+                                            <a href="{{ url_for('uploaded_file', filename=log.before_photo) }}" target="_blank">
+                                                <img src="{{ url_for('uploaded_file', filename=log.before_photo) }}" class="img-fluid rounded" alt="Before">
+                                            </a>
+                                        </div>
+                                        {% endif %}
+                                        {% if log.after_photo %}
+                                        <div class="col-6">
+                                            <a href="{{ url_for('uploaded_file', filename=log.after_photo) }}" target="_blank">
+                                                <img src="{{ url_for('uploaded_file', filename=log.after_photo) }}" class="img-fluid rounded" alt="After">
+                                            </a>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Grinding Stage -->
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-primary">
+                        <i class="fas fa-cogs me-2"></i>Grinding Stage
+                    </h6>
+                    <span class="badge bg-{{ 'success' if timeline_data.grinding.status == 'Completed' else 'warning' if timeline_data.grinding.status == 'Active' else 'danger' }} text-white fs-6">
+                        {{ timeline_data.grinding.status }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <!-- Product Ratios -->
+                    {% if timeline_data.grinding.product_ratios %}
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Main Products</h6>
+                                    <h4>{{ "%.1f"|format(timeline_data.grinding.product_ratios.main_products_percentage) if timeline_data.grinding.product_ratios.main_products_percentage is not none else 'N/A' }}%</h4>
+                                    <small>{{ "%.2f"|format(timeline_data.grinding.product_ratios.main_products_kg) if timeline_data.grinding.product_ratios.main_products_kg is not none else 'N/A' }} kg</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-{{ 'danger' if timeline_data.grinding.product_ratios.bran_percentage > 25 else 'warning' }} text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Bran</h6>
+                                    <h4>{{ "%.1f"|format(timeline_data.grinding.product_ratios.bran_percentage) if timeline_data.grinding.product_ratios.bran_percentage is not none else 'N/A' }}%</h4>
+                                    <small>{{ "%.2f"|format(timeline_data.grinding.product_ratios.bran_kg) if timeline_data.grinding.product_ratios.bran_kg is not none else 'N/A' }} kg</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total Output</h6>
+                                    <h4>{{ "%.2f"|format(timeline_data.grinding.product_ratios.total_output_kg) if timeline_data.grinding.product_ratios.total_output_kg is not none else 'N/A' }} kg</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Bran Alerts -->
+                    {% if timeline_data.grinding.bran_alerts %}
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Bran Percentage Alerts</h6>
+                        {% for alert in timeline_data.grinding.bran_alerts %}
+                        <div>{{ alert.message }} <small class="text-muted">({{ alert.timestamp.strftime('%Y-%m-%d %H:%M') if alert.timestamp else 'N/A' }})</small></div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Machine Cleaning Logs -->
+                    {% if timeline_data.grinding.machine_cleaning_logs %}
+                    <h6 class="fw-bold mb-3">Machine Cleaning Logs (Hourly with 10/5-minute reminders)</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Machine</th>
+                                    <th>Cleaned By</th>
+                                    <th>Time</th>
+                                    <th>Waste (kg)</th>
+                                    <th>Photos</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in timeline_data.grinding.machine_cleaning_logs %}
+                                <tr>
+                                    <td>{{ log.machine_name }}</td>
+                                    <td>{{ log.cleaned_by }}</td>
+                                    <td>{{ log.cleaning_time.strftime('%m/%d %H:%M') if log.cleaning_time else 'N/A' }}</td>
+                                    <td>{{ "%.1f"|format(log.waste_collected) if log.waste_collected is not none else 'N/A' }}</td>
+                                    <td>
+                                        {% if log.photo_before %}
+                                        <a href="{{ url_for('uploaded_file', filename=log.photo_before) }}" target="_blank" class="badge bg-primary text-decoration-none">Before</a>
+                                        {% endif %}
+                                        {% if log.photo_after %}
+                                        <a href="{{ url_for('uploaded_file', filename=log.photo_after) }}" target="_blank" class="badge bg-success text-decoration-none">After</a>
+                                        {% endif %}
+                                    </td>
+                                    <td><small>{{ log.notes[:50] }}{% if log.notes and log.notes|length > 50 %}...{% endif %}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    <!-- Packaging -->
+                    {% if timeline_data.grinding.packaging %}
+                    <h6 class="fw-bold mb-3">Packaging by Bag Weights</h6>
+                    <div class="row mb-4">
+                        {% for package in timeline_data.grinding.packaging %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ package.product_name }}</h6>
+                                    <p class="card-text">
+                                        <strong>{{ package.bag_weight_kg }}kg bags:</strong> {{ package.bag_count }} bags<br>
+                                        <strong>Total:</strong> {{ "%.2f"|format(package.total_weight_kg) if package.total_weight_kg is not none else 'N/A' }} kg<br>
+                                        <strong>Storage:</strong> {{ package.storage_area }}<br>
+                                        <strong>Operator:</strong> {{ package.operator_name }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Storage Levels -->
+                    {% if timeline_data.grinding.storage_levels %}
+                    <h6 class="fw-bold mb-3">Storage Levels Per Area</h6>
+                    <div class="row">
+                        {% for storage in timeline_data.grinding.storage_levels %}
+                        <div class="col-md-3 mb-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">{{ storage.area_name }}</h6>
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar bg-{{ 'danger' if storage.utilization_percent > 90 else 'warning' if storage.utilization_percent > 70 else 'success' }}" 
+                                             style="width: {{ storage.utilization_percent }}%"></div>
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ "%.1f"|format(storage.current_stock_kg) if storage.current_stock_kg is not none else 'N/A' }} / {{ "%.1f"|format(storage.capacity_kg) if storage.capacity_kg is not none else 'N/A' }} kg<br>
+                                        ({{ "%.1f"|format(storage.utilization_percent) if storage.utilization_percent is not none else 'N/A' }}% full)
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+        <!-- No Order Found Message -->
+        <div class="text-center py-5">
+            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">Search for an order to view its timeline</h5>
+            <p class="text-muted">Enter an Order ID or Order Number above to track the complete lifecycle from creation to finished goods.</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Custom CSS for Timeline -->
+<style>
+/* Bootstrap 5 badge styles are now using bg-* classes directly */
+
+.card img {
+    max-height: 100px;
+    object-fit: cover;
+}
+
+.progress {
+    height: 8px;
+}
+
+.table th {
+    border-top: none;
+}
+
+.card-body .row > div {
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+    .card img {
+        max-height: 80px;
+    }
+}
+</style>
+
+<!-- JavaScript for Live Updates (if needed) -->
+<script>
+// Optional: Add live countdown updates for active stages
+{% if (timeline_data.cleaning_24h and timeline_data.cleaning_24h.countdown_status) or (timeline_data.cleaning_12h and timeline_data.cleaning_12h.countdown_status) %}
+function updateCountdowns() {
+    // Implementation for live countdown updates
+    // This could be expanded to update countdowns in real-time
+}
+// setInterval(updateCountdowns, 60000); // Update every minute
+{% endif %}
+</script>
+
+{% endblock %}

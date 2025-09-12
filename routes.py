@@ -2407,3 +2407,245 @@ def packing_execution(order_id):
                          order=order,
                          storage_areas=storage_areas)
 
+@app.route('/order_timeline', methods=['GET', 'POST'])
+def order_timeline():
+    """Comprehensive order timeline tracking with search by Order ID"""
+    order = None
+    timeline_data = {}
+    
+    if request.method == 'POST' or request.args.get('order_id'):
+        # Get order ID from form or URL parameter
+        order_id = request.form.get('order_id') or request.args.get('order_id')
+        
+        if order_id:
+            try:
+                # Find order by ID or order number
+                if order_id.isdigit():
+                    order = ProductionOrder.query.get(int(order_id))
+                else:
+                    order = ProductionOrder.query.filter_by(order_number=order_id).first()
+                
+                if order:
+                    # Build comprehensive timeline data
+                    timeline_data = build_order_timeline(order)
+                else:
+                    flash(f'Order "{order_id}" not found', 'error')
+                    
+            except Exception as e:
+                flash(f'Error searching for order: {str(e)}', 'error')
+    
+    return render_template('order_timeline.html', 
+                         order=order,
+                         timeline_data=timeline_data)
+
+def build_order_timeline(order):
+    """Build comprehensive timeline data for an order"""
+    timeline = {
+        'order_basics': {
+            'quantity_tons': order.quantity,
+            'finished_good_type': order.finished_good_type,
+            'status': order.status,
+            'created_at': order.created_at,
+            'customer': order.customer.company_name if order.customer else None,
+            'product': order.product.name if order.product else None
+        },
+        'planning': {
+            'status': 'Not Started',
+            'allocations': []
+        },
+        'cleaning_24h': {
+            'status': 'Not Started',
+            'transfers': [],
+            'countdown_status': None,
+            'manual_cleaning_logs': [],
+            'process_data': {}
+        },
+        'cleaning_12h': {
+            'status': 'Not Started',
+            'countdown_status': None,
+            'target_moisture': None,
+            'outgoing_moisture': None,
+            'manual_cleaning_logs': [],
+            'process_data': {}
+        },
+        'grinding': {
+            'status': 'Not Started',
+            'machine_cleaning_logs': [],
+            'product_ratios': {},
+            'bran_alerts': [],
+            'packaging': [],
+            'storage_levels': [],
+            'process_data': {}
+        }
+    }
+    
+    try:
+        # 1. Planning Stage
+        production_plan = ProductionPlan.query.filter_by(order_id=order.id).first()
+        if production_plan:
+            timeline['planning']['status'] = 'Completed'
+            plan_items = ProductionPlanItem.query.filter_by(plan_id=production_plan.id).all()
+            for item in plan_items:
+                timeline['planning']['allocations'].append({
+                    'bin_name': item.precleaning_bin.name,
+                    'percentage': item.percentage,
+                    'tons': item.quantity
+                })
+        
+        # 2. Cleaning Processes
+        cleaning_processes = CleaningProcess.query.filter_by(order_id=order.id).all()
+        for process in cleaning_processes:
+            stage_key = 'cleaning_24h' if process.process_type == '24_hour' else 'cleaning_12h'
+            
+            # Update stage status
+            if process.status == 'completed':
+                timeline[stage_key]['status'] = 'Completed'
+            elif process.status in ['running', 'in_progress']:
+                timeline[stage_key]['status'] = 'Active'
+                # Calculate countdown if active
+                if process.end_time:
+                    from datetime import datetime
+                    now = datetime.utcnow()
+                    if process.end_time > now:
+                        remaining = process.end_time - now
+                        timeline[stage_key]['countdown_status'] = {
+                            'hours_remaining': remaining.total_seconds() / 3600,
+                            'end_time': process.end_time
+                        }
+            
+            # Store process data
+            timeline[stage_key]['process_data'] = {
+                'start_time': process.start_time,
+                'end_time': process.end_time,
+                'actual_end_time': process.actual_end_time,
+                'start_moisture': process.start_moisture,
+                'end_moisture': process.end_moisture,
+                'target_moisture': process.target_moisture,
+                'water_added_liters': process.water_added_liters,
+                'waste_collected_kg': process.waste_collected_kg,
+                'machine_name': process.machine_name,
+                'operator_name': process.operator_name
+            }
+            
+            if stage_key == 'cleaning_12h':
+                timeline[stage_key]['target_moisture'] = process.target_moisture
+                timeline[stage_key]['outgoing_moisture'] = process.end_moisture
+        
+        # 3. Transfer Jobs (for 24h stage)
+        transfer_jobs = TransferJob.query.filter_by(order_id=order.id).all()
+        for job in transfer_jobs:
+            timeline['cleaning_24h']['transfers'].append({
+                'job_id': job.job_id,
+                'start_time': job.start_time,
+                'end_time': job.end_time,
+                'quantity_tons': job.quantity_tons,
+                'operator_name': job.operator_name,
+                'status': job.status
+            })
+        
+        # 4. Manual Cleaning Logs
+        manual_logs = ManualCleaningLog.query.filter_by(order_id=order.id).all()
+        for log in manual_logs:
+            log_data = {
+                'machine_name': log.machine_name,
+                'operator_name': log.operator_name,
+                'cleaning_start_time': log.cleaning_start_time,
+                'cleaning_end_time': log.cleaning_end_time,
+                'duration_minutes': log.duration_minutes,
+                'before_photo': log.before_photo,
+                'after_photo': log.after_photo,
+                'notes': log.notes
+            }
+            
+            # Assign to appropriate cleaning stage based on timing or cleaning_process_id
+            if log.cleaning_process_id:
+                process = CleaningProcess.query.get(log.cleaning_process_id)
+                if process and process.process_type == '24_hour':
+                    timeline['cleaning_24h']['manual_cleaning_logs'].append(log_data)
+                elif process and process.process_type == '12_hour':
+                    timeline['cleaning_12h']['manual_cleaning_logs'].append(log_data)
+            else:
+                # Default to 24h if no specific process linked
+                timeline['cleaning_24h']['manual_cleaning_logs'].append(log_data)
+        
+        # 5. Grinding Process
+        # Note: Without a direct relationship, we'll get all grinding processes for now
+        # In a real system, there would be a proper foreign key relationship
+        grinding_processes = GrindingProcess.query.all()  # TODO: Add proper order linkage
+        
+        for grinding in grinding_processes:
+            if grinding.status == 'completed':
+                timeline['grinding']['status'] = 'Completed'
+            elif grinding.status in ['running', 'in_progress']:
+                timeline['grinding']['status'] = 'Active'
+            
+            # Product ratios and bran alerts (with null safety)
+            timeline['grinding']['product_ratios'] = {
+                'main_products_kg': grinding.main_products_kg or 0,
+                'main_products_percentage': grinding.main_products_percentage or 0,
+                'bran_kg': grinding.bran_kg or 0,
+                'bran_percentage': grinding.bran_percentage or 0,
+                'total_output_kg': grinding.total_output_kg or 0
+            }
+            
+            if getattr(grinding, 'bran_percentage_alert', False) and grinding.bran_percentage:
+                timeline['grinding']['bran_alerts'].append({
+                    'message': f'Bran percentage ({grinding.bran_percentage}%) exceeds 25% threshold',
+                    'timestamp': grinding.start_time or datetime.utcnow()
+                })
+        
+        # 6. Packaging Records (with error handling)
+        try:
+            packaging_records = PackagingRecord.query.filter_by(order_id=order.id).all()
+            for record in packaging_records:
+                timeline['grinding']['packaging'].append({
+                    'product_name': getattr(record.product, 'name', 'Unknown') if record.product else 'Unknown',
+                    'bag_weight_kg': record.bag_weight_kg or 0,
+                    'bag_count': record.bag_count or 0,
+                    'total_weight_kg': record.total_weight_kg or 0,
+                    'operator_name': record.operator_name or 'Unknown',
+                    'storage_area': getattr(record.storage_area, 'name', 'Unknown') if record.storage_area else 'Unknown'
+                })
+        except Exception as e:
+            logging.warning(f"Error fetching packaging records: {e}")
+        
+        # 7. Storage Levels (current levels across all storage areas with error handling)
+        try:
+            storage_areas = StorageArea.query.all()
+            for area in storage_areas:
+                current_stock = area.current_stock_kg or 0
+                capacity = area.capacity_kg or 0
+                utilization = (current_stock / capacity * 100) if capacity > 0 else 0
+                timeline['grinding']['storage_levels'].append({
+                    'area_name': area.name or 'Unknown',
+                    'current_stock_kg': current_stock,
+                    'capacity_kg': capacity,
+                    'utilization_percent': utilization
+                })
+        except Exception as e:
+            logging.warning(f"Error fetching storage levels: {e}")
+        
+        # 8. Machine Cleaning Logs (for grinding stage)
+        # Get cleaning logs for grinding machines
+        grinding_machine_logs = CleaningLog.query.join(
+            CleaningMachine, CleaningLog.machine_id == CleaningMachine.id
+        ).filter(CleaningMachine.machine_type == 'grinding').all()
+        
+        for log in grinding_machine_logs:
+            timeline['grinding']['machine_cleaning_logs'].append({
+                'machine_name': log.machine.name,
+                'cleaned_by': log.cleaned_by,
+                'cleaning_time': log.cleaning_time,
+                'photo_before': log.photo_before,
+                'photo_after': log.photo_after,
+                'waste_collected': log.waste_collected,
+                'notes': log.notes
+            })
+    
+    except Exception as e:
+        # Log error but don't break the view
+        import logging
+        logging.error(f"Error building order timeline: {str(e)}")
+    
+    return timeline
+
