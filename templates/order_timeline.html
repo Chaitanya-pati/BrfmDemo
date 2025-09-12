@@ -21,16 +21,52 @@
             </h6>
         </div>
         <div class="card-body">
-            <form method="POST" class="row g-3">
-                <div class="col-md-8">
+            <form method="POST" class="row g-3" id="searchForm">
+                <!-- Search Type Toggle -->
+                <div class="col-12">
+                    <div class="btn-group" role="group" aria-label="Search type">
+                        <input type="radio" class="btn-check" name="search_type" id="search_by_id" value="id" checked>
+                        <label class="btn btn-outline-primary" for="search_by_id">Search by Order ID</label>
+                        
+                        <input type="radio" class="btn-check" name="search_type" id="search_by_date" value="date">
+                        <label class="btn btn-outline-primary" for="search_by_date">Search by Date Range</label>
+                    </div>
+                </div>
+
+                <!-- Order ID Search -->
+                <div id="id_search_section" class="col-md-8">
                     <label for="order_id" class="form-label">Order ID or Order Number</label>
                     <input type="text" class="form-control" id="order_id" name="order_id" 
                            placeholder="Enter Order ID (e.g., 123) or Order Number (e.g., PRO20250912001)"
                            value="{{ request.form.get('order_id', '') }}">
                 </div>
+
+                <!-- Date Range Search -->
+                <div id="date_search_section" class="row" style="display: none;">
+                    <div class="col-md-4">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" 
+                               value="{{ request.form.get('start_date', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" 
+                               value="{{ request.form.get('end_date', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="order_select" class="form-label">Select Order</label>
+                        <select class="form-select" id="order_select" name="selected_order_id" disabled>
+                            <option value="">First select a date range</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="col-md-4 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary me-2">
                         <i class="fas fa-search me-2"></i>Search Order
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="fetchOrdersBtn" style="display: none;">
+                        <i class="fas fa-calendar-check me-2"></i>Get Orders
                     </button>
                 </div>
             </form>
@@ -440,12 +476,19 @@
                         <div class="col-md-4 mb-3">
                             <div class="card">
                                 <div class="card-body">
-                                    <h6 class="card-title">{{ package.product_name }}</h6>
+                                    <h6 class="card-title">{{ package.product_name }}
+                                        {% if package.process_stage %}
+                                        <span class="badge bg-info ms-1">{{ package.process_stage }}</span>
+                                        {% endif %}
+                                    </h6>
                                     <p class="card-text">
                                         <strong>{{ package.bag_weight_kg }}kg bags:</strong> {{ package.bag_count }} bags<br>
                                         <strong>Total:</strong> {{ "%.2f"|format(package.total_weight_kg) if package.total_weight_kg is not none else 'N/A' }} kg<br>
                                         <strong>Storage:</strong> {{ package.storage_area }}<br>
-                                        <strong>Operator:</strong> {{ package.operator_name }}
+                                        <strong>Operator:</strong> {{ package.operator_name }}<br>
+                                        {% if package.packaging_time %}
+                                        <strong>Packaged:</strong> {{ package.packaging_time.strftime('%Y-%m-%d %H:%M') }}
+                                        {% endif %}
                                     </p>
                                 </div>
                             </div>
@@ -529,6 +572,102 @@ function updateCountdowns() {
 }
 // setInterval(updateCountdowns, 60000); // Update every minute
 {% endif %}
+
+// Date range and dynamic order selection functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchById = document.getElementById('search_by_id');
+    const searchByDate = document.getElementById('search_by_date');
+    const idSearchSection = document.getElementById('id_search_section');
+    const dateSearchSection = document.getElementById('date_search_section');
+    const fetchOrdersBtn = document.getElementById('fetchOrdersBtn');
+    const orderSelect = document.getElementById('order_select');
+    const startDate = document.getElementById('start_date');
+    const endDate = document.getElementById('end_date');
+
+    // Toggle search sections
+    searchById.addEventListener('change', function() {
+        if (this.checked) {
+            idSearchSection.style.display = 'block';
+            dateSearchSection.style.display = 'none';
+            fetchOrdersBtn.style.display = 'none';
+        }
+    });
+
+    searchByDate.addEventListener('change', function() {
+        if (this.checked) {
+            idSearchSection.style.display = 'none';
+            dateSearchSection.style.display = 'block';
+            fetchOrdersBtn.style.display = 'inline-block';
+            checkDateRange();
+        }
+    });
+
+    // Check if both dates are selected
+    function checkDateRange() {
+        if (startDate.value && endDate.value) {
+            orderSelect.disabled = false;
+            fetchOrdersBtn.disabled = false;
+        } else {
+            orderSelect.disabled = true;
+            fetchOrdersBtn.disabled = true;
+            orderSelect.innerHTML = '<option value="">First select a date range</option>';
+        }
+    }
+
+    startDate.addEventListener('change', checkDateRange);
+    endDate.addEventListener('change', checkDateRange);
+
+    // Fetch orders by date range
+    fetchOrdersBtn.addEventListener('click', function() {
+        if (!startDate.value || !endDate.value) {
+            alert('Please select both start and end dates');
+            return;
+        }
+
+        fetchOrdersBtn.disabled = true;
+        fetchOrdersBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Loading...';
+
+        fetch('/api/orders_by_date_range', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                start_date: startDate.value,
+                end_date: endDate.value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            orderSelect.innerHTML = '<option value="">Select an order</option>';
+            
+            if (data.orders && data.orders.length > 0) {
+                data.orders.forEach(order => {
+                    const option = document.createElement('option');
+                    option.value = order.id;
+                    option.textContent = `Order ${order.id} - ${order.order_number} (${order.start_date})`;
+                    orderSelect.appendChild(option);
+                });
+            } else {
+                orderSelect.innerHTML = '<option value="">No orders found in date range</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching orders. Please try again.');
+            orderSelect.innerHTML = '<option value="">Error loading orders</option>';
+        })
+        .finally(() => {
+            fetchOrdersBtn.disabled = false;
+            fetchOrdersBtn.innerHTML = '<i class="fas fa-calendar-check me-2"></i>Get Orders';
+        });
+    });
+
+    // Auto-fetch orders if date range is pre-filled
+    if (startDate && endDate && startDate.value && endDate.value && searchByDate.checked) {
+        fetchOrdersBtn.click();
+    }
+});
 </script>
 
 {% endblock %}

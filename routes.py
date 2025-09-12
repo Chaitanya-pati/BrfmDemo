@@ -2406,6 +2406,53 @@ def packing_execution(order_id):
                          order=order,
                          storage_areas=storage_areas)
 
+@app.route('/api/orders_by_date_range', methods=['POST'])
+def orders_by_date_range():
+    """API endpoint to fetch orders within a date range for timeline search"""
+    try:
+        data = request.get_json()
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if not start_date or not end_date:
+            return jsonify({'error': 'Both start_date and end_date are required'}), 400
+        
+        # Convert string dates to datetime objects
+        from datetime import datetime, timedelta
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        # Add one day to end_date to include orders on the end date
+        end_dt = end_dt + timedelta(days=1)
+        
+        # Query orders within date range based on creation date
+        orders = ProductionOrder.query.filter(
+            ProductionOrder.created_at >= start_dt,
+            ProductionOrder.created_at < end_dt
+        ).order_by(ProductionOrder.created_at.desc()).all()
+        
+        # Format orders for JavaScript
+        orders_data = []
+        for order in orders:
+            orders_data.append({
+                'id': order.id,
+                'order_number': order.order_number,
+                'start_date': order.created_at.strftime('%Y-%m-%d'),
+                'quantity': order.quantity,
+                'finished_good_type': order.finished_good_type,
+                'status': order.status
+            })
+        
+        return jsonify({
+            'success': True,
+            'orders': orders_data
+        })
+        
+    except Exception as e:
+        import logging
+        logging.error(f"Error in orders_by_date_range: {e}")
+        return jsonify({'error': str(e)}), 400
+
 @app.route('/order_timeline', methods=['GET', 'POST'])
 def order_timeline():
     """Comprehensive order timeline tracking with search by Order ID"""
@@ -2413,25 +2460,42 @@ def order_timeline():
     timeline_data = {}
     
     if request.method == 'POST' or request.args.get('order_id'):
-        # Get order ID from form or URL parameter
-        order_id = request.form.get('order_id') or request.args.get('order_id')
+        search_type = request.form.get('search_type', 'id')
         
-        if order_id:
-            try:
-                # Find order by ID or order number
-                if order_id.isdigit():
-                    order = ProductionOrder.query.get(int(order_id))
-                else:
-                    order = ProductionOrder.query.filter_by(order_number=order_id).first()
+        try:
+            if search_type == 'date':
+                # Handle date range search
+                selected_order_id = request.form.get('selected_order_id', '').strip()
                 
-                if order:
-                    # Build comprehensive timeline data
-                    timeline_data = build_order_timeline(order)
+                if not selected_order_id:
+                    flash('Please select an order from the date range results', 'error')
                 else:
-                    flash(f'Order "{order_id}" not found', 'error')
+                    order = ProductionOrder.query.get(int(selected_order_id))
+                    if not order:
+                        flash('Selected order not found', 'error')
+                        
+            else:
+                # Handle direct order ID search
+                order_id = request.form.get('order_id') or request.args.get('order_id')
+                
+                if not order_id:
+                    flash('Please enter an Order ID or Order Number', 'error')
+                else:
+                    # Find order by ID or order number
+                    if order_id.isdigit():
+                        order = ProductionOrder.query.get(int(order_id))
+                    else:
+                        order = ProductionOrder.query.filter_by(order_number=order_id).first()
                     
-            except Exception as e:
-                flash(f'Error searching for order: {str(e)}', 'error')
+                    if not order:
+                        flash(f'Order "{order_id}" not found', 'error')
+            
+            if order:
+                # Build comprehensive timeline data
+                timeline_data = build_order_timeline(order)
+                    
+        except Exception as e:
+            flash(f'Error searching for order: {str(e)}', 'error')
     
     return render_template('order_timeline.html', 
                          order=order,
@@ -2593,17 +2657,20 @@ def build_order_timeline(order):
                     'timestamp': grinding.start_time or datetime.utcnow()
                 })
         
-        # 6. Packaging Records (with error handling)
+        # 6. Packaging Records (with correct field name: production_order_id)
         try:
-            packaging_records = PackagingRecord.query.filter_by(order_id=order.id).all()
+            packaging_records = PackagingRecord.query.filter_by(production_order_id=order.id).all()
             for record in packaging_records:
+                storage_area = StorageArea.query.get(record.storage_area_id) if record.storage_area_id else None
                 timeline['grinding']['packaging'].append({
-                    'product_name': getattr(record.product, 'name', 'Unknown') if record.product else 'Unknown',
+                    'product_name': record.product_name or 'Unknown',
                     'bag_weight_kg': record.bag_weight_kg or 0,
                     'bag_count': record.bag_count or 0,
                     'total_weight_kg': record.total_weight_kg or 0,
                     'operator_name': record.operator_name or 'Unknown',
-                    'storage_area': getattr(record.storage_area, 'name', 'Unknown') if record.storage_area else 'Unknown'
+                    'storage_area': storage_area.name if storage_area else 'Unknown',
+                    'packaging_time': record.packaging_time,
+                    'process_stage': record.process_stage or 'Unknown'
                 })
         except Exception as e:
             import logging
