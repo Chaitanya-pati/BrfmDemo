@@ -171,7 +171,7 @@
                         </div>
                         <div class="col-md-3">
                             <p class="mb-1"><strong>End Moisture:</strong></p>
-                            <p class="text-muted">{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.end_moisture) if timeline_data.cleaning_24h.process_data.end_moisture is not none else 'N/A' %}%</p>
+                            <p class="text-muted">{{ ("%.1f"|format(timeline_data.cleaning_24h.process_data.end_moisture)) if timeline_data.cleaning_24h.process_data.end_moisture is not none else 'N/A' }}%</p>
                         </div>
                     </div>
                     {% endif %}
@@ -289,7 +289,7 @@
                             <div class="card bg-light">
                                 <div class="card-body text-center">
                                     <h5 class="card-title">Outgoing Moisture</h5>
-                                    <h3 class="text-success">{{ "%.1f"|format(timeline_data.cleaning_12h.outgoing_moisture) if timeline_data.cleaning_12h.outgoing_moisture is not none else 'N/A' %}%</h3>
+                                    <h3 class="text-success">{{ ("%.1f"|format(timeline_data.cleaning_12h.outgoing_moisture)) if timeline_data.cleaning_12h.outgoing_moisture is not none else 'N/A' }}%</h3>
                                 </div>
                             </div>
                         </div>
