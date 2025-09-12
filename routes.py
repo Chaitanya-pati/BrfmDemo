@@ -1771,6 +1771,7 @@ def start_grinding(order_id):
                 order_id=order_id,
                 start_time=datetime.utcnow(),
                 status='grinding',
+                timer_active=True,  # Set timer as active
                 b1_scale_operator=b1_scale_operator,
                 b1_scale_handoff_time=datetime.utcnow(),
                 b1_scale_weight_kg=b1_scale_weight,
@@ -1855,10 +1856,10 @@ def get_grinding_timer_status(order_id):
     try:
         grinding_session = GrindingSession.query.filter_by(
             order_id=order_id, 
-            status='running'
+            status='grinding'
         ).first()
         
-        if not grinding_session:
+        if not grinding_session or not grinding_session.timer_active:
             return jsonify({'timer_active': False})
         
         current_time = datetime.utcnow()
@@ -2367,9 +2368,9 @@ def packing_execution(order_id):
                     bag_count = int(bag_counts[i])
                     total_weight = bag_weight * bag_count
                     
-                    # Create packaging record
+                    # Create packaging record linked to production order
                     packaging = PackagingRecord(
-                        grinding_session_id=None,  # Not linked to grinding session in this case
+                        production_order_id=order_id,  # Link to production order
                         product_name=product_names[i],
                         bag_weight_kg=bag_weight,
                         bag_count=bag_count,
