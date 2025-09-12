@@ -4,7 +4,7 @@ from flask import request, render_template, redirect, url_for, flash, jsonify, s
 from werkzeug.utils import secure_filename
 from app import app, db
 from models import *
-from utils import allowed_file, generate_order_number, notify_responsible_person, validate_plan_percentages
+from utils import allowed_file, generate_order_number, generate_job_id, notify_responsible_person, validate_plan_percentages
 import logging
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
@@ -317,7 +317,8 @@ def masters():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'Error adding {form_type}: {str(e)}', 'error')
+            error_type = form_type if 'form_type' in locals() else 'item'
+            flash(f'Error adding {error_type}: {str(e)}', 'error')
     
     suppliers = Supplier.query.all()
     customers = Customer.query.all()
