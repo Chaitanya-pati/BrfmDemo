@@ -719,16 +719,14 @@ def start_cleaning_process():
         
         cleaning_process = CleaningProcess(
             order_id=order_id,
+            job_id=None,  # Set to None for production orders
             cleaning_bin_id=cleaning_bin_id,
             process_type=process_type,
             duration_hours=duration_hours,
             start_time=start_time,
             end_time=end_time,
             operator_name=operator_name,
-            status='running',
-            timer_active=True,
-            countdown_start=start_time,
-            countdown_end=end_time
+            status='running'
         )
         
         db.session.add(cleaning_process)
@@ -789,7 +787,7 @@ def start_cleaning_process():
 def cleaning_timer_status(order_id):
     """Get current timer status for cleaning process"""
     try:
-        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, timer_active=True).first()
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, status='running').first()
         
         if not cleaning_process:
             return jsonify({'timer_active': False})
@@ -797,24 +795,24 @@ def cleaning_timer_status(order_id):
         current_time = datetime.utcnow()
         
         # Check if timer has completed
-        if current_time >= cleaning_process.countdown_end:
+        if current_time >= cleaning_process.end_time:
             return jsonify({
                 'timer_active': False,
                 'completed': True,
                 'can_proceed': True,
-                'end_time': cleaning_process.countdown_end.isoformat()
+                'end_time': cleaning_process.end_time.isoformat()
             })
         
         # Calculate remaining time
-        remaining_seconds = (cleaning_process.countdown_end - current_time).total_seconds()
+        remaining_seconds = (cleaning_process.end_time - current_time).total_seconds()
         
         return jsonify({
             'timer_active': True,
             'completed': False,
             'can_proceed': False,
             'process_type': cleaning_process.process_type,
-            'start_time': cleaning_process.countdown_start.isoformat(),
-            'end_time': cleaning_process.countdown_end.isoformat(),
+            'start_time': cleaning_process.start_time.isoformat(),
+            'end_time': cleaning_process.end_time.isoformat(),
             'remaining_seconds': int(remaining_seconds),
             'duration_hours': cleaning_process.duration_hours
         })
@@ -848,7 +846,7 @@ def send_cleaning_reminder(reminder_id):
             cleaning_process = reminder.cleaning_process
             current_time = datetime.utcnow()
             
-            if current_time >= cleaning_process.countdown_end:
+            if current_time >= cleaning_process.end_time:
                 logging.info(f"Cleaning process {cleaning_process.id} already completed, skipping reminder")
                 return False
             
@@ -1157,7 +1155,7 @@ def submit_post_process_data():
         
         # Check if timer is completed
         current_time = datetime.utcnow()
-        if current_time < cleaning_process.countdown_end:
+        if current_time < cleaning_process.end_time:
             return jsonify({'error': 'Cannot submit data until cleaning process is complete'}), 400
         
         # Get machine name
@@ -1385,7 +1383,7 @@ def get_12h_timer_status(order_id):
         cleaning_process = CleaningProcess.query.filter_by(
             order_id=order_id, 
             process_type='12_hour',
-            timer_active=True
+            status='running'
         ).first()
         
         if not cleaning_process:
@@ -1394,17 +1392,17 @@ def get_12h_timer_status(order_id):
         current_time = datetime.utcnow()
         
         # Check if timer has completed
-        if current_time >= cleaning_process.countdown_end:
+        if current_time >= cleaning_process.end_time:
             return jsonify({
                 'timer_active': False,
                 'completed': True,
                 'can_proceed': True,
-                'end_time': cleaning_process.countdown_end.isoformat()
+                'end_time': cleaning_process.end_time.isoformat()
             })
         
         # Calculate remaining time
-        remaining_seconds = (cleaning_process.countdown_end - current_time).total_seconds()
-        elapsed_seconds = (current_time - cleaning_process.countdown_start).total_seconds()
+        remaining_seconds = (cleaning_process.end_time - current_time).total_seconds()
+        elapsed_seconds = (current_time - cleaning_process.start_time).total_seconds()
         
         # Check for pre-end reminders (configurable offsets)
         reminder_offsets = [300, 600, 1800]  # 5min, 10min, 30min before end
@@ -1421,8 +1419,8 @@ def get_12h_timer_status(order_id):
             'completed': False,
             'can_proceed': False,
             'process_type': cleaning_process.process_type,
-            'start_time': cleaning_process.countdown_start.isoformat(),
-            'end_time': cleaning_process.countdown_end.isoformat(),
+            'start_time': cleaning_process.start_time.isoformat(),
+            'end_time': cleaning_process.end_time.isoformat(),
             'remaining_seconds': int(remaining_seconds),
             'elapsed_seconds': int(elapsed_seconds),
             'duration_hours': cleaning_process.duration_hours,
@@ -1471,11 +1469,11 @@ def submit_12h_completion():
         
         # Check if timer is completed - allow completion if timer has finished OR if manually triggered
         current_time = datetime.utcnow()
-        timer_completed = current_time >= cleaning_process.countdown_end
+        timer_completed = current_time >= cleaning_process.end_time
         
         # Allow completion if timer is done OR if this is a manual completion
         if not timer_completed and not data.get('force_completion', False):
-            remaining_minutes = (cleaning_process.countdown_end - current_time).total_seconds() / 60
+            remaining_minutes = (cleaning_process.end_time - current_time).total_seconds() / 60
             return jsonify({
                 'error': f'Timer not completed yet. {remaining_minutes:.1f} minutes remaining. Please wait or contact supervisor.',
                 'remaining_minutes': remaining_minutes
@@ -1591,7 +1589,7 @@ def upload_12h_cleaning_photo():
 def get_pending_reminders(order_id):
     """Get pending reminders for a cleaning process - improved version"""
     try:
-        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, timer_active=True).first()
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, status='running').first()
         
         if not cleaning_process:
             return jsonify({'has_pending': False})
@@ -1631,7 +1629,7 @@ def get_pending_reminders(order_id):
 def trigger_manual_reminders(order_id):
     """Manually trigger cleaning reminders for testing"""
     try:
-        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, timer_active=True).first()
+        cleaning_process = CleaningProcess.query.filter_by(order_id=order_id, status='running').first()
         
         if not cleaning_process:
             return jsonify({'error': 'No active cleaning process found'}), 404
@@ -1771,15 +1769,14 @@ def start_grinding(order_id):
             grinding_session = GrindingSession(
                 order_id=order_id,
                 start_time=datetime.utcnow(),
-                timer_active=True,
+                status='grinding',
                 b1_scale_operator=b1_scale_operator,
                 b1_scale_handoff_time=datetime.utcnow(),
                 b1_scale_weight_kg=b1_scale_weight,
                 b1_scale_notes=b1_scale_notes,
                 grinding_machine_name=grinding_machine,
                 grinding_operator=grinding_operator,
-                total_input_kg=b1_scale_weight,
-                status='grinding'
+                total_input_kg=b1_scale_weight
             )
             
             db.session.add(grinding_session)
@@ -1857,7 +1854,7 @@ def get_grinding_timer_status(order_id):
     try:
         grinding_session = GrindingSession.query.filter_by(
             order_id=order_id, 
-            timer_active=True
+            status='running'
         ).first()
         
         if not grinding_session:
