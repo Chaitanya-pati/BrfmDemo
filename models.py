@@ -748,8 +748,9 @@ class CleaningReminderPhoto(db.Model):
 class ManualCleaningLog(db.Model):
     """Track manual cleaning activities with before/after photos and timing"""
     id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('production_order.id'), nullable=True)
     cleaning_process_id = db.Column(db.Integer, db.ForeignKey('cleaning_process.id'), nullable=True)
+    precleaning_process_id = db.Column(db.Integer, db.ForeignKey('precleaning_process.id'), nullable=True)
     machine_name = db.Column(db.String(100), nullable=False, default='Manual Cleaning Machine')
     operator_name = db.Column(db.String(100), nullable=False)
     cleaning_start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -764,3 +765,41 @@ class ManualCleaningLog(db.Model):
     # Relationships
     production_order = db.relationship('ProductionOrder', backref='manual_cleanings')
     cleaning_process = db.relationship('CleaningProcess', backref='manual_cleaning_logs')
+    precleaning_process = db.relationship('PrecleaningProcess', backref='manual_cleaning_logs')
+
+class PrecleaningProcess(db.Model):
+    """Timer-based precleaning process with manual cleaning reminders"""
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_id = db.Column(db.Integer, db.ForeignKey('transfer.id'), nullable=False)
+    from_godown_id = db.Column(db.Integer, db.ForeignKey('godown.id'), nullable=False)
+    to_precleaning_bin_id = db.Column(db.Integer, db.ForeignKey('precleaning_bin.id'), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    operator = db.Column(db.String(100), nullable=False)
+    start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime)
+    duration_seconds = db.Column(db.Integer)
+    timer_active = db.Column(db.Boolean, default=False)
+    status = db.Column(db.String(20), default='preparing')  # preparing, running, completed
+    notes = db.Column(db.Text)
+    evidence_photo = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    transfer = db.relationship('Transfer', backref='precleaning_process')
+    from_godown = db.relationship('Godown', foreign_keys=[from_godown_id])
+    to_precleaning_bin = db.relationship('PrecleaningBin', foreign_keys=[to_precleaning_bin_id])
+
+class PrecleaningReminder(db.Model):
+    """30-second reminders for manual cleaning during precleaning process"""
+    id = db.Column(db.Integer, primary_key=True)
+    precleaning_process_id = db.Column(db.Integer, db.ForeignKey('precleaning_process.id'), nullable=False)
+    due_time = db.Column(db.DateTime, nullable=False)
+    reminder_sent = db.Column(db.Boolean, default=False)
+    user_notified = db.Column(db.String(100))
+    completed = db.Column(db.Boolean, default=False)
+    reminder_sequence = db.Column(db.Integer, default=1)  # 1, 2, 3... for multiple reminders
+    photo_uploaded = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationship
+    precleaning_process = db.relationship('PrecleaningProcess', backref='precleaning_reminders')

@@ -171,47 +171,67 @@ def weight_entry():
 def precleaning():
     if request.method == 'POST':
         try:
-            # Handle transfer photos
-            transfer_photo = None
+            action = request.form.get('action', 'start_process')
             
-            if 'transfer_photo' in request.files:
-                file = request.files['transfer_photo']
-                if file and file.filename and file.filename != '' and allowed_file(file.filename):
-                    filename = secure_filename(file.filename)
-                    filename = f"transfer_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
-                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                    transfer_photo = filename
-            
-            transfer = Transfer()
-            transfer.from_godown_id = int(request.form['from_godown_id'])
-            transfer.to_precleaning_bin_id = int(request.form['to_precleaning_bin_id'])
-            transfer.quantity = float(request.form['quantity'])
-            transfer.transfer_type = 'godown_to_precleaning'
-            transfer.operator = request.form['operator']
-            transfer.notes = request.form.get('notes')
-            transfer.evidence_photo = transfer_photo
-            
-            # Update stocks
-            from_godown = Godown.query.get(transfer.from_godown_id)
-            to_bin = PrecleaningBin.query.get(transfer.to_precleaning_bin_id)
-            
-            if from_godown and to_bin:
-                from_godown.current_stock -= transfer.quantity
-                to_bin.current_stock += transfer.quantity
-            
-            db.session.add(transfer)
-            db.session.commit()
-            flash('Transfer completed successfully!', 'success')
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error processing transfer: {str(e)}', 'error')
+            if action == 'start_process':
+                # Handle transfer photos
+                transfer_photo = None
+                
+                if 'evidence_photo' in request.files:
+                    file = request.files['evidence_photo']
+                    if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        filename = f"precleaning_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        transfer_photo = filename
+                
+                # Create transfer record
+                transfer = Transfer()
+                transfer.from_godown_id = int(request.form['from_godown_id'])
+                transfer.to_precleaning_bin_id = int(request.form['to_precleaning_bin_id'])
+                transfer.quantity = float(request.form['quantity'])
+                transfer.transfer_type = 'godown_to_precleaning'
+                transfer.operator = request.form['operator']
+                transfer.notes = request.form.get('notes')
+                transfer.evidence_photo = transfer_photo
+                
+                db.session.add(transfer)
+                db.session.flush()  # Get transfer ID
+                
+                # Create precleaning process with timer
+                precleaning_process = PrecleaningProcess()
+                precleaning_process.transfer_id = transfer.id
+                precleaning_process.from_godown_id = transfer.from_godown_id
+                precleaning_process.to_precleaning_bin_id = transfer.to_precleaning_bin_id
+                precleaning_process.quantity = transfer.quantity
+                precleaning_process.operator = transfer.operator
+                precleaning_process.start_time = datetime.utcnow()
+                precleaning_process.timer_active = True
+                precleaning_process.status = 'running'
+                precleaning_process.notes = transfer.notes
+                precleaning_process.evidence_photo = transfer_photo
+                
+                db.session.add(precleaning_process)
+                db.session.commit()
+                
+                flash('Precleaning process started successfully! Timer is now running.', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error starting precleaning process: {str(e)}', 'error')
     
     godowns = Godown.query.filter(Godown.current_stock > 0).all()
     precleaning_bins = PrecleaningBin.query.all()
     recent_transfers = Transfer.query.filter_by(transfer_type='godown_to_precleaning').order_by(Transfer.transfer_time.desc()).limit(10).all()
     
-    return render_template('precleaning.html', godowns=godowns, precleaning_bins=precleaning_bins, recent_transfers=recent_transfers)
+    # Get active precleaning processes
+    active_processes = PrecleaningProcess.query.filter_by(status='running').all()
+    
+    return render_template('precleaning.html', 
+                         godowns=godowns, 
+                         precleaning_bins=precleaning_bins, 
+                         transfers=recent_transfers,
+                         active_processes=active_processes)
 
 @app.route('/godown_management')
 def godown_management():
@@ -1659,6 +1679,202 @@ def trigger_manual_reminders(order_id):
     except Exception as e:
         db.session.rollback()
         logging.error(f"Error triggering manual reminder: {e}")
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/precleaning_timer_status/<int:process_id>')
+def get_precleaning_timer_status(process_id):
+    """Get current timer status for precleaning process"""
+    try:
+        precleaning_process = PrecleaningProcess.query.filter_by(
+            id=process_id, 
+            status='running'
+        ).first()
+        
+        if not precleaning_process or not precleaning_process.timer_active:
+            return jsonify({'timer_active': False})
+        
+        current_time = datetime.utcnow()
+        elapsed_seconds = int((current_time - precleaning_process.start_time).total_seconds())
+        
+        # Manual cleaning reminder every 30 seconds
+        needs_manual_cleaning = (elapsed_seconds % 30 == 0) and elapsed_seconds > 0
+        
+        return jsonify({
+            'timer_active': True,
+            'start_time': precleaning_process.start_time.isoformat(),
+            'elapsed_seconds': elapsed_seconds,
+            'quantity': precleaning_process.quantity,
+            'operator': precleaning_process.operator,
+            'needs_manual_cleaning': needs_manual_cleaning,
+            'process_id': precleaning_process.id
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/stop_precleaning/<int:process_id>', methods=['POST'])
+def stop_precleaning(process_id):
+    """Stop precleaning timer and finalize process"""
+    try:
+        precleaning_process = PrecleaningProcess.query.get_or_404(process_id)
+        
+        if not precleaning_process.timer_active:
+            return jsonify({'error': 'Timer is not active'}), 400
+        
+        # Stop timer and calculate duration
+        end_time = datetime.utcnow()
+        duration_seconds = int((end_time - precleaning_process.start_time).total_seconds())
+        
+        precleaning_process.end_time = end_time
+        precleaning_process.duration_seconds = duration_seconds
+        precleaning_process.timer_active = False
+        precleaning_process.status = 'completed'
+        
+        # Update godown and bin stocks
+        from_godown = Godown.query.get(precleaning_process.from_godown_id)
+        to_bin = PrecleaningBin.query.get(precleaning_process.to_precleaning_bin_id)
+        
+        if from_godown and to_bin:
+            from_godown.current_stock -= precleaning_process.quantity
+            to_bin.current_stock += precleaning_process.quantity
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'duration_seconds': duration_seconds,
+            'end_time': end_time.isoformat(),
+            'message': 'Precleaning process completed successfully!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/upload_precleaning_cleaning_photo', methods=['POST'])
+def upload_precleaning_cleaning_photo():
+    """Upload manual cleaning photos during precleaning (every 30 seconds)"""
+    try:
+        process_id = request.form.get('process_id')
+        photo_type = request.form.get('photo_type')  # 'before', 'after'
+        operator_name = request.form.get('operator_name', 'Operator')
+        notes = request.form.get('notes', '')
+        
+        if not process_id or not photo_type:
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Check if file was uploaded
+        if 'photo_file' not in request.files:
+            return jsonify({'error': 'No photo file uploaded'}), 400
+        
+        file = request.files['photo_file']
+        if file.filename == '' or not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid photo file'}), 400
+        
+        # Save the file
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"precleaning_{photo_type}_{timestamp}_{filename}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        
+        # Create or update manual cleaning log
+        precleaning_cleaning = ManualCleaningLog(
+            precleaning_process_id=int(process_id),
+            machine_name='Precleaning Equipment',
+            operator_name=operator_name,
+            notes=notes,
+            status='completed'
+        )
+        
+        # Set appropriate photo field
+        if photo_type == 'before':
+            precleaning_cleaning.before_photo = filename
+        else:
+            precleaning_cleaning.after_photo = filename
+        
+        db.session.add(precleaning_cleaning)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'upload_time': datetime.utcnow().isoformat(),
+            'message': f'{photo_type.title()} photo uploaded successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/get_precleaning_pending_reminders/<int:process_id>')
+def get_precleaning_pending_reminders(process_id):
+    """Get pending reminders for a precleaning process"""
+    try:
+        precleaning_process = PrecleaningProcess.query.filter_by(id=process_id, status='running').first()
+        
+        if not precleaning_process:
+            return jsonify({'has_pending': False})
+        
+        current_time = datetime.utcnow()
+        
+        # Calculate elapsed seconds since process started
+        elapsed_seconds = (current_time - precleaning_process.start_time).total_seconds()
+        current_interval = int(elapsed_seconds // 30)  # 30-second intervals
+        
+        # Only show reminder every 30 seconds during active process
+        if current_interval > 0 and elapsed_seconds >= (current_interval * 30):
+            return jsonify({
+                'has_pending': True,
+                'reminder': {
+                    'id': f'interval_{current_interval}',
+                    'process_id': process_id,
+                    'sequence': current_interval,
+                    'due_time': current_time.isoformat(),
+                    'message': f'Manual cleaning required - 30-second interval #{current_interval}',
+                    'process_type': 'precleaning'
+                },
+                'elapsed_seconds': int(elapsed_seconds),
+                'show_popup': True
+            })
+        
+        return jsonify({
+            'has_pending': False,
+            'elapsed_seconds': int(elapsed_seconds)
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting precleaning pending reminders: {e}")
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/get_precleaning_manual_cleanings/<int:process_id>')
+def get_precleaning_manual_cleanings(process_id):
+    """Get manual cleaning logs for a precleaning process"""
+    try:
+        manual_cleanings = ManualCleaningLog.query.filter_by(
+            precleaning_process_id=process_id
+        ).order_by(ManualCleaningLog.cleaning_start_time.desc()).all()
+        
+        cleaning_data = []
+        for cleaning in manual_cleanings:
+            cleaning_data.append({
+                'id': cleaning.id,
+                'machine_name': cleaning.machine_name,
+                'operator_name': cleaning.operator_name,
+                'cleaning_time': cleaning.cleaning_start_time.isoformat(),
+                'duration_minutes': cleaning.duration_minutes,
+                'before_photo': cleaning.before_photo,
+                'after_photo': cleaning.after_photo,
+                'notes': cleaning.notes,
+                'status': cleaning.status
+            })
+        
+        return jsonify({
+            'manual_cleanings': cleaning_data,
+            'total_manual_cleanings': len(cleaning_data)
+        })
+        
+    except Exception as e:
         return jsonify({'error': str(e)}), 400
 
 @app.route('/upload_reminder_photos', methods=['POST'])
