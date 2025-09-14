@@ -216,9 +216,9 @@ def precleaning():
                 
                 flash('Precleaning process started successfully! Timer is now running.', 'success')
                 
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Error starting precleaning process: {str(e)}', 'error')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error starting precleaning process: {str(e)}', 'error')
     
     godowns = Godown.query.filter(Godown.current_stock > 0).all()
     precleaning_bins = PrecleaningBin.query.all()
