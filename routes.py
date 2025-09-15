@@ -173,7 +173,7 @@ def precleaning():
         try:
             action = request.form.get('action', 'start_process')
             
-            if action == 'start_process':
+            if action == 'create_transfer':
                 # Handle transfer photos
                 transfer_photo = None
                 
@@ -185,7 +185,7 @@ def precleaning():
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         transfer_photo = filename
                 
-                # Create transfer record
+                # Create transfer record only (no timer yet)
                 transfer = Transfer()
                 transfer.from_godown_id = int(request.form['from_godown_id'])
                 transfer.to_precleaning_bin_id = int(request.form['to_precleaning_bin_id'])
@@ -196,25 +196,9 @@ def precleaning():
                 transfer.evidence_photo = transfer_photo
                 
                 db.session.add(transfer)
-                db.session.flush()  # Get transfer ID
-                
-                # Create precleaning process with timer
-                precleaning_process = PrecleaningProcess()
-                precleaning_process.transfer_id = transfer.id
-                precleaning_process.from_godown_id = transfer.from_godown_id
-                precleaning_process.to_precleaning_bin_id = transfer.to_precleaning_bin_id
-                precleaning_process.quantity = transfer.quantity
-                precleaning_process.operator = transfer.operator
-                precleaning_process.start_time = datetime.utcnow()
-                precleaning_process.timer_active = True
-                precleaning_process.status = 'running'
-                precleaning_process.notes = transfer.notes
-                precleaning_process.evidence_photo = transfer_photo
-                
-                db.session.add(precleaning_process)
                 db.session.commit()
                 
-                flash('Precleaning process started successfully! Timer is now running.', 'success')
+                flash('Transfer record created. Use Start Transfer button to begin the precleaning process.', 'success')
                 
         except Exception as e:
             db.session.rollback()
@@ -227,11 +211,21 @@ def precleaning():
     # Get active precleaning processes
     active_processes = PrecleaningProcess.query.filter_by(status='running').all()
     
+    # Get recent transfers that don't have precleaning processes yet
+    pending_transfers = Transfer.query.filter_by(transfer_type='godown_to_precleaning').filter(
+        ~Transfer.id.in_(
+            db.session.query(PrecleaningProcess.transfer_id).filter(
+                PrecleaningProcess.transfer_id.isnot(None)
+            )
+        )
+    ).order_by(Transfer.transfer_time.desc()).limit(5).all()
+    
     return render_template('precleaning.html', 
                          godowns=godowns, 
                          precleaning_bins=precleaning_bins, 
                          transfers=recent_transfers,
-                         active_processes=active_processes)
+                         active_processes=active_processes,
+                         pending_transfers=pending_transfers)
 
 @app.route('/godown_management')
 def godown_management():
@@ -1712,6 +1706,48 @@ def get_precleaning_timer_status(process_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@app.route('/start_precleaning_timer/<int:transfer_id>', methods=['POST'])
+def start_precleaning_timer(transfer_id):
+    """Start timer for a transfer that has been created"""
+    try:
+        transfer = Transfer.query.get_or_404(transfer_id)
+        
+        # Check if there's already an active precleaning process for this transfer
+        existing_process = PrecleaningProcess.query.filter_by(transfer_id=transfer_id).first()
+        if existing_process:
+            return jsonify({'error': 'Timer already exists for this transfer'}), 400
+        
+        # Check if there's already an active precleaning process running
+        active_process = PrecleaningProcess.query.filter_by(status='running').first()
+        if active_process:
+            return jsonify({'error': 'Another precleaning process is already running. Please stop it first.'}), 400
+        
+        # Create precleaning process with timer
+        precleaning_process = PrecleaningProcess()
+        precleaning_process.transfer_id = transfer.id
+        precleaning_process.from_godown_id = transfer.from_godown_id
+        precleaning_process.to_precleaning_bin_id = transfer.to_precleaning_bin_id
+        precleaning_process.quantity = transfer.quantity
+        precleaning_process.operator = transfer.operator
+        precleaning_process.start_time = datetime.utcnow()
+        precleaning_process.timer_active = True
+        precleaning_process.status = 'running'
+        precleaning_process.notes = transfer.notes
+        precleaning_process.evidence_photo = transfer.evidence_photo
+        
+        db.session.add(precleaning_process)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'process_id': precleaning_process.id,
+            'message': 'Precleaning timer started successfully!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
 @app.route('/stop_precleaning/<int:process_id>', methods=['POST'])
 def stop_precleaning(process_id):
     """Stop precleaning timer and finalize process"""
@@ -1729,12 +1765,13 @@ def stop_precleaning(process_id):
         precleaning_process.timer_active = False
         precleaning_process.status = 'completed'
         
-        # Update godown and bin stocks only if not already updated
-        if precleaning_process.status != 'completed':
-            from_godown = Godown.query.get(precleaning_process.from_godown_id)
-            to_bin = PrecleaningBin.query.get(precleaning_process.to_precleaning_bin_id)
-            
-            if from_godown and to_bin:
+        # Update godown and bin stocks when process is completed
+        from_godown = Godown.query.get(precleaning_process.from_godown_id)
+        to_bin = PrecleaningBin.query.get(precleaning_process.to_precleaning_bin_id)
+        
+        if from_godown and to_bin:
+            # Only transfer if not already transferred
+            if from_godown.current_stock >= precleaning_process.quantity:
                 from_godown.current_stock -= precleaning_process.quantity
                 to_bin.current_stock += precleaning_process.quantity
         

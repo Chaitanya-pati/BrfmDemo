@@ -63,9 +63,9 @@
                         <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
                     </div>
                     
-                    <input type="hidden" name="action" value="start_process">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-play me-2"></i>Start Precleaning Process
+                    <input type="hidden" name="action" value="create_transfer">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-plus me-2"></i>Create Transfer Record
                     </button>
                 </form>
             </div>
@@ -73,7 +73,51 @@
     </div>
     
     <div class="col-lg-6">
+        <!-- Pending Transfers (Ready to Start) -->
         <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Pending Transfers (Ready to Start)</h5>
+            </div>
+            <div class="card-body">
+                {% if pending_transfers %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Qty (kg)</th>
+                                    <th>Operator</th>
+                                    <th>Time</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transfer in pending_transfers %}
+                                <tr>
+                                    <td>{{ transfer.from_godown.name if transfer.from_godown else '-' }}</td>
+                                    <td>{{ transfer.to_precleaning_bin.name if transfer.to_precleaning_bin else '-' }}</td>
+                                    <td>{{ "%.1f"|format(transfer.quantity) }}</td>
+                                    <td>{{ transfer.operator }}</td>
+                                    <td>{{ transfer.transfer_time.strftime('%m/%d %H:%M') }}</td>
+                                    <td>
+                                        <button class="btn btn-warning btn-sm" onclick="startPrecleaningTimer({{ transfer.id }})">
+                                            <i class="fas fa-play me-1"></i>Start Transfer
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No pending transfers. Create a transfer record first.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Recent Completed Transfers -->
+        <div class="card mt-3">
             <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Transfers</h5>
             </div>
@@ -497,8 +541,33 @@ function openPrecleaningManualCleaningFromReminder() {
     openPrecleaningManualCleaning(currentPrecleaningProcessId);
 }
 
+function startPrecleaningTimer(transferId) {
+    if (confirm('Start precleaning timer for this transfer?')) {
+        fetch(`/start_precleaning_timer/${transferId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                // Reload page to show the active process
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error starting timer:', error);
+            alert('Error starting timer');
+        });
+    }
+}
+
 function stopPrecleaningProcess(processId) {
-    if (confirm('Are you sure you want to stop this precleaning process?')) {
+    if (confirm('Are you sure you want to stop this precleaning process? This will complete the inventory transfer.')) {
         // Clear timers immediately to prevent continued updates
         if (precleaningTimers[processId]) {
             clearInterval(precleaningTimers[processId]);
