@@ -1717,10 +1717,27 @@ def start_precleaning_timer(transfer_id):
         if existing_process:
             return jsonify({'error': 'Timer already exists for this transfer'}), 400
         
-        # Check if there's already an active precleaning process running
+        # Clean up any stuck processes first (processes running for more than 4 hours)
+        from datetime import datetime, timedelta
+        stuck_cutoff = datetime.utcnow() - timedelta(hours=4)
+        stuck_processes = PrecleaningProcess.query.filter(
+            PrecleaningProcess.status == 'running',
+            PrecleaningProcess.start_time < stuck_cutoff
+        ).all()
+        
+        for stuck_process in stuck_processes:
+            stuck_process.status = 'completed'
+            stuck_process.timer_active = False
+            stuck_process.end_time = datetime.utcnow()
+        
+        if stuck_processes:
+            db.session.commit()
+            print(f"Cleaned up {len(stuck_processes)} stuck precleaning processes")
+        
+        # Check if there's already an active precleaning process running (after cleanup)
         active_process = PrecleaningProcess.query.filter_by(status='running').first()
         if active_process:
-            return jsonify({'error': 'Another precleaning process is already running. Please stop it first.'}), 400
+            return jsonify({'error': f'Another precleaning process #{active_process.id} is already running. Please stop it first or wait for it to complete.'}), 400
         
         # Create precleaning process with timer
         precleaning_process = PrecleaningProcess()
@@ -1913,6 +1930,66 @@ def get_precleaning_manual_cleanings(process_id):
         })
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/cleanup_stuck_precleaning_processes', methods=['POST'])
+def cleanup_stuck_precleaning_processes():
+    """Cleanup stuck precleaning processes that have been running too long"""
+    try:
+        from datetime import datetime, timedelta
+        
+        # Consider processes stuck if running for more than 4 hours
+        stuck_cutoff = datetime.utcnow() - timedelta(hours=4)
+        
+        stuck_processes = PrecleaningProcess.query.filter(
+            PrecleaningProcess.status == 'running',
+            PrecleaningProcess.start_time < stuck_cutoff
+        ).all()
+        
+        cleaned_count = 0
+        for process in stuck_processes:
+            process.status = 'completed'
+            process.timer_active = False
+            process.end_time = datetime.utcnow()
+            process.duration_seconds = int((process.end_time - process.start_time).total_seconds())
+            cleaned_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'cleaned_processes': cleaned_count,
+            'message': f'Successfully cleaned up {cleaned_count} stuck precleaning processes'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/force_stop_all_precleaning', methods=['POST'])
+def force_stop_all_precleaning():
+    """Force stop all running precleaning processes (emergency cleanup)"""
+    try:
+        running_processes = PrecleaningProcess.query.filter_by(status='running').all()
+        
+        stopped_count = 0
+        for process in running_processes:
+            process.status = 'completed'
+            process.timer_active = False
+            process.end_time = datetime.utcnow()
+            process.duration_seconds = int((process.end_time - process.start_time).total_seconds())
+            stopped_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'stopped_processes': stopped_count,
+            'message': f'Force stopped {stopped_count} running precleaning processes'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
 @app.route('/upload_reminder_photos', methods=['POST'])

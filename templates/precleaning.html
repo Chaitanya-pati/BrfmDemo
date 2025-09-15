@@ -5,7 +5,17 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <h1 class="mb-4"><i class="fas fa-filter me-2"></i>Pre-cleaning Process</h1>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="mb-0"><i class="fas fa-filter me-2"></i>Pre-cleaning Process</h1>
+            <div>
+                <button class="btn btn-warning btn-sm me-2" onclick="cleanupStuckProcesses()">
+                    <i class="fas fa-broom me-1"></i>Cleanup Stuck Processes
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="forceStopAllProcesses()">
+                    <i class="fas fa-stop me-1"></i>Force Stop All
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -697,5 +707,53 @@ function loadPrecleaningManualCleanings(processId) {
 {% for process in active_processes %}
 loadPrecleaningManualCleanings({{ process.id }});
 {% endfor %}
+
+function cleanupStuckProcesses() {
+    if (confirm('This will cleanup precleaning processes that have been running for more than 4 hours. Continue?')) {
+        fetch('/cleanup_stuck_precleaning_processes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error cleaning up processes');
+        });
+    }
+}
+
+function forceStopAllProcesses() {
+    if (confirm('⚠️ WARNING: This will force stop ALL running precleaning processes. This should only be used in emergencies. Continue?')) {
+        fetch('/force_stop_all_precleaning', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error force stopping processes');
+        });
+    }
+}
 </script>
 {% endblock %}
