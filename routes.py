@@ -1698,13 +1698,22 @@ def trigger_manual_reminders(order_id):
 def get_precleaning_timer_status(process_id):
     """Get current timer status for precleaning process"""
     try:
-        precleaning_process = PrecleaningProcess.query.filter_by(
-            id=process_id, 
-            status='running'
-        ).first()
+        precleaning_process = PrecleaningProcess.query.get(process_id)
         
-        if not precleaning_process or not precleaning_process.timer_active:
-            return jsonify({'timer_active': False})
+        # Return immediately if process doesn't exist or is completed
+        if not precleaning_process:
+            return jsonify({'timer_active': False, 'error': 'Process not found'})
+        
+        if precleaning_process.status == 'completed':
+            return jsonify({
+                'timer_active': False, 
+                'status': 'completed',
+                'message': 'Process completed'
+            })
+        
+        # Only return active status for running processes with active timers
+        if precleaning_process.status != 'running' or not precleaning_process.timer_active:
+            return jsonify({'timer_active': False, 'status': precleaning_process.status})
         
         current_time = datetime.utcnow()
         elapsed_seconds = int((current_time - precleaning_process.start_time).total_seconds())
@@ -1714,6 +1723,7 @@ def get_precleaning_timer_status(process_id):
         
         return jsonify({
             'timer_active': True,
+            'status': 'running',
             'start_time': precleaning_process.start_time.isoformat(),
             'elapsed_seconds': elapsed_seconds,
             'quantity': precleaning_process.quantity,
@@ -1736,11 +1746,20 @@ def stop_precleaning(process_id):
     try:
         precleaning_process = PrecleaningProcess.query.get_or_404(process_id)
         
+        # Check if already completed to prevent duplicate processing
+        if precleaning_process.status == 'completed':
+            return jsonify({
+                'success': True,
+                'process_completed': True,
+                'message': 'Process already completed!',
+                'timer_active': False
+            })
+        
         # Stop timer and calculate duration
         end_time = datetime.utcnow()
         duration_seconds = int((end_time - precleaning_process.start_time).total_seconds())
         
-        # Complete the process
+        # Complete the process with finalized status
         precleaning_process.end_time = end_time
         precleaning_process.duration_seconds = duration_seconds
         precleaning_process.timer_active = False
@@ -1770,6 +1789,7 @@ def stop_precleaning(process_id):
             'end_time': end_time.isoformat(),
             'timer_active': False,
             'process_completed': True,
+            'status': 'completed',
             'message': 'Precleaning process completed successfully!'
         })
         

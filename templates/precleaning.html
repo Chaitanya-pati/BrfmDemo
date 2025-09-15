@@ -389,6 +389,12 @@ startPrecleaningTimer({{ process.id }});
 {% endfor %}
 
 function startPrecleaningTimer(processId) {
+    // Check if process card still exists and is visible
+    const processCard = document.getElementById(`process-card-${processId}`);
+    if (!processCard || processCard.style.display === 'none') {
+        return; // Don't start timer for hidden/removed processes
+    }
+    
     // Clear any existing timer first
     if (precleaningTimers[processId]) {
         clearInterval(precleaningTimers[processId]);
@@ -396,6 +402,14 @@ function startPrecleaningTimer(processId) {
     }
     
     precleaningTimers[processId] = setInterval(() => {
+        // Double-check process card still exists before making API call
+        const currentProcessCard = document.getElementById(`process-card-${processId}`);
+        if (!currentProcessCard || currentProcessCard.style.display === 'none') {
+            clearInterval(precleaningTimers[processId]);
+            delete precleaningTimers[processId];
+            return;
+        }
+        
         fetch(`/api/precleaning_timer_status/${processId}`)
             .then(response => response.json())
             .then(data => {
@@ -416,10 +430,11 @@ function startPrecleaningTimer(processId) {
                         delete precleaningReminderIntervals[processId];
                     }
                     
-                    // Hide the process card
+                    // Hide and remove the process card
                     const processCard = document.getElementById(`process-card-${processId}`);
                     if (processCard) {
                         processCard.style.display = 'none';
+                        processCard.remove();
                     }
                 }
             })
@@ -526,6 +541,13 @@ function stopPrecleaningProcess(processId) {
             currentPrecleaningProcessId = null;
         }
         
+        // Immediately hide the process card to prevent it from reappearing
+        const processCard = document.getElementById(`process-card-${processId}`);
+        if (processCard) {
+            processCard.style.display = 'none';
+            processCard.remove(); // Completely remove from DOM
+        }
+        
         fetch(`/stop_precleaning/${processId}`, {
             method: 'POST',
             headers: {
@@ -535,14 +557,6 @@ function stopPrecleaningProcess(processId) {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.process_completed) {
-                alert(data.message);
-                
-                // Hide the process card immediately
-                const processCard = document.getElementById(`process-card-${processId}`);
-                if (processCard) {
-                    processCard.style.display = 'none';
-                }
-                
                 // Close any open modals related to this process
                 const activeModals = document.querySelectorAll('.modal.show');
                 activeModals.forEach(modal => {
@@ -550,17 +564,33 @@ function stopPrecleaningProcess(processId) {
                     if (modalInstance) modalInstance.hide();
                 });
                 
-                // Reload page to update the view
-                setTimeout(() => {
-                    location.reload();
-                }, 500);
+                // Show success message without alert popup
+                showAlert(data.message, 'success');
+                
+                // Don't reload the page - just update the UI
+                // Remove the entire active processes section if no more processes
+                const activeProcessesSection = document.querySelector('.row .card.border-warning');
+                if (activeProcessesSection) {
+                    const remainingProcesses = activeProcessesSection.querySelectorAll('.card[id^="process-card-"]:not([style*="display: none"])');
+                    if (remainingProcesses.length === 0) {
+                        activeProcessesSection.parentElement.parentElement.style.display = 'none';
+                    }
+                }
             } else {
                 alert('Error: ' + (data.error || 'Process not completed properly'));
+                // If error, restore the process card
+                if (processCard) {
+                    processCard.style.display = 'block';
+                }
             }
         })
         .catch(error => {
             console.error('Error stopping process:', error);
             alert('Error stopping process: ' + error.message);
+            // If error, restore the process card
+            if (processCard) {
+                processCard.style.display = 'block';
+            }
         });
     }
 }
