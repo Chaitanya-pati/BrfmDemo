@@ -1718,8 +1718,7 @@ def stop_precleaning(process_id):
     try:
         precleaning_process = PrecleaningProcess.query.get_or_404(process_id)
         
-        if not precleaning_process.timer_active:
-            return jsonify({'error': 'Timer is not active'}), 400
+        # Allow stopping even if timer_active is False (for cleanup purposes)
         
         # Stop timer and calculate duration
         end_time = datetime.utcnow()
@@ -1730,13 +1729,14 @@ def stop_precleaning(process_id):
         precleaning_process.timer_active = False
         precleaning_process.status = 'completed'
         
-        # Update godown and bin stocks
-        from_godown = Godown.query.get(precleaning_process.from_godown_id)
-        to_bin = PrecleaningBin.query.get(precleaning_process.to_precleaning_bin_id)
-        
-        if from_godown and to_bin:
-            from_godown.current_stock -= precleaning_process.quantity
-            to_bin.current_stock += precleaning_process.quantity
+        # Update godown and bin stocks only if not already updated
+        if precleaning_process.status != 'completed':
+            from_godown = Godown.query.get(precleaning_process.from_godown_id)
+            to_bin = PrecleaningBin.query.get(precleaning_process.to_precleaning_bin_id)
+            
+            if from_godown and to_bin:
+                from_godown.current_stock -= precleaning_process.quantity
+                to_bin.current_stock += precleaning_process.quantity
         
         db.session.commit()
         
@@ -1744,6 +1744,7 @@ def stop_precleaning(process_id):
             'success': True,
             'duration_seconds': duration_seconds,
             'end_time': end_time.isoformat(),
+            'timer_active': False,
             'message': 'Precleaning process completed successfully!'
         })
         
