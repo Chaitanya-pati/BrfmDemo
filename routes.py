@@ -261,12 +261,10 @@ def sales_dispatch():
                 sales_order = SalesOrder()
                 sales_order.order_number = generate_order_number('SO')
                 sales_order.customer_id = int(request.form['customer_id'])
-                sales_order.product_id = int(request.form['product_id'])
-                sales_order.quantity_kg = float(request.form['quantity_kg'])
-                sales_order.sale_price_per_kg = float(request.form['sale_price_per_kg'])
-                sales_order.total_amount = sales_order.quantity_kg * sales_order.sale_price_per_kg
+                sales_order.salesman = request.form.get('salesman', 'Sales Rep')
                 sales_order.delivery_date = datetime.strptime(request.form['delivery_date'], '%Y-%m-%d')
-                sales_order.notes = request.form.get('notes')
+                sales_order.total_quantity = float(request.form['total_quantity'])
+                sales_order.pending_quantity = float(request.form['total_quantity'])
                 
                 db.session.add(sales_order)
                 db.session.commit()
@@ -275,15 +273,90 @@ def sales_dispatch():
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error creating sales order: {str(e)}', 'error')
+        
+        elif request.form.get('action') == 'dispatch':
+            try:
+                # Handle dispatch photos
+                loading_photo = None
+                loaded_photo = None
+                
+                if 'loading_photo' in request.files:
+                    file = request.files['loading_photo']
+                    if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        filename = f"loading_{timestamp}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        loading_photo = filename
+                
+                if 'loaded_photo' in request.files:
+                    file = request.files['loaded_photo']
+                    if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        filename = f"loaded_{timestamp}_{filename}"
+                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                        loaded_photo = filename
+                
+                # Create dispatch record
+                dispatch = Dispatch()
+                dispatch.dispatch_number = generate_order_number('DISP')
+                dispatch.sales_order_id = int(request.form['sales_order_id'])
+                dispatch.vehicle_id = int(request.form['vehicle_id'])
+                dispatch.quantity = float(request.form['quantity'])
+                dispatch.loading_photo = loading_photo
+                dispatch.loaded_photo = loaded_photo
+                
+                # Update sales order
+                sales_order = SalesOrder.query.get(dispatch.sales_order_id)
+                sales_order.delivered_quantity += dispatch.quantity
+                sales_order.pending_quantity = sales_order.total_quantity - sales_order.delivered_quantity
+                
+                if sales_order.pending_quantity <= 0:
+                    sales_order.status = 'completed'
+                else:
+                    sales_order.status = 'partial'
+                
+                db.session.add(dispatch)
+                db.session.commit()
+                flash('Dispatch created successfully!', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error creating dispatch: {str(e)}', 'error')
     
-    # Get data for the template
-    customers = Customer.query.all()
-    products = Product.query.all()
-    sales_orders = SalesOrder.query.order_by(SalesOrder.created_at.desc()).all()
-    dispatches = Dispatch.query.order_by(Dispatch.dispatch_date.desc()).all()
-    
-    return render_template('sales_dispatch.html', customers=customers, products=products, 
-                         sales_orders=sales_orders, dispatches=dispatches)
+    try:
+        # Get data for the template with error handling
+        customers = Customer.query.all() or []
+        
+        # Check if DispatchVehicle table exists, otherwise use Vehicle
+        try:
+            vehicles = DispatchVehicle.query.filter_by(status='available').all()
+        except:
+            # Fallback to Vehicle model if DispatchVehicle doesn't exist
+            vehicles = Vehicle.query.filter_by(status='approved').all()
+        
+        sales_orders = SalesOrder.query.filter(SalesOrder.status.in_(['pending', 'partial'])).all() or []
+        
+        try:
+            dispatches = Dispatch.query.order_by(Dispatch.dispatch_date.desc()).all()
+        except:
+            # If Dispatch table doesn't exist, use empty list
+            dispatches = []
+        
+        return render_template('sales_dispatch.html', 
+                             customers=customers, 
+                             vehicles=vehicles,
+                             sales_orders=sales_orders, 
+                             dispatches=dispatches)
+                             
+    except Exception as e:
+        flash(f'Error loading sales dispatch page: {str(e)}', 'error')
+        return render_template('sales_dispatch.html', 
+                             customers=[], 
+                             vehicles=[],
+                             sales_orders=[], 
+                             dispatches=[])
 
 @app.route('/reports')
 def reports():

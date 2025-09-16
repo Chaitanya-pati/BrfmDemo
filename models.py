@@ -263,6 +263,7 @@ class DispatchVehicle(db.Model):
     city = db.Column(db.String(50))
     capacity = db.Column(db.Float)
     status = db.Column(db.String(20), default='available')  # available, dispatched, blocked
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationship
     dispatches = db.relationship('Dispatch', backref='vehicle', lazy=True)
