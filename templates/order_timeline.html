@@ -176,34 +176,57 @@
                         </div>
                     {% endif %}
 
-                    <!-- Process Data -->
+                    <!-- Enhanced Process Data -->
                     {% if timeline_data.cleaning_24h.process_data %}
+                    <!-- Timing Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Start Time</h6>
+                                    <p class="mb-0"><strong>{{ timeline_data.cleaning_24h.process_data.start_time.strftime('%Y-%m-%d %H:%M') if timeline_data.cleaning_24h.process_data.start_time else 'N/A' }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">End Time</h6>
+                                    <p class="mb-0"><strong>{{ (timeline_data.cleaning_24h.process_data.actual_end_time or timeline_data.cleaning_24h.process_data.end_time).strftime('%Y-%m-%d %H:%M') if (timeline_data.cleaning_24h.process_data.actual_end_time or timeline_data.cleaning_24h.process_data.end_time) else 'N/A' }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Duration</h6>
+                                    <p class="mb-0"><strong>{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.duration_hours) if timeline_data.cleaning_24h.process_data.duration_hours is not none else 'N/A' }} hours</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Water Added</h6>
+                                    <p class="mb-0"><strong>{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.water_added_liters) if timeline_data.cleaning_24h.process_data.water_added_liters is not none else 'N/A' }} L</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Process Details -->
                     <div class="row mb-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <p class="mb-1"><strong>Machine:</strong></p>
                             <p class="text-muted">{{ timeline_data.cleaning_24h.process_data.machine_name or 'N/A' }}</p>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <p class="mb-1"><strong>Operator:</strong></p>
                             <p class="text-muted">{{ timeline_data.cleaning_24h.process_data.operator_name or 'N/A' }}</p>
                         </div>
-                        <div class="col-md-4">
-                            <p class="mb-1"><strong>Start Time:</strong></p>
-                            <p class="text-muted">{{ timeline_data.cleaning_24h.process_data.start_time.strftime('%Y-%m-%d %H:%M') if timeline_data.cleaning_24h.process_data.start_time else 'N/A' }}</p>
-                        </div>
-                    </div>
-                    <div class="row mb-3">
                         <div class="col-md-3">
                             <p class="mb-1"><strong>Start Moisture:</strong></p>
                             <p class="text-muted">{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.start_moisture) if timeline_data.cleaning_24h.process_data.start_moisture is not none else 'N/A' }}%</p>
-                        </div>
-                        <div class="col-md-3">
-                            <p class="mb-1"><strong>Water Added:</strong></p>
-                            <p class="text-muted">{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.water_added_liters) if timeline_data.cleaning_24h.process_data.water_added_liters is not none else 'N/A' }} L</p>
-                        </div>
-                        <div class="col-md-3">
-                            <p class="mb-1"><strong>Waste Collected:</strong></p>
-                            <p class="text-muted">{{ "%.1f"|format(timeline_data.cleaning_24h.process_data.waste_collected_kg) if timeline_data.cleaning_24h.process_data.waste_collected_kg is not none else 'N/A' }} kg</p>
                         </div>
                         <div class="col-md-3">
                             <p class="mb-1"><strong>End Moisture:</strong></p>
@@ -310,6 +333,45 @@
                         </div>
                     {% endif %}
 
+                    <!-- Enhanced 12-Hour Process Data -->
+                    {% if timeline_data.cleaning_12h.process_data %}
+                    <!-- Timing Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Start Time</h6>
+                                    <p class="mb-0"><strong>{{ timeline_data.cleaning_12h.process_data.start_time.strftime('%Y-%m-%d %H:%M') if timeline_data.cleaning_12h.process_data.start_time else 'N/A' }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">End Time</h6>
+                                    <p class="mb-0"><strong>{{ (timeline_data.cleaning_12h.process_data.actual_end_time or timeline_data.cleaning_12h.process_data.end_time).strftime('%Y-%m-%d %H:%M') if (timeline_data.cleaning_12h.process_data.actual_end_time or timeline_data.cleaning_12h.process_data.end_time) else 'N/A' }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Duration</h6>
+                                    <p class="mb-0"><strong>{{ "%.1f"|format(timeline_data.cleaning_12h.process_data.duration_hours) if timeline_data.cleaning_12h.process_data.duration_hours is not none else 'N/A' }} hours</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Water Added</h6>
+                                    <p class="mb-0"><strong>{{ "%.1f"|format(timeline_data.cleaning_12h.process_data.water_added_liters) if timeline_data.cleaning_12h.process_data.water_added_liters is not none else 'N/A' }} L</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
                     <!-- Moisture Comparison -->
                     {% if timeline_data.cleaning_12h.target_moisture or timeline_data.cleaning_12h.outgoing_moisture %}
                     <div class="row mb-3">
@@ -388,6 +450,91 @@
                     </span>
                 </div>
                 <div class="card-body">
+                    <!-- Enhanced Grinding Process Data -->
+                    {% if timeline_data.grinding.process_data %}
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Start Time</h6>
+                                    <p class="mb-0"><strong>{{ timeline_data.grinding.process_data.start_time.strftime('%Y-%m-%d %H:%M') if timeline_data.grinding.process_data.start_time else 'N/A' }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">End Time</h6>
+                                    <p class="mb-0"><strong>{{ timeline_data.grinding.process_data.end_time.strftime('%Y-%m-%d %H:%M') if timeline_data.grinding.process_data.end_time else 'Ongoing' }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Duration</h6>
+                                    <p class="mb-0"><strong>{{ "%.1f"|format(timeline_data.grinding.process_data.duration_hours) if timeline_data.grinding.process_data.duration_hours is not none else 'N/A' }} hours</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">B1 Scale Weight</h6>
+                                    <p class="mb-0"><strong>{{ "%.1f"|format(timeline_data.grinding.process_data.b1_scale_weight_kg) if timeline_data.grinding.process_data.b1_scale_weight_kg is not none else 'N/A' }} kg</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Process Details -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>Grinding Machine:</strong></p>
+                            <p class="text-muted">{{ timeline_data.grinding.process_data.grinding_machine_name or 'N/A' }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>Grinding Operator:</strong></p>
+                            <p class="text-muted">{{ timeline_data.grinding.process_data.grinding_operator or 'N/A' }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-1"><strong>B1 Scale Operator:</strong></p>
+                            <p class="text-muted">{{ timeline_data.grinding.process_data.b1_scale_operator or 'N/A' }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Machine Cleaning Timestamps (as requested) -->
+                    {% if timeline_data.grinding.machine_cleaning_logs %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="fw-bold mb-3">Machine Cleaning Timestamps</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Cleaning Time</th>
+                                            <th>Machine/Type</th>
+                                            <th>Operator</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for cleaning in timeline_data.grinding.machine_cleaning_logs %}
+                                        <tr>
+                                            <td><strong>{{ cleaning.cleaning_timestamp.strftime('%Y-%m-%d %H:%M:%S') if cleaning.cleaning_timestamp else 'N/A' }}</strong></td>
+                                            <td>{{ cleaning.machine_name or cleaning.type or 'Manual Cleaning' }}</td>
+                                            <td>{{ cleaning.operator_name }}</td>
+                                            <td><span class="badge bg-{{ 'success' if cleaning.status == 'completed' else 'warning' }}">{{ cleaning.status or 'completed' }}</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
                     <!-- Product Ratios -->
                     {% if timeline_data.grinding.product_ratios %}
                     <div class="row mb-4">

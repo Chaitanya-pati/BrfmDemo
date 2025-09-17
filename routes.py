@@ -2971,18 +2971,26 @@ def build_order_timeline(order):
                             'end_time': process.end_time
                         }
             
-            # Store process data
+            # Store process data with enhanced timing information
+            duration_hours = None
+            if process.start_time and process.end_time:
+                duration_hours = (process.end_time - process.start_time).total_seconds() / 3600
+            elif process.start_time and process.actual_end_time:
+                duration_hours = (process.actual_end_time - process.start_time).total_seconds() / 3600
+                
             timeline[stage_key]['process_data'] = {
                 'start_time': process.start_time,
                 'end_time': process.end_time,
                 'actual_end_time': process.actual_end_time,
+                'duration_hours': duration_hours,
                 'start_moisture': process.start_moisture,
                 'end_moisture': process.end_moisture,
                 'target_moisture': process.target_moisture,
                 'water_added_liters': process.water_added_liters,
                 'waste_collected_kg': process.waste_collected_kg,
                 'machine_name': process.machine_name,
-                'operator_name': process.operator_name
+                'operator_name': process.operator_name,
+                'status': process.status
             }
             
             if stage_key == 'cleaning_12h':
@@ -3026,16 +3034,33 @@ def build_order_timeline(order):
                 # Default to 24h if no specific process linked
                 timeline['cleaning_24h']['manual_cleaning_logs'].append(log_data)
         
-        # 5. Grinding Process
-        # Note: Without a direct relationship, we'll get all grinding processes for now
-        # In a real system, there would be a proper foreign key relationship
-        grinding_processes = GrindingProcess.query.all()  # TODO: Add proper order linkage
+        # 5. Grinding Sessions (Enhanced with proper order linkage)
+        grinding_sessions = GrindingSession.query.filter_by(order_id=order.id).all()
         
-        for grinding in grinding_processes:
+        for grinding in grinding_sessions:
             if grinding.status == 'completed':
                 timeline['grinding']['status'] = 'Completed'
-            elif grinding.status in ['running', 'in_progress']:
+            elif grinding.status in ['grinding', 'running']:
                 timeline['grinding']['status'] = 'Active'
+            
+            # Process timing data
+            duration_hours = None
+            if grinding.start_time and grinding.end_time:
+                duration_hours = (grinding.end_time - grinding.start_time).total_seconds() / 3600
+                
+            timeline['grinding']['process_data'] = {
+                'start_time': grinding.start_time,
+                'end_time': grinding.end_time,
+                'duration_hours': duration_hours,
+                'status': grinding.status,
+                'grinding_machine_name': grinding.grinding_machine_name,
+                'grinding_operator': grinding.grinding_operator,
+                'b1_scale_operator': grinding.b1_scale_operator,
+                'b1_scale_handoff_time': grinding.b1_scale_handoff_time,
+                'b1_scale_weight_kg': grinding.b1_scale_weight_kg,
+                'total_input_kg': grinding.total_input_kg,
+                'total_output_kg': grinding.total_output_kg
+            }
             
             # Product ratios and bran alerts (with null safety)
             timeline['grinding']['product_ratios'] = {
@@ -3046,10 +3071,30 @@ def build_order_timeline(order):
                 'total_output_kg': grinding.total_output_kg or 0
             }
             
-            if getattr(grinding, 'bran_percentage_alert', False) and grinding.bran_percentage:
+            if getattr(grinding, 'bran_alert_triggered', False) and grinding.bran_percentage:
                 timeline['grinding']['bran_alerts'].append({
                     'message': f'Bran percentage ({grinding.bran_percentage}%) exceeds 25% threshold',
                     'timestamp': grinding.start_time or datetime.utcnow()
+                })
+                
+            # Manual cleaning logs for this grinding session (only timestamps as requested)
+            manual_cleanings = GrindingManualCleaning.query.filter_by(grinding_session_id=grinding.id).all()
+            for cleaning in manual_cleanings:
+                timeline['grinding']['machine_cleaning_logs'].append({
+                    'cleaning_timestamp': cleaning.reminder_time,
+                    'operator_name': cleaning.operator_name,
+                    'status': cleaning.status
+                })
+            
+            # B1 Scale cleaning logs (machine cleaning timestamps)
+            b1_cleaning_logs = B1ScaleCleaningLog.query.all()  # All B1 scale cleanings
+            for b1_log in b1_cleaning_logs:
+                timeline['grinding']['machine_cleaning_logs'].append({
+                    'cleaning_timestamp': b1_log.cleaning_start_time,
+                    'machine_name': 'B1 Scale',
+                    'operator_name': b1_log.cleaned_by,
+                    'cleaning_end_time': b1_log.cleaning_end_time,
+                    'type': 'b1_scale_cleaning'
                 })
         
         # 6. Packaging Records (with correct field name: production_order_id)
@@ -3088,22 +3133,23 @@ def build_order_timeline(order):
             import logging
             logging.warning(f"Error fetching storage levels: {e}")
         
-        # 8. Machine Cleaning Logs (for grinding stage)
+        # 8. Additional Machine Cleaning Logs (general grinding machines)
         # Get cleaning logs for grinding machines
-        grinding_machine_logs = CleaningLog.query.join(
-            CleaningMachine, CleaningLog.machine_id == CleaningMachine.id
-        ).filter(CleaningMachine.machine_type == 'grinding').all()
-        
-        for log in grinding_machine_logs:
-            timeline['grinding']['machine_cleaning_logs'].append({
-                'machine_name': log.machine.name,
-                'cleaned_by': log.cleaned_by,
-                'cleaning_time': log.cleaning_time,
-                'photo_before': log.photo_before,
-                'photo_after': log.photo_after,
-                'waste_collected': log.waste_collected,
-                'notes': log.notes
-            })
+        try:
+            grinding_machine_logs = CleaningLog.query.join(
+                CleaningMachine, CleaningLog.machine_id == CleaningMachine.id
+            ).filter(CleaningMachine.machine_type == 'grinding').all()
+            
+            for log in grinding_machine_logs:
+                timeline['grinding']['machine_cleaning_logs'].append({
+                    'cleaning_timestamp': log.cleaning_time,
+                    'machine_name': log.machine.name,
+                    'operator_name': log.cleaned_by,
+                    'type': 'general_machine_cleaning'
+                })
+        except Exception as e:
+            import logging
+            logging.warning(f"Error fetching general grinding machine logs: {e}")
     
     except Exception as e:
         # Log error but don't break the view
