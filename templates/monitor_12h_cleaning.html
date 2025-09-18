@@ -209,7 +209,7 @@
                 <div class="card-body">
                     <form id="completion-form">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label">
                                         <i class="fas fa-tint me-2"></i>Outgoing Moisture (%) *
@@ -219,7 +219,17 @@
                                     <div class="form-text">Final moisture content after 12-hour cleaning</div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-water me-2"></i>Water Added (Liters) *
+                                    </label>
+                                    <input type="number" id="water_added_liters" name="water_added_liters"
+                                           class="form-control" step="0.1" min="0" required>
+                                    <div class="form-text">Amount of water added during the process</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label">
                                         <i class="fas fa-user me-2"></i>Completion Operator

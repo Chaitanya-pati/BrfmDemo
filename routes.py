@@ -1560,6 +1560,7 @@ def submit_12h_completion():
         data = request.get_json()
         order_id = data['order_id']
         outgoing_moisture = float(data['outgoing_moisture'])
+        water_added_liters = float(data.get('water_added_liters', 0.0))
         operator_name = data.get('operator_name', 'Operator')
         notes = data.get('notes', '')
         
@@ -1587,6 +1588,7 @@ def submit_12h_completion():
         
         # Update cleaning process with completion data
         cleaning_process.moisture_after = outgoing_moisture
+        cleaning_process.water_added_liters = water_added_liters
         cleaning_process.completed_by = operator_name
         cleaning_process.completion_time = current_time
         cleaning_process.post_process_notes = notes
