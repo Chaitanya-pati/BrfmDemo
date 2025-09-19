@@ -27,7 +27,7 @@
                     <div class="btn-group" role="group" aria-label="Search type">
                         <input type="radio" class="btn-check" name="search_type" id="search_by_id" value="id" checked>
                         <label class="btn btn-outline-primary" for="search_by_id">Search by Order ID</label>
-                        
+
                         <input type="radio" class="btn-check" name="search_type" id="search_by_date" value="date">
                         <label class="btn btn-outline-primary" for="search_by_date">Search by Date Range</label>
                     </div>
@@ -36,7 +36,7 @@
                 <!-- Order ID Search -->
                 <div id="id_search_section" class="col-md-8">
                     <label for="order_id" class="form-label">Order ID or Order Number</label>
-                    <input type="text" class="form-control" id="order_id" name="order_id" 
+                    <input type="text" class="form-control" id="order_id" name="order_id"
                            placeholder="Enter Order ID (e.g., 123) or Order Number (e.g., PRO20250912001)"
                            value="{{ request.form.get('order_id', '') }}">
                 </div>
@@ -45,12 +45,12 @@
                 <div id="date_search_section" class="row" style="display: none;">
                     <div class="col-md-4">
                         <label for="start_date" class="form-label">Start Date</label>
-                        <input type="date" class="form-control" id="start_date" name="start_date" 
+                        <input type="date" class="form-control" id="start_date" name="start_date"
                                value="{{ request.form.get('start_date', '') }}">
                     </div>
                     <div class="col-md-4">
                         <label for="end_date" class="form-label">End Date</label>
-                        <input type="date" class="form-control" id="end_date" name="end_date" 
+                        <input type="date" class="form-control" id="end_date" name="end_date"
                                value="{{ request.form.get('end_date', '') }}">
                     </div>
                     <div class="col-md-4">
@@ -213,7 +213,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Process Details -->
                     <div class="row mb-3">
                         <div class="col-md-3">
@@ -371,7 +371,7 @@
                         </div>
                     </div>
                     {% endif %}
-                    
+
                     <!-- Moisture Comparison -->
                     {% if timeline_data.cleaning_12h.target_moisture or timeline_data.cleaning_12h.outgoing_moisture %}
                     <div class="row mb-3">
@@ -486,7 +486,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Process Details -->
                     <div class="row mb-3">
                         <div class="col-md-4">
@@ -503,7 +503,7 @@
                         </div>
                     </div>
                     {% endif %}
-                    
+
                     <!-- Machine Cleaning Timestamps (as requested) -->
                     {% if timeline_data.grinding.machine_cleaning_logs %}
                     <div class="row mb-4">
@@ -534,7 +534,7 @@
                         </div>
                     </div>
                     {% endif %}
-                    
+
                     <!-- Product Ratios -->
                     {% if timeline_data.grinding.product_ratios %}
                     <div class="row mb-4">
@@ -595,19 +595,19 @@
                             <tbody>
                                 {% for log in timeline_data.grinding.machine_cleaning_logs %}
                                 <tr>
-                                    <td>{{ log.machine_name }}</td>
-                                    <td>{{ log.cleaned_by }}</td>
-                                    <td>{{ log.cleaning_time.strftime('%m/%d %H:%M') if log.cleaning_time else 'N/A' }}</td>
-                                    <td>{{ "%.1f"|format(log.waste_collected) if log.waste_collected is not none else 'N/A' }}</td>
+                                    <td>{{ log.get('machine_name', 'Unknown') }}</td>
+                                    <td>{{ log.get('cleaned_by', log.get('operator_name', 'Unknown')) }}</td>
+                                    <td>{{ log.get('cleaning_time', log.get('cleaning_timestamp')).strftime('%m/%d %H:%M') if log.get('cleaning_time') or log.get('cleaning_timestamp') else 'N/A' }}</td>
+                                    <td>{{ "%.1f"|format(log.get('waste_collected', 0)) if log.get('waste_collected') is not none else 'N/A' }}</td>
                                     <td>
-                                        {% if log.photo_before %}
-                                        <a href="{{ url_for('uploaded_file', filename=log.photo_before) }}" target="_blank" class="badge bg-primary text-decoration-none">Before</a>
+                                        {% if log.get('photo_before') %}
+                                        <a href="{{ url_for('uploaded_file', filename=log.get('photo_before')) }}" target="_blank" class="badge bg-primary text-decoration-none">Before</a>
                                         {% endif %}
-                                        {% if log.photo_after %}
-                                        <a href="{{ url_for('uploaded_file', filename=log.photo_after) }}" target="_blank" class="badge bg-success text-decoration-none">After</a>
+                                        {% if log.get('photo_after') %}
+                                        <a href="{{ url_for('uploaded_file', filename=log.get('photo_after')) }}" target="_blank" class="badge bg-success text-decoration-none">After</a>
                                         {% endif %}
                                     </td>
-                                    <td><small>{{ log.notes[:50] }}{% if log.notes and log.notes|length > 50 %}...{% endif %}</small></td>
+                                    <td><small>{{ log.get('notes', '')[:50] }}{% if log.get('notes', '') and log.get('notes', '')|length > 50 %}...{% endif %}</small></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -654,7 +654,7 @@
                                 <div class="card-body text-center">
                                     <h6 class="card-title">{{ storage.area_name }}</h6>
                                     <div class="progress mb-2">
-                                        <div class="progress-bar bg-{{ 'danger' if storage.utilization_percent > 90 else 'warning' if storage.utilization_percent > 70 else 'success' }}" 
+                                        <div class="progress-bar bg-{{ 'danger' if storage.utilization_percent > 90 else 'warning' if storage.utilization_percent > 70 else 'success' }}"
                                              style="width: {{ storage.utilization_percent }}%"></div>
                                     </div>
                                     <small class="text-muted">
@@ -787,7 +787,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             orderSelect.innerHTML = '<option value="">Select an order</option>';
-            
+
             if (data.orders && data.orders.length > 0) {
                 data.orders.forEach(order => {
                     const option = document.createElement('option');
