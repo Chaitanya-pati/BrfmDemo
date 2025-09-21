@@ -71,9 +71,11 @@
                 <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Vehicle Status Report</h5>
             </div>
             <div class="card-body">
-                <canvas id="vehicleStatusChart" width="400" height="200"></canvas>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="vehicleStatusChart"></canvas>
+                </div>
 
-                <div class="table-responsive mt-3">
+                <div class="table-responsive mt-3"></div>
                     <table class="table table-sm">
                         <thead>
                             <tr>
@@ -108,9 +110,11 @@
                 <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Godown Inventory Report</h5>
             </div>
             <div class="card-body">
-                <canvas id="inventoryChart" width="400" height="200"></canvas>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="inventoryChart"></canvas>
+                </div>
 
-                <div class="table-responsive mt-3">
+                <div class="table-responsive mt-3"></div>
                     <table class="table table-sm">
                         <thead>
                             <tr>
@@ -154,9 +158,11 @@
                 <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Production Status Report</h5>
             </div>
             <div class="card-body">
-                <canvas id="productionChart" width="400" height="200"></canvas>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="productionChart"></canvas>
+                </div>
 
-                <div class="table-responsive mt-3">
+                <div class="table-responsive mt-3"></div>
                     <table class="table table-sm">
                         <thead>
                             <tr>
@@ -191,9 +197,11 @@
                 <h5 class="mb-0"><i class="fas fa-shipping-fast me-2"></i>Dispatch Status Report</h5>
             </div>
             <div class="card-body">
-                <canvas id="dispatchChart" width="400" height="200"></canvas>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="dispatchChart"></canvas>
+                </div>
 
-                <div class="table-responsive mt-3">
+                <div class="table-responsive mt-3"></div>
                     <table class="table table-sm">
                         <thead>
                             <tr>
@@ -375,12 +383,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     position: 'bottom',
                     labels: {
                         boxWidth: 12,
-                        padding: 15,
+                        padding: 10,
                         font: {
                             size: 11
                         }
                     }
                 }
+            },
+            layout: {
+                padding: 10
             }
         }
     });
@@ -419,12 +430,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         display: true,
                         text: 'Stock (kg)'
                     }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 0
+                    }
                 }
             },
             plugins: {
                 legend: {
                     display: false
                 }
+            },
+            layout: {
+                padding: 10
             }
         }
     });
@@ -463,12 +483,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     position: 'bottom',
                     labels: {
                         boxWidth: 12,
-                        padding: 15,
+                        padding: 10,
                         font: {
                             size: 11
                         }
                     }
                 }
+            },
+            layout: {
+                padding: 10
             }
         }
     });
@@ -506,12 +529,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     position: 'bottom',
                     labels: {
                         boxWidth: 12,
-                        padding: 15,
+                        padding: 10,
                         font: {
                             size: 11
                         }
                     }
                 }
+            },
+            layout: {
+                padding: 10
             }
         }
     });
