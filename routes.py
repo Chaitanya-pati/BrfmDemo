@@ -6,6 +6,14 @@ from app import app, db
 from models import *
 from utils import allowed_file, generate_order_number, generate_job_id, notify_responsible_person, validate_plan_percentages
 import logging
+import pandas as pd
+import csv
+import io
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
 
@@ -374,13 +382,334 @@ def reports():
     recent_vehicles = Vehicle.query.order_by(Vehicle.created_at.desc()).limit(5).all()
     recent_dispatches = Dispatch.query.order_by(Dispatch.dispatch_date.desc()).limit(5).all()
     
+    # Get additional data for the template
+    godown_inventory = Godown.query.all()
+    production_stats = db.session.query(
+        ProductionOrder.status, 
+        db.func.count(ProductionOrder.id).label('count')
+    ).group_by(ProductionOrder.status).all()
+    dispatch_stats = db.session.query(
+        Dispatch.status,
+        db.func.count(Dispatch.id).label('count')
+    ).group_by(Dispatch.status).all()
+    
     return render_template('reports.html',
                          vehicle_stats=vehicle_stats,
                          total_vehicles=total_vehicles,
                          total_stock=total_stock,
                          total_dispatches=total_dispatches,
                          recent_vehicles=recent_vehicles,
-                         recent_dispatches=recent_dispatches)
+                         recent_dispatches=recent_dispatches,
+                         godown_inventory=godown_inventory,
+                         production_stats=production_stats,
+                         dispatch_stats=dispatch_stats)
+
+@app.route('/report/customer-wise')
+def customer_wise_report():
+    """Generate customer-wise report with orders and deliveries"""
+    try:
+        customers = db.session.query(
+            Customer.id,
+            Customer.company_name,
+            Customer.contact_person,
+            Customer.city,
+            db.func.count(SalesOrder.id).label('total_orders'),
+            db.func.sum(SalesOrder.total_quantity).label('total_quantity'),
+            db.func.sum(SalesOrder.delivered_quantity).label('delivered_quantity'),
+            db.func.count(Dispatch.id).label('total_dispatches')
+        ).outerjoin(SalesOrder, Customer.id == SalesOrder.customer_id)\
+         .outerjoin(Dispatch, SalesOrder.id == Dispatch.sales_order_id)\
+         .group_by(Customer.id, Customer.company_name, Customer.contact_person, Customer.city)\
+         .all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'customer_id': c.id,
+                'company_name': c.company_name,
+                'contact_person': c.contact_person,
+                'city': c.city,
+                'total_orders': c.total_orders or 0,
+                'total_quantity': float(c.total_quantity or 0),
+                'delivered_quantity': float(c.delivered_quantity or 0),
+                'total_dispatches': c.total_dispatches or 0,
+                'completion_rate': round((float(c.delivered_quantity or 0) / float(c.total_quantity or 1)) * 100, 2)
+            } for c in customers]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/report/product-wise')
+def product_wise_report():
+    """Generate product-wise report with production and sales"""
+    try:
+        products = db.session.query(
+            Product.id,
+            Product.name,
+            Product.category,
+            db.func.count(SalesOrderItem.id).label('orders_count'),
+            db.func.sum(SalesOrderItem.quantity).label('total_ordered'),
+            db.func.sum(SalesOrderItem.delivered_quantity).label('total_delivered'),
+            db.func.count(ProductionOrder.id).label('production_count'),
+            db.func.sum(ProductionOrder.quantity).label('total_produced')
+        ).outerjoin(SalesOrderItem, Product.id == SalesOrderItem.product_id)\
+         .outerjoin(ProductionOrder, Product.id == ProductionOrder.product_id)\
+         .group_by(Product.id, Product.name, Product.category)\
+         .all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'product_id': p.id,
+                'name': p.name,
+                'category': p.category,
+                'orders_count': p.orders_count or 0,
+                'total_ordered': float(p.total_ordered or 0),
+                'total_delivered': float(p.total_delivered or 0),
+                'production_count': p.production_count or 0,
+                'total_produced': float(p.total_produced or 0),
+                'delivery_rate': round((float(p.total_delivered or 0) / float(p.total_ordered or 1)) * 100, 2)
+            } for p in products]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/report/vehicle-wise')
+def vehicle_wise_report():
+    """Generate vehicle-wise performance report"""
+    try:
+        vehicles = db.session.query(
+            Vehicle.id,
+            Vehicle.vehicle_number,
+            Vehicle.driver_name,
+            Vehicle.driver_phone,
+            Supplier.company_name.label('supplier_name'),
+            Vehicle.status,
+            Vehicle.final_weight,
+            Vehicle.created_at,
+            db.func.count(Dispatch.id).label('dispatch_count')
+        ).join(Supplier, Vehicle.supplier_id == Supplier.id)\
+         .outerjoin(DispatchVehicle, Vehicle.vehicle_number == DispatchVehicle.vehicle_number)\
+         .outerjoin(Dispatch, DispatchVehicle.id == Dispatch.vehicle_id)\
+         .group_by(Vehicle.id, Vehicle.vehicle_number, Vehicle.driver_name, 
+                   Vehicle.driver_phone, Supplier.company_name, Vehicle.status,
+                   Vehicle.final_weight, Vehicle.created_at)\
+         .order_by(Vehicle.created_at.desc())\
+         .all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'vehicle_id': v.id,
+                'vehicle_number': v.vehicle_number,
+                'driver_name': v.driver_name,
+                'driver_phone': v.driver_phone,
+                'supplier_name': v.supplier_name,
+                'status': v.status,
+                'final_weight': float(v.final_weight or 0),
+                'entry_date': v.created_at.strftime('%Y-%m-%d') if v.created_at else None,
+                'dispatch_count': v.dispatch_count or 0
+            } for v in vehicles]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/report/salesman-performance')
+def salesman_performance_report():
+    """Generate salesman performance report"""
+    try:
+        salesmen = db.session.query(
+            SalesOrder.salesman,
+            db.func.count(SalesOrder.id).label('orders_count'),
+            db.func.sum(SalesOrder.total_quantity).label('total_quantity'),
+            db.func.sum(SalesOrder.delivered_quantity).label('delivered_quantity'),
+            db.func.count(db.distinct(SalesOrder.customer_id)).label('unique_customers'),
+            db.func.avg(SalesOrder.total_quantity).label('avg_order_size')
+        ).filter(SalesOrder.salesman.isnot(None))\
+         .group_by(SalesOrder.salesman)\
+         .order_by(db.func.count(SalesOrder.id).desc())\
+         .all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'salesman': s.salesman,
+                'orders_count': s.orders_count,
+                'total_quantity': float(s.total_quantity or 0),
+                'delivered_quantity': float(s.delivered_quantity or 0),
+                'unique_customers': s.unique_customers,
+                'avg_order_size': round(float(s.avg_order_size or 0), 2),
+                'performance_score': round((float(s.delivered_quantity or 0) / float(s.total_quantity or 1)) * 100, 2)
+            } for s in salesmen]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/report/order-wise')
+def order_wise_report():
+    """Generate order-wise lifecycle tracking report"""
+    try:
+        orders = db.session.query(
+            ProductionOrder.id,
+            ProductionOrder.order_number,
+            ProductionOrder.finished_good_type,
+            ProductionOrder.quantity,
+            ProductionOrder.status,
+            ProductionOrder.created_at,
+            Customer.company_name.label('customer_name'),
+            Product.name.label('product_name')
+        ).outerjoin(Customer, ProductionOrder.customer_id == Customer.id)\
+         .outerjoin(Product, ProductionOrder.product_id == Product.id)\
+         .order_by(ProductionOrder.created_at.desc())\
+         .limit(100)\
+         .all()
+        
+        # Get additional data for each order
+        order_data = []
+        for order in orders:
+            # Get cleaning processes
+            cleaning_processes = CleaningProcess.query.filter_by(order_id=order.id).all()
+            cleaning_data = []
+            for cp in cleaning_processes:
+                cleaning_data.append({
+                    'type': cp.process_type,
+                    'status': cp.status,
+                    'start_time': cp.start_time.strftime('%Y-%m-%d %H:%M') if cp.start_time else None,
+                    'duration_hours': cp.duration_hours,
+                    'water_added_liters': float(cp.water_added_liters or 0)
+                })
+            
+            order_data.append({
+                'order_id': order.id,
+                'order_number': order.order_number,
+                'finished_good_type': order.finished_good_type,
+                'quantity': float(order.quantity),
+                'status': order.status,
+                'created_date': order.created_at.strftime('%Y-%m-%d') if order.created_at else None,
+                'customer_name': order.customer_name,
+                'product_name': order.product_name,
+                'cleaning_processes': cleaning_data
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': order_data
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/export/<report_type>/<format>')
+def export_report(report_type, format):
+    """Export reports in PDF or CSV format"""
+    try:
+        # Get report data based on type
+        if report_type == 'customer':
+            response = customer_wise_report()
+        elif report_type == 'product':
+            response = product_wise_report()
+        elif report_type == 'vehicle':
+            response = vehicle_wise_report()
+        elif report_type == 'salesman':
+            response = salesman_performance_report()
+        elif report_type == 'order':
+            response = order_wise_report()
+        else:
+            return jsonify({'error': 'Invalid report type'}), 400
+        
+        data = response.get_json()
+        if not data['success']:
+            return jsonify({'error': data['error']}), 500
+        
+        report_data = data['data']
+        
+        if format == 'csv':
+            return export_to_csv(report_data, report_type)
+        elif format == 'pdf':
+            return export_to_pdf(report_data, report_type)
+        else:
+            return jsonify({'error': 'Invalid format'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def export_to_csv(data, report_type):
+    """Export data to CSV format"""
+    output = io.StringIO()
+    
+    if not data:
+        return jsonify({'error': 'No data to export'}), 400
+    
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer.writeheader()
+    writer.writerows(data)
+    
+    output.seek(0)
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = f'attachment; filename={report_type}_report.csv'
+    
+    return response
+
+def export_to_pdf(data, report_type):
+    """Export data to PDF format"""
+    if not data:
+        return jsonify({'error': 'No data to export'}), 400
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    elements = []
+    
+    # Add title
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], 
+                                 fontSize=18, spaceAfter=30, alignment=1)
+    title = Paragraph(f'{report_type.title()} Report', title_style)
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+    
+    # Create table data
+    if data:
+        headers = list(data[0].keys())
+        table_data = [headers]
+        
+        for item in data:
+            row = []
+            for key in headers:
+                value = item[key]
+                if isinstance(value, (int, float)):
+                    row.append(str(value))
+                elif isinstance(value, list):
+                    row.append(str(len(value)) + ' items')
+                else:
+                    row.append(str(value) if value else '')
+            table_data.append(row)
+        
+        # Create table
+        table = Table(table_data, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(table)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename={report_type}_report.pdf'
+    
+    return response
 
 @app.route('/masters', methods=['GET', 'POST'])
 def masters():

@@ -2,6 +2,138 @@
 
 {% block title %}Reports - Wheat Processing Management{% endblock %}
 
+{% block head %}
+<style>
+/* Mobile-first responsive design */
+@media (max-width: 576px) {
+    .card-body .row [class*="col-"] {
+        margin-bottom: 15px;
+    }
+    
+    .btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .table-responsive {
+        font-size: 12px;
+    }
+    
+    .progress {
+        min-width: 100px;
+    }
+    
+    .card .row > div {
+        margin-bottom: 1rem;
+    }
+    
+    /* Make custom report cards stack nicely */
+    .col-md-3, .col-md-6 {
+        margin-bottom: 1rem;
+    }
+    
+    /* Adjust modal for mobile */
+    .modal-xl {
+        max-width: 95vw;
+        margin: 1rem;
+    }
+    
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    /* Stack export buttons on mobile */
+    .modal-body .mb-3 .btn {
+        display: block;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .card-header h5 {
+        font-size: 1rem;
+    }
+    
+    .card-title {
+        font-size: 0.9rem;
+    }
+    
+    /* Stack metric cards on tablets */
+    .col-lg-3 {
+        margin-bottom: 1rem;
+    }
+    
+    /* Adjust chart containers for tablets */
+    canvas {
+        max-height: 250px !important;
+    }
+    
+    /* Make tables more readable on tablets */
+    .table-sm th,
+    .table-sm td {
+        padding: 0.5rem;
+        font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 992px) {
+    .col-lg-6 {
+        margin-bottom: 2rem;
+    }
+    
+    /* Adjust export options for smaller screens */
+    .btn-group {
+        flex-wrap: wrap;
+    }
+}
+
+/* Additional responsive utilities */
+.text-truncate-mobile {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+    .text-truncate-mobile {
+        max-width: 150px;
+    }
+}
+
+/* Loading indicator responsive */
+#loadingIndicator {
+    z-index: 9999;
+}
+
+@media (max-width: 576px) {
+    #loadingIndicator {
+        width: 80%;
+        left: 10% !important;
+        transform: translateY(-50%) !important;
+    }
+}
+
+/* Alert positioning for mobile */
+@media (max-width: 576px) {
+    .alert.position-fixed {
+        left: 10px !important;
+        right: 10px !important;
+        top: 60px !important;
+        min-width: auto !important;
+        width: auto !important;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -548,50 +680,216 @@ function generateDateReport() {
     const startDate = prompt("Enter start date (YYYY-MM-DD):");
     const endDate = prompt("Enter end date (YYYY-MM-DD):");
     if (startDate && endDate) {
-        alert(`Generating date-wise report from ${startDate} to ${endDate}`);
-        // Implement actual report generation
+        showLoading("Generating date-wise report...");
+        // For now, use order report with date filtering
+        generateReport('order', `Date Range: ${startDate} to ${endDate}`);
     }
 }
 
 function generateCustomerReport() {
-    alert("Generating customer-wise report...");
-    // Implement actual report generation
+    showLoading("Generating customer-wise report...");
+    generateReport('customer', 'Customer Performance Report');
 }
 
 function generateProductReport() {
-    alert("Generating product-wise report...");
-    // Implement actual report generation
+    showLoading("Generating product-wise report...");
+    generateReport('product', 'Product Performance Report');
 }
 
 function generateVehicleReport() {
-    alert("Generating vehicle-wise report...");
-    // Implement actual report generation
+    showLoading("Generating vehicle-wise report...");
+    generateReport('vehicle', 'Vehicle Performance Report');
 }
 
 function generateSalesmanReport() {
-    alert("Generating salesman performance report...");
-    // Implement actual report generation
+    showLoading("Generating salesman performance report...");
+    generateReport('salesman', 'Salesman Performance Report');
 }
 
 function generateOrderReport() {
-    alert("Generating order-wise report...");
-    // Implement actual report generation
+    showLoading("Generating order-wise report...");
+    generateReport('order', 'Order Lifecycle Report');
+}
+
+function generateReport(reportType, title) {
+    const endpoint = `/report/${reportType}-wise`.replace('-wise', '');
+    
+    fetch(endpoint)
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                displayReportData(data.data, title, reportType);
+            } else {
+                showError('Error generating report: ' + data.error);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showError('Error generating report: ' + error.message);
+        });
+}
+
+function displayReportData(data, title, reportType) {
+    // Create modal to display report
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'reportModal';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">${title}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <button class="btn btn-primary me-2" onclick="exportReport('${reportType}', 'pdf')">
+                            <i class="fas fa-file-pdf me-1"></i>Export PDF
+                        </button>
+                        <button class="btn btn-success" onclick="exportReport('${reportType}', 'csv')">
+                            <i class="fas fa-file-csv me-1"></i>Export CSV
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            ${generateTableFromData(data)}
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('reportModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    document.body.appendChild(modal);
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    // Cleanup when modal is hidden
+    modal.addEventListener('hidden.bs.modal', function () {
+        modal.remove();
+    });
+}
+
+function generateTableFromData(data) {
+    if (!data || data.length === 0) {
+        return '<tbody><tr><td colspan="100%" class="text-center">No data available</td></tr></tbody>';
+    }
+    
+    const headers = Object.keys(data[0]);
+    let html = '<thead class="table-dark"><tr>';
+    
+    headers.forEach(header => {
+        html += `<th>${header.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    data.forEach(row => {
+        html += '<tr>';
+        headers.forEach(header => {
+            let value = row[header];
+            if (typeof value === 'object' && value !== null) {
+                value = JSON.stringify(value);
+            } else if (value === null || value === undefined) {
+                value = '-';
+            }
+            html += `<td>${value}</td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody>';
+    return html;
+}
+
+function exportReport(reportType, format) {
+    const url = `/export/${reportType}/${format}`;
+    window.open(url, '_blank');
 }
 
 // Export functions
 function exportToExcel() {
-    alert("Exporting data to Excel format...");
-    // Implement actual Excel export
+    showInfo("Excel export coming soon! Use CSV export for now.");
 }
 
 function exportToPDF() {
-    alert("Exporting data to PDF format...");
-    // Implement actual PDF export
+    showInfo("Please generate a specific report first, then use the Export PDF button in the report modal.");
 }
 
 function exportToCSV() {
-    alert("Exporting data to CSV format...");
-    // Implement actual CSV export
+    showInfo("Please generate a specific report first, then use the Export CSV button in the report modal.");
+}
+
+// Utility functions
+function showLoading(message) {
+    // Create or update loading indicator
+    let loadingDiv = document.getElementById('loadingIndicator');
+    if (!loadingDiv) {
+        loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loadingIndicator';
+        loadingDiv.className = 'position-fixed top-50 start-50 translate-middle';
+        loadingDiv.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="mt-2 text-primary">Loading...</div>
+            </div>
+        `;
+        document.body.appendChild(loadingDiv);
+    }
+    loadingDiv.querySelector('.text-primary').textContent = message;
+    loadingDiv.style.display = 'block';
+}
+
+function hideLoading() {
+    const loadingDiv = document.getElementById('loadingIndicator');
+    if (loadingDiv) {
+        loadingDiv.style.display = 'none';
+    }
+}
+
+function showError(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+function showInfo(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-info alert-dismissible fade show position-fixed';
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
 }
 </script>
 {% endblock %}
