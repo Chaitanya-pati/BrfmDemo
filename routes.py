@@ -1930,22 +1930,61 @@ def upload_precleaning_cleaning_photo():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
         
-        # Create or update manual cleaning log
-        precleaning_cleaning = ManualCleaningLog(
+        # Check if we already have a recent cleaning log (within last 5 seconds) to avoid duplicates
+        recent_cutoff = datetime.utcnow() - timedelta(seconds=5)
+        existing_log = ManualCleaningLog.query.filter_by(
             precleaning_process_id=int(process_id),
-            machine_name='Precleaning Equipment',
-            operator_name=operator_name,
-            notes=notes,
-            status='completed'
-        )
+            operator_name=operator_name
+        ).filter(
+            ManualCleaningLog.cleaning_start_time >= recent_cutoff
+        ).first()
         
-        # Set appropriate photo field
-        if photo_type == 'before':
-            precleaning_cleaning.before_photo = filename
+        if existing_log:
+            # Update existing log with the new photo
+            if photo_type == 'before' and not existing_log.before_photo:
+                existing_log.before_photo = filename
+            elif photo_type == 'after' and not existing_log.after_photo:
+                existing_log.after_photo = filename
+            else:
+                # If photo field already exists, create new log
+                precleaning_cleaning = ManualCleaningLog(
+                    precleaning_process_id=int(process_id),
+                    machine_name='Precleaning Equipment',
+                    operator_name=operator_name,
+                    cleaning_start_time=datetime.utcnow(),
+                    cleaning_end_time=datetime.utcnow(),
+                    duration_minutes=0.5,
+                    notes=notes,
+                    status='completed'
+                )
+                
+                if photo_type == 'before':
+                    precleaning_cleaning.before_photo = filename
+                else:
+                    precleaning_cleaning.after_photo = filename
+                
+                db.session.add(precleaning_cleaning)
         else:
-            precleaning_cleaning.after_photo = filename
+            # Create new manual cleaning log
+            precleaning_cleaning = ManualCleaningLog(
+                precleaning_process_id=int(process_id),
+                machine_name='Precleaning Equipment',
+                operator_name=operator_name,
+                cleaning_start_time=datetime.utcnow(),
+                cleaning_end_time=datetime.utcnow(),
+                duration_minutes=0.5,
+                notes=notes,
+                status='completed'
+            )
+            
+            # Set appropriate photo field
+            if photo_type == 'before':
+                precleaning_cleaning.before_photo = filename
+            else:
+                precleaning_cleaning.after_photo = filename
+            
+            db.session.add(precleaning_cleaning)
         
-        db.session.add(precleaning_cleaning)
         db.session.commit()
         
         return jsonify({
@@ -2083,6 +2122,51 @@ def force_stop_all_precleaning():
             'success': True,
             'stopped_processes': stopped_count,
             'message': f'Force stopped {stopped_count} running precleaning processes'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/cleanup_duplicate_manual_cleanings', methods=['POST'])
+def cleanup_duplicate_manual_cleanings():
+    """Clean up duplicate manual cleaning logs"""
+    try:
+        # Find duplicates based on precleaning_process_id, operator_name, and timestamp proximity
+        duplicates_removed = 0
+        
+        # Get all precleaning process IDs
+        precleaning_processes = PrecleaningProcess.query.all()
+        
+        for process in precleaning_processes:
+            # Get all manual cleaning logs for this process
+            logs = ManualCleaningLog.query.filter_by(
+                precleaning_process_id=process.id
+            ).order_by(ManualCleaningLog.cleaning_start_time.desc()).all()
+            
+            # Group logs by operator and time proximity (within 5 seconds)
+            kept_logs = []
+            for log in logs:
+                is_duplicate = False
+                for kept_log in kept_logs:
+                    time_diff = abs((log.cleaning_start_time - kept_log.cleaning_start_time).total_seconds())
+                    if log.operator_name == kept_log.operator_name and time_diff <= 5:
+                        # This is a duplicate, mark for deletion
+                        is_duplicate = True
+                        break
+                
+                if not is_duplicate:
+                    kept_logs.append(log)
+                else:
+                    db.session.delete(log)
+                    duplicates_removed += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'duplicates_removed': duplicates_removed,
+            'message': f'Successfully removed {duplicates_removed} duplicate manual cleaning logs'
         })
         
     except Exception as e:
