@@ -481,10 +481,12 @@ def raw_wheat_quality_report():
             # Update vehicle status based on approval
             vehicle = Vehicle.query.get(report.vehicle_id)
             if vehicle:
-                vehicle.status = 'quality_check'
                 vehicle.quality_category = report.category_assigned
                 if report.approved:
+                    vehicle.status = 'approved'
                     vehicle.owner_approved = True
+                else:
+                    vehicle.status = 'quality_check'
             
             db.session.add(report)
             db.session.commit()
