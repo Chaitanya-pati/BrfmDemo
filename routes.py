@@ -453,10 +453,38 @@ def raw_wheat_quality_report():
             report.dry_gluten = float(request.form.get('dry_gluten', 0))
             report.sedimentation_value = float(request.form.get('sedimentation_value', 0))
             
-            # Additional fields...
+            # Refractions/Impurities
+            report.chaff_husk = float(request.form.get('chaff_husk', 0))
+            report.straws_sticks = float(request.form.get('straws_sticks', 0))
+            report.other_foreign_matter = float(request.form.get('other_foreign_matter', 0))
+            report.mudballs = float(request.form.get('mudballs', 0))
+            report.stones = float(request.form.get('stones', 0))
+            report.dust_sand = float(request.form.get('dust_sand', 0))
+            report.total_impurities = float(request.form.get('total_impurities', 0))
+            
+            # Grain dockage
+            report.shriveled_wheat = float(request.form.get('shriveled_wheat', 0))
+            report.insect_damage = float(request.form.get('insect_damage', 0))
+            report.blackened_wheat = float(request.form.get('blackened_wheat', 0))
+            report.other_grains = float(request.form.get('other_grains', 0))
+            report.soft_wheat = float(request.form.get('soft_wheat', 0))
+            report.heat_damaged = float(request.form.get('heat_damaged', 0))
+            report.immature_wheat = float(request.form.get('immature_wheat', 0))
+            report.broken_wheat = float(request.form.get('broken_wheat', 0))
+            report.total_dockage = float(request.form.get('total_dockage', 0))
+            
+            # Final assessment
             report.category_assigned = request.form['category_assigned']
             report.approved = request.form.get('approved') == 'on'
             report.comments_action = request.form.get('comments_action')
+            
+            # Update vehicle status based on approval
+            vehicle = Vehicle.query.get(report.vehicle_id)
+            if vehicle:
+                vehicle.status = 'quality_check'
+                vehicle.quality_category = report.category_assigned
+                if report.approved:
+                    vehicle.owner_approved = True
             
             db.session.add(report)
             db.session.commit()
@@ -466,10 +494,11 @@ def raw_wheat_quality_report():
             db.session.rollback()
             flash(f'Error creating quality report: {str(e)}', 'error')
     
-    vehicles = Vehicle.query.filter_by(status='quality_check').all()
+    # Include both pending and quality_check vehicles for testing
+    vehicles = Vehicle.query.filter(Vehicle.status.in_(['pending', 'quality_check'])).all()
     reports = RawWheatQualityReport.query.order_by(RawWheatQualityReport.test_date.desc()).all()
     
-    return render_template('raw_wheat_quality_report.html', vehicles=vehicles, reports=reports)
+    return render_template('raw_wheat_quality_report.html', vehicles=vehicles, raw_wheat_reports=reports)
 
 # Configure upload folder
 app.config['UPLOAD_FOLDER'] = 'uploads'
