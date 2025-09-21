@@ -4,7 +4,52 @@
 
 {% block head %}
 <style>
+/* Fix chart container sizing */
+.chart-container {
+    position: relative;
+    height: 300px !important;
+    width: 100% !important;
+    overflow: hidden;
+}
+
+.chart-container canvas {
+    max-height: 300px !important;
+    height: 300px !important;
+    width: 100% !important;
+}
+
+/* Ensure proper responsive layout */
+.main-content {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+}
+
+@media (min-width: 769px) {
+    .main-wrapper {
+        margin-left: var(--sidebar-width, 280px) !important;
+    }
+    
+    .main-wrapper.expanded {
+        margin-left: var(--sidebar-collapsed-width, 60px) !important;
+    }
+}
+
 /* Mobile-first responsive design */
+@media (max-width: 768px) {
+    .main-wrapper {
+        margin-left: 0 !important;
+    }
+    
+    .chart-container {
+        height: 250px !important;
+    }
+    
+    .chart-container canvas {
+        max-height: 250px !important;
+        height: 250px !important;
+    }
+}
+
 @media (max-width: 576px) {
     .card-body .row [class*="col-"] {
         margin-bottom: 15px;
@@ -54,6 +99,15 @@
         display: block;
         width: 100%;
         margin-bottom: 10px;
+    }
+    
+    .chart-container {
+        height: 200px !important;
+    }
+    
+    .chart-container canvas {
+        max-height: 200px !important;
+        height: 200px !important;
     }
 }
 
@@ -203,7 +257,7 @@
                 <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Vehicle Status Report</h5>
             </div>
             <div class="card-body">
-                <div style="position: relative; height: 300px; width: 100%;">
+                <div class="chart-container">
                     <canvas id="vehicleStatusChart"></canvas>
                 </div>
 
@@ -242,7 +296,7 @@
                 <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Godown Inventory Report</h5>
             </div>
             <div class="card-body">
-                <div style="position: relative; height: 300px; width: 100%;">
+                <div class="chart-container">
                     <canvas id="inventoryChart"></canvas>
                 </div>
 
@@ -290,7 +344,7 @@
                 <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Production Status Report</h5>
             </div>
             <div class="card-body">
-                <div style="position: relative; height: 300px; width: 100%;">
+                <div class="chart-container">
                     <canvas id="productionChart"></canvas>
                 </div>
 
@@ -329,7 +383,7 @@
                 <h5 class="mb-0"><i class="fas fa-shipping-fast me-2"></i>Dispatch Status Report</h5>
             </div>
             <div class="card-body">
-                <div style="position: relative; height: 300px; width: 100%;">
+                <div class="chart-container">
                     <canvas id="dispatchChart"></canvas>
                 </div>
 
@@ -510,6 +564,7 @@ document.addEventListener('DOMContentLoaded', function() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            aspectRatio: 1,
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -524,6 +579,10 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             layout: {
                 padding: 10
+            },
+            onResize: function(chart, size) {
+                chart.canvas.style.height = '300px';
+                chart.canvas.style.maxHeight = '300px';
             }
         }
     });
@@ -555,6 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            aspectRatio: 1.5,
             scales: {
                 y: {
                     beginAtZero: true,
@@ -577,6 +637,10 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             layout: {
                 padding: 10
+            },
+            onResize: function(chart, size) {
+                chart.canvas.style.height = '300px';
+                chart.canvas.style.maxHeight = '300px';
             }
         }
     });
@@ -610,6 +674,7 @@ document.addEventListener('DOMContentLoaded', function() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            aspectRatio: 1,
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -624,6 +689,10 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             layout: {
                 padding: 10
+            },
+            onResize: function(chart, size) {
+                chart.canvas.style.height = '300px';
+                chart.canvas.style.maxHeight = '300px';
             }
         }
     });
@@ -656,6 +725,7 @@ document.addEventListener('DOMContentLoaded', function() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            aspectRatio: 1,
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -670,6 +740,10 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             layout: {
                 padding: 10
+            },
+            onResize: function(chart, size) {
+                chart.canvas.style.height = '300px';
+                chart.canvas.style.maxHeight = '300px';
             }
         }
     });

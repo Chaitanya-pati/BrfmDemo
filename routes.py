@@ -366,6 +366,131 @@ def sales_dispatch():
                              sales_orders=[], 
                              dispatches=[])
 
+@app.route('/report/customer')
+def customer_report():
+    """Generate customer-wise report"""
+    try:
+        # Get customer statistics from sales dispatch
+        customer_stats = db.session.query(
+            SalesDispatch.customer_name,
+            func.count(SalesDispatch.id).label('total_orders'),
+            func.sum(SalesDispatch.quantity).label('total_quantity'),
+            func.avg(SalesDispatch.rate).label('avg_rate')
+        ).group_by(SalesDispatch.customer_name).all()
+        
+        data = []
+        for stat in customer_stats:
+            data.append({
+                'customer_name': stat.customer_name,
+                'total_orders': stat.total_orders,
+                'total_quantity': float(stat.total_quantity) if stat.total_quantity else 0,
+                'avg_rate': float(stat.avg_rate) if stat.avg_rate else 0
+            })
+        
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/report/product')
+def product_report():
+    """Generate product-wise report"""
+    try:
+        # Get product statistics from production orders
+        product_stats = db.session.query(
+            ProductionOrder.product_type,
+            func.count(ProductionOrder.id).label('total_orders'),
+            func.sum(ProductionOrder.quantity_kg).label('total_quantity')
+        ).group_by(ProductionOrder.product_type).all()
+        
+        data = []
+        for stat in product_stats:
+            data.append({
+                'product_type': stat.product_type,
+                'total_orders': stat.total_orders,
+                'total_quantity': float(stat.total_quantity) if stat.total_quantity else 0
+            })
+        
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/report/vehicle')
+def vehicle_report():
+    """Generate vehicle-wise report"""
+    try:
+        # Get vehicle performance statistics
+        vehicle_stats = db.session.query(
+            VehicleEntry.vehicle_number,
+            VehicleEntry.driver_name,
+            func.count(VehicleEntry.id).label('total_entries'),
+            func.sum(VehicleEntry.loaded_weight).label('total_weight'),
+            func.avg(VehicleEntry.loaded_weight).label('avg_weight')
+        ).group_by(VehicleEntry.vehicle_number, VehicleEntry.driver_name).all()
+        
+        data = []
+        for stat in vehicle_stats:
+            data.append({
+                'vehicle_number': stat.vehicle_number,
+                'driver_name': stat.driver_name,
+                'total_entries': stat.total_entries,
+                'total_weight': float(stat.total_weight) if stat.total_weight else 0,
+                'avg_weight': float(stat.avg_weight) if stat.avg_weight else 0
+            })
+        
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/report/salesman')
+def salesman_report():
+    """Generate salesman performance report"""
+    try:
+        # Get salesman statistics from sales dispatch
+        salesman_stats = db.session.query(
+            SalesDispatch.salesman,
+            func.count(SalesDispatch.id).label('total_orders'),
+            func.sum(SalesDispatch.quantity).label('total_quantity'),
+            func.sum(SalesDispatch.amount).label('total_amount')
+        ).group_by(SalesDispatch.salesman).all()
+        
+        data = []
+        for stat in salesman_stats:
+            data.append({
+                'salesman': stat.salesman,
+                'total_orders': stat.total_orders,
+                'total_quantity': float(stat.total_quantity) if stat.total_quantity else 0,
+                'total_amount': float(stat.total_amount) if stat.total_amount else 0
+            })
+        
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/report/order')
+def order_report():
+    """Generate order-wise report"""
+    try:
+        # Get comprehensive order information
+        orders = db.session.query(SalesDispatch).all()
+        
+        data = []
+        for order in orders:
+            data.append({
+                'order_id': order.id,
+                'customer_name': order.customer_name,
+                'product_type': order.product_type,
+                'quantity': float(order.quantity) if order.quantity else 0,
+                'rate': float(order.rate) if order.rate else 0,
+                'amount': float(order.amount) if order.amount else 0,
+                'salesman': order.salesman,
+                'dispatch_date': order.dispatch_date.strftime('%Y-%m-%d') if order.dispatch_date else None,
+                'status': order.status
+            })
+        
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/reports')
 def reports():
     # Various report data without production references
