@@ -2724,11 +2724,11 @@ def start_grinding(order_id):
     
     if request.method == 'POST':
         try:
-            # Get form data (removed fields: b1_scale_weight, grinding_machine, grinding_operator)
+            # Get form data with defaults for nullable fields
             b1_scale_operator = request.form['b1_scale_operator']
             b1_scale_notes = request.form.get('b1_scale_notes', '')
             
-            # Create grinding session
+            # Create grinding session with nullable fields handled
             grinding_session = GrindingSession(
                 order_id=order_id,
                 start_time=datetime.utcnow(),
@@ -2736,8 +2736,11 @@ def start_grinding(order_id):
                 timer_active=True,  # Set timer as active
                 b1_scale_operator=b1_scale_operator,
                 b1_scale_handoff_time=datetime.utcnow(),
+                b1_scale_weight_kg=None,  # Set to None for nullable field
                 b1_scale_notes=b1_scale_notes,
-                # Removed fields: b1_scale_weight_kg, grinding_machine_name, grinding_operator, total_input_kg
+                grinding_machine_name=None,  # Set to None for nullable field
+                grinding_operator=None,      # Set to None for nullable field
+                total_input_kg=None,        # Set to None for nullable field
             )
             
             db.session.add(grinding_session)
