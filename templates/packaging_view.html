@@ -295,7 +295,7 @@ function addPackagingRow() {
     row.id = `packaging_row_${packagingRowCount}`;
     row.innerHTML = `
         <td>
-            <select class="form-select product-select" name="product_name" required>
+            <select class="form-select product-select" name="product_name" required onchange="toggleStorageOptions(${packagingRowCount})">
                 <option value="">Select product...</option>
                 {% for product in products %}
                 <option value="{{ product.name }}">{{ product.name }}</option>
@@ -303,15 +303,39 @@ function addPackagingRow() {
             </select>
         </td>
         <td>
-            <select class="form-select bag-size-select" name="bag_weight_kg" required onchange="calculateRowTotal(${packagingRowCount})">
-                <option value="">Bag size...</option>
-                <option value="5">5 kg</option>
-                <option value="25">25 kg</option>
-                <option value="50">50 kg</option>
-            </select>
+            <div id="storage_type_${packagingRowCount}" style="display: none;">
+                <label class="form-label text-small">Storage Type:</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="storage_type_${packagingRowCount}" id="bags_${packagingRowCount}" value="bags" checked onchange="togglePackagingFields(${packagingRowCount})">
+                    <label class="btn btn-outline-primary btn-sm" for="bags_${packagingRowCount}">Pack in Bags</label>
+                    <input type="radio" class="btn-check" name="storage_type_${packagingRowCount}" id="shallows_${packagingRowCount}" value="shallows" onchange="togglePackagingFields(${packagingRowCount})">
+                    <label class="btn btn-outline-success btn-sm" for="shallows_${packagingRowCount}">Store in Shallows</label>
+                </div>
+            </div>
+            <div id="bag_size_section_${packagingRowCount}">
+                <select class="form-select bag-size-select" name="bag_weight_kg" required onchange="calculateRowTotal(${packagingRowCount})">
+                    <option value="">Bag size...</option>
+                    <option value="5">5 kg</option>
+                    <option value="25">25 kg</option>
+                    <option value="50">50 kg</option>
+                </select>
+            </div>
+            <div id="shallows_section_${packagingRowCount}" style="display: none;">
+                <select class="form-select shallows-select" name="shallows_id">
+                    <option value="">Select Shallow...</option>
+                    {% for shallow in shallows %}
+                    <option value="{{ shallow.id }}">{{ shallow.name }} ({{ shallow.current_stock_kg }}/{{ shallow.capacity_kg }} kg)</option>
+                    {% endfor %}
+                </select>
+            </div>
         </td>
         <td>
-            <input type="number" class="form-control bag-count-input" name="bag_count" min="1" required onchange="calculateRowTotal(${packagingRowCount})">
+            <div id="bag_count_section_${packagingRowCount}">
+                <input type="number" class="form-control bag-count-input" name="bag_count" min="1" required onchange="calculateRowTotal(${packagingRowCount})">
+            </div>
+            <div id="direct_weight_section_${packagingRowCount}" style="display: none;">
+                <input type="number" class="form-control direct-weight-input" name="direct_weight" min="0.1" step="0.1" placeholder="Weight (kg)" onchange="calculateRowTotal(${packagingRowCount})">
+            </div>
         </td>
         <td>
             <input type="number" class="form-control total-weight-input" name="total_weight_kg" readonly>
@@ -335,11 +359,73 @@ function removePackagingRow(rowId) {
     }
 }
 
+// Toggle storage options visibility for Maida products
+function toggleStorageOptions(rowId) {
+    const row = document.getElementById(`packaging_row_${rowId}`);
+    const productSelect = row.querySelector('.product-select');
+    const storageTypeDiv = document.getElementById(`storage_type_${rowId}`);
+    
+    if (productSelect.value === 'Maida') {
+        storageTypeDiv.style.display = 'block';
+    } else {
+        storageTypeDiv.style.display = 'none';
+        // Reset to bags for non-Maida products
+        document.getElementById(`bags_${rowId}`).checked = true;
+        togglePackagingFields(rowId);
+    }
+}
+
+// Toggle between bags and shallows packaging fields
+function togglePackagingFields(rowId) {
+    const bagsRadio = document.getElementById(`bags_${rowId}`);
+    const bagSizeSection = document.getElementById(`bag_size_section_${rowId}`);
+    const shallowsSection = document.getElementById(`shallows_section_${rowId}`);
+    const bagCountSection = document.getElementById(`bag_count_section_${rowId}`);
+    const directWeightSection = document.getElementById(`direct_weight_section_${rowId}`);
+    
+    if (bagsRadio.checked) {
+        // Show bag packaging fields
+        bagSizeSection.style.display = 'block';
+        shallowsSection.style.display = 'none';
+        bagCountSection.style.display = 'block';
+        directWeightSection.style.display = 'none';
+        
+        // Make bag fields required
+        bagSizeSection.querySelector('select').required = true;
+        bagCountSection.querySelector('input').required = true;
+        shallowsSection.querySelector('select').required = false;
+        directWeightSection.querySelector('input').required = false;
+    } else {
+        // Show shallows storage fields
+        bagSizeSection.style.display = 'none';
+        shallowsSection.style.display = 'block';
+        bagCountSection.style.display = 'none';
+        directWeightSection.style.display = 'block';
+        
+        // Make shallows fields required
+        bagSizeSection.querySelector('select').required = false;
+        bagCountSection.querySelector('input').required = false;
+        shallowsSection.querySelector('select').required = true;
+        directWeightSection.querySelector('input').required = true;
+    }
+    
+    calculateRowTotal(rowId);
+}
+
 function calculateRowTotal(rowId) {
     const row = document.getElementById(`packaging_row_${rowId}`);
-    const bagWeight = parseFloat(row.querySelector('.bag-size-select').value) || 0;
-    const bagCount = parseInt(row.querySelector('.bag-count-input').value) || 0;
-    const totalWeight = bagWeight * bagCount;
+    const storageTypeRadio = document.querySelector(`input[name="storage_type_${rowId}"]:checked`);
+    let totalWeight = 0;
+    
+    if (!storageTypeRadio || storageTypeRadio.value === 'bags') {
+        // Calculate for bag packaging
+        const bagWeight = parseFloat(row.querySelector('.bag-size-select').value) || 0;
+        const bagCount = parseInt(row.querySelector('.bag-count-input').value) || 0;
+        totalWeight = bagWeight * bagCount;
+    } else {
+        // Calculate for shallows storage (direct weight entry)
+        totalWeight = parseFloat(row.querySelector('.direct-weight-input').value) || 0;
+    }
     
     row.querySelector('.total-weight-input').value = totalWeight.toFixed(2);
     updateSummary();

@@ -613,10 +613,23 @@ class PackagingRecord(db.Model):
     operator_name = db.Column(db.String(100), nullable=False)
     storage_area_id = db.Column(db.Integer, db.ForeignKey('storage_area.id'), nullable=True)
     process_stage = db.Column(db.String(50), nullable=False, default='packaging')  # packaging, quality_check, dispatch_ready
+    # Enhanced fields for Maida packaging options
+    storage_type = db.Column(db.String(20), default='bags')  # bags, shallows
+    shallows_id = db.Column(db.Integer, db.ForeignKey('shallows_master.id'), nullable=True)
 
     # Relationships
     production_order = db.relationship('ProductionOrder', backref='packaging_records')
     storage_area = db.relationship('StorageArea', backref='packaging_records')
+    shallows = db.relationship('ShallowsMaster', backref='packaging_records')
+
+class ShallowsMaster(db.Model):
+    """Master setup for Shallows storage with capacity tracking"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    capacity_kg = db.Column(db.Float, nullable=False)
+    current_stock_kg = db.Column(db.Float, default=0)
+    location = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class StorageTransaction(db.Model):
     """Enhanced storage management with shifting and tracking"""

@@ -121,7 +121,7 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">From Storage Area *</label>
-                                    <select name="from_storage_id" id="fromStorage" class="form-select" required onchange="updateFromStorageInfo()">
+                                    <select name="from_storage_id" id="fromStorage" class="form-select" required onchange="loadAvailableProducts()">
                                         <option value="">Select source storage...</option>
                                         {% for area in storage_areas %}
                                         {% if area.current_stock_kg > 0 %}
@@ -146,26 +146,47 @@
                             </div>
                         </div>
                         
-                        <div class="row">
-                            <div class="col-md-6">
+                        <!-- Dynamic Product Selection Section -->
+                        <div class="row" id="productSelectionSection" style="display: none;">
+                            <div class="col-md-12">
                                 <div class="mb-3">
-                                    <label class="form-label">Product *</label>
-                                    <select name="product_id" class="form-select" required>
-                                        <option value="">Select product...</option>
-                                        {% for product in products %}
-                                        <option value="{{ product.id }}">{{ product.name }}</option>
-                                        {% endfor %}
+                                    <label class="form-label">Available Products in Source Storage *</label>
+                                    <select name="product_bag_type" id="productBagSelect" class="form-select" required onchange="updateTransferFields()">
+                                        <option value="">Select product and bag type...</option>
                                     </select>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Quantity (kg) *</label>
-                                    <input type="number" name="quantity" id="transferQuantity" class="form-control" step="0.01" min="0.01" required>
-                                    <small class="form-text text-muted" id="quantityInfo">Enter quantity to transfer</small>
+                                    <small class="form-text text-muted" id="productInfo">Select a source storage area first to see available products</small>
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Transfer Quantity Section -->
+                        <div class="row" id="quantitySection" style="display: none;">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Number of Bags *</label>
+                                    <input type="number" name="bag_count" id="bagCount" class="form-control" min="1" required onchange="calculateTransferWeight()">
+                                    <small class="form-text text-muted" id="bagCountInfo">Enter number of bags to transfer</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Weight per Bag (kg)</label>
+                                    <input type="number" name="weight_per_bag" id="weightPerBag" class="form-control" readonly>
+                                    <small class="form-text text-muted">Automatically filled based on selection</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Total Weight (kg) *</label>
+                                    <input type="number" name="total_weight" id="totalWeight" class="form-control" readonly>
+                                    <small class="form-text text-muted" id="totalWeightInfo">Calculated automatically</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden fields for backend processing -->
+                        <input type="hidden" name="product_name" id="hiddenProductName">
+                        <input type="hidden" name="quantity" id="hiddenQuantity">
                         
                         <div class="row">
                             <div class="col-md-6">
@@ -191,11 +212,12 @@
 
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>Transfer Guidelines:</strong>
+                            <strong>Enhanced Transfer System:</strong>
                             <ul class="mb-0 mt-2">
-                                <li>Ensure sufficient stock is available in source storage</li>
-                                <li>Check destination storage has adequate capacity</li>
-                                <li>Document the reason for transfer for audit purposes</li>
+                                <li><strong>Step 1:</strong> Select source storage to see available products with bag information</li>
+                                <li><strong>Step 2:</strong> Choose product and bag type (e.g., "Maida (25kg bags) - 50 bags available")</li>
+                                <li><strong>Step 3:</strong> Enter number of bags to transfer - weight calculates automatically</li>
+                                <li><strong>Step 4:</strong> Select destination storage and complete transfer</li>
                                 <li>Physical movement should be completed before confirming transfer</li>
                             </ul>
                         </div>
@@ -290,11 +312,157 @@ function updateToStorageInfo() {
     }
 }
 
-// Form validation
+// Enhanced transfer functionality for dynamic product loading
+function loadAvailableProducts() {
+    const fromStorageSelect = document.getElementById('fromStorage');
+    const productSection = document.getElementById('productSelectionSection');
+    const productSelect = document.getElementById('productBagSelect');
+    const productInfo = document.getElementById('productInfo');
+    const quantitySection = document.getElementById('quantitySection');
+    
+    // Reset sections
+    productSection.style.display = 'none';
+    quantitySection.style.display = 'none';
+    productSelect.innerHTML = '<option value="">Loading available products...</option>';
+    
+    if (!fromStorageSelect.value) {
+        productInfo.textContent = 'Select a source storage area first to see available products';
+        updateFromStorageInfo();
+        return;
+    }
+    
+    // Update storage info
+    updateFromStorageInfo();
+    
+    // Load available products via API
+    fetch(`/api/storage_area_stock/${fromStorageSelect.value}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.available_products.length > 0) {
+                productSection.style.display = 'block';
+                productSelect.innerHTML = '<option value="">Select product and bag type...</option>';
+                
+                data.available_products.forEach(product => {
+                    product.bag_types.forEach(bagType => {
+                        const optionValue = JSON.stringify({
+                            product_name: product.product_name,
+                            bag_type: bagType.bag_type,
+                            weight_per_bag: bagType.weight_per_bag,
+                            available_bags: bagType.available_bags
+                        });
+                        
+                        const option = document.createElement('option');
+                        option.value = optionValue;
+                        option.textContent = bagType.display_text;
+                        productSelect.appendChild(option);
+                    });
+                });
+                
+                productInfo.textContent = `Found ${data.available_products.length} products with available stock`;
+            } else {
+                productSection.style.display = 'block';
+                productSelect.innerHTML = '<option value="">No products available in this storage area</option>';
+                productInfo.textContent = 'No products found with available stock in this storage area';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading products:', error);
+            productSection.style.display = 'block';
+            productSelect.innerHTML = '<option value="">Error loading products</option>';
+            productInfo.textContent = 'Error loading products. Please try again.';
+        });
+}
+
+function updateTransferFields() {
+    const productSelect = document.getElementById('productBagSelect');
+    const quantitySection = document.getElementById('quantitySection');
+    const bagCountInput = document.getElementById('bagCount');
+    const weightPerBagInput = document.getElementById('weightPerBag');
+    const bagCountInfo = document.getElementById('bagCountInfo');
+    
+    if (!productSelect.value) {
+        quantitySection.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const productData = JSON.parse(productSelect.value);
+        
+        // Show quantity section and populate fields
+        quantitySection.style.display = 'block';
+        weightPerBagInput.value = productData.weight_per_bag;
+        bagCountInput.max = productData.available_bags;
+        bagCountInput.value = '';
+        
+        // Update hidden fields
+        document.getElementById('hiddenProductName').value = productData.product_name;
+        
+        // Update info text
+        bagCountInfo.textContent = `Available: ${productData.available_bags} bags (max)`;
+        
+        // Clear total weight
+        document.getElementById('totalWeight').value = '';
+        document.getElementById('hiddenQuantity').value = '';
+        
+    } catch (error) {
+        console.error('Error parsing product data:', error);
+        quantitySection.style.display = 'none';
+    }
+}
+
+function calculateTransferWeight() {
+    const bagCountInput = document.getElementById('bagCount');
+    const weightPerBagInput = document.getElementById('weightPerBag');
+    const totalWeightInput = document.getElementById('totalWeight');
+    const hiddenQuantityInput = document.getElementById('hiddenQuantity');
+    const totalWeightInfo = document.getElementById('totalWeightInfo');
+    
+    const bagCount = parseInt(bagCountInput.value) || 0;
+    const weightPerBag = parseFloat(weightPerBagInput.value) || 0;
+    const totalWeight = bagCount * weightPerBag;
+    
+    totalWeightInput.value = totalWeight.toFixed(2);
+    hiddenQuantityInput.value = totalWeight.toFixed(2);
+    
+    if (bagCount > 0) {
+        totalWeightInfo.textContent = `${bagCount} bags × ${weightPerBag}kg = ${totalWeight.toFixed(2)}kg total`;
+    } else {
+        totalWeightInfo.textContent = 'Calculated automatically';
+    }
+}
+
+// Enhanced form validation for bag-based transfers
 document.querySelector('#transferModal form').addEventListener('submit', function(e) {
     const fromStorage = document.getElementById('fromStorage').value;
     const toStorage = document.getElementById('toStorage').value;
-    const quantity = parseFloat(document.getElementById('transferQuantity').value) || 0;
+    const productBagSelect = document.getElementById('productBagSelect').value;
+    const bagCount = parseInt(document.getElementById('bagCount').value) || 0;
+    const quantity = parseFloat(document.getElementById('hiddenQuantity').value) || 0;
+    
+    // Basic validation
+    if (!fromStorage) {
+        alert('Please select a source storage area!');
+        e.preventDefault();
+        return;
+    }
+    
+    if (!toStorage) {
+        alert('Please select a destination storage area!');
+        e.preventDefault();
+        return;
+    }
+    
+    if (!productBagSelect) {
+        alert('Please select a product and bag type to transfer!');
+        e.preventDefault();
+        return;
+    }
+    
+    if (bagCount <= 0) {
+        alert('Please enter a valid number of bags to transfer!');
+        e.preventDefault();
+        return;
+    }
     
     if (fromStorage === toStorage) {
         alert('Source and destination storage areas cannot be the same!');
@@ -302,25 +470,48 @@ document.querySelector('#transferModal form').addEventListener('submit', functio
         return;
     }
     
-    const fromOption = document.querySelector(`#fromStorage option[value="${fromStorage}"]`);
-    const toOption = document.querySelector(`#toStorage option[value="${toStorage}"]`);
-    
-    if (fromOption && toOption) {
-        const availableStock = parseFloat(fromOption.dataset.stock || 0);
-        const availableCapacity = parseFloat(toOption.dataset.available || 0);
+    // Validate against available stock and capacity
+    try {
+        const productData = JSON.parse(productBagSelect);
         
-        if (quantity > availableStock) {
-            alert(`Transfer quantity (${quantity}kg) exceeds available stock (${availableStock}kg)!`);
+        if (bagCount > productData.available_bags) {
+            alert(`Cannot transfer ${bagCount} bags. Only ${productData.available_bags} bags available!`);
             e.preventDefault();
             return;
         }
         
-        if (quantity > availableCapacity) {
-            if (!confirm(`Transfer quantity (${quantity}kg) exceeds available capacity (${availableCapacity}kg). This may cause overflow. Continue?`)) {
-                e.preventDefault();
-                return;
+        // Check destination capacity
+        const toOption = document.querySelector(`#toStorage option[value="${toStorage}"]`);
+        if (toOption) {
+            const availableCapacity = parseFloat(toOption.dataset.available || 0);
+            
+            if (quantity > availableCapacity) {
+                if (!confirm(`Transfer quantity (${quantity}kg) exceeds available capacity (${availableCapacity}kg). This may cause overflow. Continue?`)) {
+                    e.preventDefault();
+                    return;
+                }
             }
         }
+        
+        // Final confirmation
+        const confirmMessage = `Confirm transfer:\n\n` +
+            `Product: ${productData.product_name}\n` +
+            `Quantity: ${bagCount} bags (${productData.bag_type})\n` +
+            `Total Weight: ${quantity}kg\n` +
+            `From: ${document.querySelector('#fromStorage option:checked').textContent}\n` +
+            `To: ${document.querySelector('#toStorage option:checked').textContent}\n\n` +
+            `Proceed with transfer?`;
+        
+        if (!confirm(confirmMessage)) {
+            e.preventDefault();
+            return;
+        }
+        
+    } catch (error) {
+        console.error('Validation error:', error);
+        alert('Invalid product selection. Please try again.');
+        e.preventDefault();
+        return;
     }
 });
 

@@ -44,7 +44,7 @@ def init_sample_data():
     """Initialize sample data for testing"""
     try:
         # Import models here to avoid circular imports
-        from models import GodownType, Godown, PrecleaningBin, Supplier, Product, Customer
+        from models import GodownType, Godown, PrecleaningBin, Supplier, Product, Customer, ShallowsMaster
         from datetime import timedelta, datetime
         
         # Create godown types
@@ -214,6 +214,26 @@ def init_sample_data():
             storage4.location = 'Secondary Warehouse Section B'
             
             db.session.add_all([storage1, storage2, storage3, storage4])
+            db.session.commit()
+        
+        # Create sample shallows
+        if not db.session.query(ShallowsMaster).first():
+            shallow1 = ShallowsMaster()
+            shallow1.name = 'Shallow Tank A'
+            shallow1.capacity_kg = 2000.0
+            shallow1.location = 'Main Processing Area'
+            
+            shallow2 = ShallowsMaster()
+            shallow2.name = 'Shallow Tank B'
+            shallow2.capacity_kg = 1500.0
+            shallow2.location = 'Main Processing Area'
+            
+            shallow3 = ShallowsMaster()
+            shallow3.name = 'Shallow Tank C'
+            shallow3.capacity_kg = 1800.0
+            shallow3.location = 'Secondary Processing Area'
+            
+            db.session.add_all([shallow1, shallow2, shallow3])
             db.session.commit()
         
         # Create B1 scale machine

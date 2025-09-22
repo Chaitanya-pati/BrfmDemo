@@ -2724,12 +2724,9 @@ def start_grinding(order_id):
     
     if request.method == 'POST':
         try:
-            # Get form data
+            # Get form data (removed fields: b1_scale_weight, grinding_machine, grinding_operator)
             b1_scale_operator = request.form['b1_scale_operator']
-            b1_scale_weight = float(request.form['b1_scale_weight'])
             b1_scale_notes = request.form.get('b1_scale_notes', '')
-            grinding_machine = request.form['grinding_machine']
-            grinding_operator = request.form['grinding_operator']
             
             # Create grinding session
             grinding_session = GrindingSession(
@@ -2739,11 +2736,8 @@ def start_grinding(order_id):
                 timer_active=True,  # Set timer as active
                 b1_scale_operator=b1_scale_operator,
                 b1_scale_handoff_time=datetime.utcnow(),
-                b1_scale_weight_kg=b1_scale_weight,
                 b1_scale_notes=b1_scale_notes,
-                grinding_machine_name=grinding_machine,
-                grinding_operator=grinding_operator,
-                total_input_kg=b1_scale_weight
+                # Removed fields: b1_scale_weight_kg, grinding_machine_name, grinding_operator, total_input_kg
             )
             
             db.session.add(grinding_session)
@@ -3088,6 +3082,103 @@ def get_storage_areas():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@app.route('/api/storage_area_stock/<int:storage_area_id>')
+def get_storage_area_stock(storage_area_id):
+    """Get available stock by product with bag information for a storage area"""
+    try:
+        # Get recent transactions for this storage area to calculate product-wise stock
+        inbound_transactions = StorageTransaction.query.filter_by(
+            to_storage_area_id=storage_area_id
+        ).all()
+        
+        outbound_transactions = StorageTransaction.query.filter_by(
+            from_storage_area_id=storage_area_id
+        ).all()
+        
+        # Also get packaging records that went to this storage area
+        packaging_records = PackagingRecord.query.filter_by(
+            storage_area_id=storage_area_id,
+            storage_type='bags'  # Only bag-packaged items for transfer
+        ).all()
+        
+        # Calculate product stock with bag information
+        product_stock = {}
+        
+        # Add from inbound transactions
+        for transaction in inbound_transactions:
+            product_name = transaction.product_name
+            if product_name not in product_stock:
+                product_stock[product_name] = {'total_kg': 0, 'bags': []}
+            product_stock[product_name]['total_kg'] += transaction.quantity_kg
+        
+        # Add from packaging records (these have specific bag information)
+        for record in packaging_records:
+            product_name = record.product_name
+            if product_name not in product_stock:
+                product_stock[product_name] = {'total_kg': 0, 'bags': []}
+            
+            # Track bag information
+            bag_info = f"{record.bag_weight_kg}kg bags"
+            if bag_info not in [bag['type'] for bag in product_stock[product_name]['bags']]:
+                product_stock[product_name]['bags'].append({
+                    'type': bag_info,
+                    'weight_per_bag': record.bag_weight_kg,
+                    'count': 0
+                })
+            
+            # Find and update bag count
+            for bag in product_stock[product_name]['bags']:
+                if bag['type'] == bag_info:
+                    bag['count'] += record.bag_count
+                    break
+            
+            product_stock[product_name]['total_kg'] += record.total_weight_kg
+        
+        # Subtract outbound transactions
+        for transaction in outbound_transactions:
+            product_name = transaction.product_name
+            if product_name in product_stock:
+                product_stock[product_name]['total_kg'] -= transaction.quantity_kg
+        
+        # Format response with available products
+        available_products = []
+        for product_name, stock_info in product_stock.items():
+            if stock_info['total_kg'] > 0:
+                product_data = {
+                    'product_name': product_name,
+                    'total_available_kg': round(stock_info['total_kg'], 2),
+                    'bag_types': []
+                }
+                
+                for bag in stock_info['bags']:
+                    if bag['count'] > 0:
+                        product_data['bag_types'].append({
+                            'bag_type': bag['type'],
+                            'weight_per_bag': bag['weight_per_bag'],
+                            'available_bags': bag['count'],
+                            'display_text': f"{product_name} ({bag['type']}) - {bag['count']} bags available"
+                        })
+                
+                # If no specific bag info, show as bulk
+                if not product_data['bag_types']:
+                    product_data['bag_types'].append({
+                        'bag_type': 'bulk',
+                        'weight_per_bag': 1,
+                        'available_bags': int(stock_info['total_kg']),
+                        'display_text': f"{product_name} (Bulk) - {round(stock_info['total_kg'], 1)}kg available"
+                    })
+                
+                available_products.append(product_data)
+        
+        return jsonify({
+            'success': True,
+            'storage_area_id': storage_area_id,
+            'available_products': available_products
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
 @app.route('/shift_stock', methods=['POST'])
 def shift_stock():
     """Shift stock between storage areas"""
@@ -3147,36 +3238,62 @@ def packaging_view(production_order_id):
             packaging_items = data['packaging_items']
             
             for item in packaging_items:
+                # Enhanced packaging logic to handle bags vs shallows storage
+                storage_type = item.get('storage_type', 'bags')
+                
                 # Create packaging record linked to production order
-                packaging = PackagingRecord(
-                    production_order_id=production_order_id,
-                    product_name=item['product_name'],
-                    bag_weight_kg=float(item['bag_weight_kg']),
-                    bag_count=int(item['bag_count']),
-                    total_weight_kg=float(item['bag_weight_kg']) * int(item['bag_count']),
-                    operator_name=item['operator_name'],
-                    storage_area_id=int(item['storage_area_id']),
-                    process_stage=item.get('process_stage', 'packaging')
-                )
+                packaging = PackagingRecord()
+                packaging.production_order_id = production_order_id
+                packaging.product_name = item['product_name']
+                packaging.operator_name = item['operator_name']
+                packaging.process_stage = item.get('process_stage', 'packaging')
+                packaging.storage_type = storage_type
+                
+                if storage_type == 'shallows':
+                    # Handle shallows storage for Maida
+                    packaging.bag_weight_kg = 0  # No bags for shallows
+                    packaging.bag_count = 0
+                    packaging.total_weight_kg = float(item['total_weight_kg'])
+                    packaging.shallows_id = int(item['shallows_id'])
+                    packaging.storage_area_id = None
+                    
+                    # Update shallows stock
+                    from models import ShallowsMaster
+                    shallow = ShallowsMaster.query.get(item['shallows_id'])
+                    if shallow:
+                        shallow.current_stock_kg += packaging.total_weight_kg
+                    
+                    notes = f"Production Order #{production_order.order_number}: Stored {packaging.total_weight_kg}kg of {item['product_name']} in shallows - Stage: {item.get('process_stage', 'packaging')}"
+                else:
+                    # Handle traditional bag packaging
+                    packaging.bag_weight_kg = float(item['bag_weight_kg'])
+                    packaging.bag_count = int(item['bag_count'])
+                    packaging.total_weight_kg = float(item['bag_weight_kg']) * int(item['bag_count'])
+                    packaging.storage_area_id = int(item['storage_area_id'])
+                    packaging.shallows_id = None
+                    
+                    # Update storage area stock
+                    storage_area = StorageArea.query.get(item['storage_area_id'])
+                    if storage_area:
+                        storage_area.current_stock_kg += packaging.total_weight_kg
+                    
+                    notes = f"Production Order #{production_order.order_number}: Packaged {item['bag_count']} bags of {item['bag_weight_kg']}kg each - Stage: {item.get('process_stage', 'packaging')}"
                 
                 db.session.add(packaging)
                 
                 # Create storage transaction
-                storage_transaction = StorageTransaction(
-                    to_storage_area_id=int(item['storage_area_id']),
-                    product_name=item['product_name'],
-                    quantity_kg=packaging.total_weight_kg,
-                    transaction_type='storage',
-                    operator_name=item['operator_name'],
-                    notes=f"Production Order #{production_order.order_number}: Packaged {item['bag_count']} bags of {item['bag_weight_kg']}kg each - Stage: {item.get('process_stage', 'packaging')}"
-                )
+                storage_transaction = StorageTransaction()
+                storage_transaction.product_name = item['product_name']
+                storage_transaction.quantity_kg = packaging.total_weight_kg
+                storage_transaction.transaction_type = 'storage'
+                storage_transaction.operator_name = item['operator_name']
+                storage_transaction.notes = notes
+                
+                if storage_type == 'bags':
+                    storage_transaction.to_storage_area_id = int(item['storage_area_id'])
+                # For shallows, we don't link to storage_area since it's a separate system
                 
                 db.session.add(storage_transaction)
-                
-                # Update storage area stock
-                storage_area = StorageArea.query.get(item['storage_area_id'])
-                if storage_area:
-                    storage_area.current_stock_kg += packaging.total_weight_kg
             
             # Update production order status to packaging if not already completed
             if production_order.status != 'completed':
@@ -3186,7 +3303,7 @@ def packaging_view(production_order_id):
             
             return jsonify({
                 'success': True,
-                'message': f'Successfully packaged {len(packaging_items)} products for Order #{production_order.order_number}'
+                'message': f'Successfully processed {len(packaging_items)} items for Order #{production_order.order_number}'
             })
             
         except Exception as e:
@@ -3194,8 +3311,10 @@ def packaging_view(production_order_id):
             return jsonify({'error': str(e)}), 400
     
     # Get data for the template
+    from models import ShallowsMaster
     products = Product.query.all()
     storage_areas = StorageArea.query.all()
+    shallows = ShallowsMaster.query.all()  # Add shallows data for Maida packaging
     order_packaging = PackagingRecord.query.filter_by(
         production_order_id=production_order_id
     ).order_by(PackagingRecord.packaging_time.desc()).all()
@@ -3205,6 +3324,7 @@ def packaging_view(production_order_id):
                          production_order=production_order,
                          products=products, 
                          storage_areas=storage_areas,
+                         shallows=shallows,
                          order_packaging=order_packaging,
                          recent_packaging=recent_packaging)
 
