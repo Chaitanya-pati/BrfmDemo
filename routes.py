@@ -3001,9 +3001,70 @@ def submit_packaging():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
-@app.route('/storage_management')
+@app.route('/storage_management', methods=['GET', 'POST'])
 def storage_management():
-    """Storage areas management dashboard"""
+    """Storage areas management dashboard with enhanced bag-based transfers"""
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'transfer_storage':
+            try:
+                # Get form data for bag-based transfer
+                from_storage_id = int(request.form['from_storage_id'])
+                to_storage_id = int(request.form['to_storage_id'])
+                product_name = request.form['product_name']
+                bag_count = int(request.form.get('bag_count', 0))
+                total_weight = float(request.form['total_weight'])
+                operator_name = request.form['operator_name']
+                reason = request.form.get('reason', '')
+                
+                # Validate inputs
+                if from_storage_id == to_storage_id:
+                    flash('Source and destination storage areas cannot be the same!', 'error')
+                    return redirect(url_for('storage_management'))
+                
+                if bag_count <= 0 or total_weight <= 0:
+                    flash('Invalid transfer quantity!', 'error')
+                    return redirect(url_for('storage_management'))
+                
+                # Validate storage areas
+                from_storage = StorageArea.query.get_or_404(from_storage_id)
+                to_storage = StorageArea.query.get_or_404(to_storage_id)
+                
+                # Check capacity
+                if (to_storage.current_stock_kg + total_weight) > to_storage.capacity_kg:
+                    flash(f'Insufficient capacity in {to_storage.name}! Available: {to_storage.capacity_kg - to_storage.current_stock_kg:.1f}kg', 'error')
+                    return redirect(url_for('storage_management'))
+                
+                # Create transfer transaction with bag information
+                transaction = StorageTransaction(
+                    from_storage_area_id=from_storage_id,
+                    to_storage_area_id=to_storage_id,
+                    product_name=product_name,
+                    quantity_kg=total_weight,
+                    transaction_type='shift',
+                    operator_name=operator_name,
+                    notes=f"Bag transfer: {bag_count} bags. Reason: {reason}" if reason else f"Bag transfer: {bag_count} bags"
+                )
+                
+                db.session.add(transaction)
+                
+                # Update storage quantities
+                from_storage.current_stock_kg -= total_weight
+                to_storage.current_stock_kg += total_weight
+                
+                db.session.commit()
+                
+                flash(f'Successfully transferred {bag_count} bags ({total_weight}kg) of {product_name} from {from_storage.name} to {to_storage.name}', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Transfer failed: {str(e)}', 'error')
+            
+            return redirect(url_for('storage_management'))
+    
+    # GET request - render dashboard
     storage_areas = StorageArea.query.all()
     
     # Get recent transactions
@@ -3250,18 +3311,26 @@ def packaging_view(production_order_id):
                 packaging.storage_type = storage_type
                 
                 if storage_type == 'shallows':
-                    # Handle shallows storage for Maida
+                    # Handle shallows storage for Maida with capacity enforcement
                     packaging.bag_weight_kg = 0  # No bags for shallows
                     packaging.bag_count = 0
                     packaging.total_weight_kg = float(item['total_weight_kg'])
                     packaging.shallows_id = int(item['shallows_id'])
                     packaging.storage_area_id = None
                     
-                    # Update shallows stock
+                    # Update shallows stock with capacity check
                     from models import ShallowsMaster
                     shallow = ShallowsMaster.query.get(item['shallows_id'])
-                    if shallow:
-                        shallow.current_stock_kg += packaging.total_weight_kg
+                    if not shallow:
+                        raise ValueError(f"Shallow storage ID {item['shallows_id']} not found")
+                    
+                    # Check capacity before storing
+                    available_capacity = shallow.capacity_kg - shallow.current_stock_kg
+                    if packaging.total_weight_kg > available_capacity:
+                        raise ValueError(f"Insufficient capacity in {shallow.name}. Available: {available_capacity:.1f}kg, Required: {packaging.total_weight_kg}kg")
+                    
+                    # Update shallows stock
+                    shallow.current_stock_kg += packaging.total_weight_kg
                     
                     notes = f"Production Order #{production_order.order_number}: Stored {packaging.total_weight_kg}kg of {item['product_name']} in shallows - Stage: {item.get('process_stage', 'packaging')}"
                 else:
