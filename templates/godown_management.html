@@ -40,7 +40,7 @@
                                 <td>
                                     {% set utilization = (godown.current_stock / godown.capacity * 100) if godown.capacity > 0 else 0 %}
                                     <div class="progress" style="height: 20px;">
-                                        <div class="progress-bar bg-{{ 'success' if utilization < 80 else 'warning' if utilization < 100 else 'danger' }}" 
+                                        <div class="progress-bar {% if utilization < 50 %}bg-success{% elif utilization < 80 %}bg-warning{% else %}bg-danger{% endif %}" 
                                              style="width: {{ utilization }}%">
                                             {{ "%.1f"|format(utilization) }}%
                                         </div>
@@ -87,10 +87,13 @@
                         <span><strong>{{ bin.name }}</strong></span>
                         <span class="badge bg-info">{{ "%.1f"|format(bin.current_stock) }} kg</span>
                     </div>
-                    <div class="progress mt-1" style="height: 6px;">
+                    <div class="progress mt-1" style="height: 8px;">
                         {% set utilization = (bin.current_stock / bin.capacity * 100) if bin.capacity > 0 else 0 %}
-                        <div class="progress-bar bg-info" style="width: {{ utilization }}%"></div>
+                        <div class="progress-bar {% if utilization < 50 %}bg-success{% elif utilization < 80 %}bg-info{% else %}bg-warning{% endif %}" 
+                             style="width: {{ utilization }}%">
+                        </div>
                     </div>
+                    <small class="text-muted">{{ "%.1f"|format(utilization) }}% utilized</small>
                     <small class="text-muted">Capacity: {{ "%.0f"|format(bin.capacity) }} kg</small>
                 </div>
                 {% endfor %}
