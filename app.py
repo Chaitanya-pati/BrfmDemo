@@ -49,73 +49,113 @@ def init_sample_data():
         
         # Create godown types
         if not db.session.query(GodownType).first():
-            mill_type = GodownType(name='Mill', description='Regular mill quality wheat')
-            low_mill_type = GodownType(name='Low Mill', description='Lower quality wheat')
-            hd_type = GodownType(name='HD', description='High density wheat')
+            mill_type = GodownType()
+            mill_type.name = 'Mill'
+            mill_type.description = 'Regular mill quality wheat'
+            
+            low_mill_type = GodownType()
+            low_mill_type.name = 'Low Mill'
+            low_mill_type.description = 'Lower quality wheat'
+            
+            hd_type = GodownType()
+            hd_type.name = 'HD'
+            hd_type.description = 'High density wheat'
             
             db.session.add_all([mill_type, low_mill_type, hd_type])
             db.session.commit()
         
         # Create sample godowns
         if not db.session.query(Godown).first():
-            godown1 = Godown(name='Godown A', type_id=1, capacity=100.0)
-            godown2 = Godown(name='Godown B', type_id=2, capacity=150.0)
-            godown3 = Godown(name='Godown C', type_id=3, capacity=200.0)
+            godown1 = Godown()
+            godown1.name = 'Godown A'
+            godown1.type_id = 1
+            godown1.capacity = 100.0
+            
+            godown2 = Godown()
+            godown2.name = 'Godown B'
+            godown2.type_id = 2
+            godown2.capacity = 150.0
+            
+            godown3 = Godown()
+            godown3.name = 'Godown C'
+            godown3.type_id = 3
+            godown3.capacity = 200.0
             
             db.session.add_all([godown1, godown2, godown3])
             db.session.commit()
         
         # Create sample precleaning bins
         if not db.session.query(PrecleaningBin).first():
-            bin1 = PrecleaningBin(name='Pre-cleaning Bin 1', capacity=50.0)
-            bin2 = PrecleaningBin(name='Pre-cleaning Bin 2', capacity=75.0)
-            bin3 = PrecleaningBin(name='Pre-cleaning Bin 3', capacity=60.0)
+            bin1 = PrecleaningBin()
+            bin1.name = 'Pre-cleaning Bin 1'
+            bin1.capacity = 50.0
+            
+            bin2 = PrecleaningBin()
+            bin2.name = 'Pre-cleaning Bin 2'
+            bin2.capacity = 75.0
+            
+            bin3 = PrecleaningBin()
+            bin3.name = 'Pre-cleaning Bin 3'
+            bin3.capacity = 60.0
             
             db.session.add_all([bin1, bin2, bin3])
             db.session.commit()
         
         # Create sample suppliers
         if not db.session.query(Supplier).first():
-            supplier1 = Supplier(
-                company_name='ABC Wheat Suppliers',
-                contact_person='John Doe',
-                phone='9876543210',
-                city='Delhi'
-            )
-            supplier2 = Supplier(
-                company_name='XYZ Grain Traders',
-                contact_person='Jane Smith',
-                phone='9876543211',
-                city='Mumbai'
-            )
+            supplier1 = Supplier()
+            supplier1.company_name = 'ABC Wheat Suppliers'
+            supplier1.contact_person = 'John Doe'
+            supplier1.phone = '9876543210'
+            supplier1.city = 'Delhi'
+            
+            supplier2 = Supplier()
+            supplier2.company_name = 'XYZ Grain Traders'
+            supplier2.contact_person = 'Jane Smith'
+            supplier2.phone = '9876543211'
+            supplier2.city = 'Mumbai'
             
             db.session.add_all([supplier1, supplier2])
             db.session.commit()
         
         # Create sample products
         if not db.session.query(Product).first():
-            maida = Product(name='Maida', category='Main Product', description='Refined wheat flour')
-            suji = Product(name='Suji', category='Main Product', description='Semolina')
-            chakki_ata = Product(name='Chakki Ata', category='Main Product', description='Whole wheat flour')
-            bran = Product(name='Bran', category='Bran', description='Wheat bran')
+            maida = Product()
+            maida.name = 'Maida'
+            maida.category = 'Main Product'
+            maida.description = 'Refined wheat flour'
+            
+            suji = Product()
+            suji.name = 'Suji'
+            suji.category = 'Main Product'
+            suji.description = 'Semolina'
+            
+            chakki_ata = Product()
+            chakki_ata.name = 'Chakki Ata'
+            chakki_ata.category = 'Main Product'
+            chakki_ata.description = 'Whole wheat flour'
+            
+            bran = Product()
+            bran.name = 'Bran'
+            bran.category = 'Bran'
+            bran.description = 'Wheat bran'
             
             db.session.add_all([maida, suji, chakki_ata, bran])
             db.session.commit()
         
         # Create sample customers
         if not db.session.query(Customer).first():
-            customer1 = Customer(
-                company_name='ABC Bakery',
-                contact_person='Ram Kumar',
-                phone='9876543220',
-                city='Delhi'
-            )
-            customer2 = Customer(
-                company_name='XYZ Food Products',
-                contact_person='Shyam Gupta',
-                phone='9876543221',
-                city='Mumbai'
-            )
+            customer1 = Customer()
+            customer1.company_name = 'ABC Bakery'
+            customer1.contact_person = 'Ram Kumar'
+            customer1.phone = '9876543220'
+            customer1.city = 'Delhi'
+            
+            customer2 = Customer()
+            customer2.company_name = 'XYZ Food Products'
+            customer2.contact_person = 'Shyam Gupta'
+            customer2.phone = '9876543221'
+            customer2.city = 'Mumbai'
             
             db.session.add_all([customer1, customer2])
             db.session.commit()
@@ -123,37 +163,69 @@ def init_sample_data():
         # Create cleaning bins for 24h and 12h processes
         from models import CleaningBin
         if not db.session.query(CleaningBin).first():
-            cleaning_bins = [
-                CleaningBin(name='24-Hour Cleaning Bin #1', capacity=100.0, status='empty', cleaning_type='24_hour'),
-                CleaningBin(name='24-Hour Cleaning Bin #2', capacity=100.0, status='empty', cleaning_type='24_hour'),
-                CleaningBin(name='12-Hour Cleaning Bin #1', capacity=75.0, status='empty', cleaning_type='12_hour'),
-                CleaningBin(name='12-Hour Cleaning Bin #2', capacity=75.0, status='empty', cleaning_type='12_hour')
-            ]
-            db.session.add_all(cleaning_bins)
+            bin1 = CleaningBin()
+            bin1.name = '24-Hour Cleaning Bin #1'
+            bin1.capacity = 100.0
+            bin1.status = 'empty'
+            bin1.cleaning_type = '24_hour'
+            
+            bin2 = CleaningBin()
+            bin2.name = '24-Hour Cleaning Bin #2'
+            bin2.capacity = 100.0
+            bin2.status = 'empty'
+            bin2.cleaning_type = '24_hour'
+            
+            bin3 = CleaningBin()
+            bin3.name = '12-Hour Cleaning Bin #1'
+            bin3.capacity = 75.0
+            bin3.status = 'empty'
+            bin3.cleaning_type = '12_hour'
+            
+            bin4 = CleaningBin()
+            bin4.name = '12-Hour Cleaning Bin #2'
+            bin4.capacity = 75.0
+            bin4.status = 'empty'
+            bin4.cleaning_type = '12_hour'
+            
+            db.session.add_all([bin1, bin2, bin3, bin4])
             db.session.commit()
         
         # Create 4 storage areas as requested
         from models import StorageArea
         if not db.session.query(StorageArea).first():
-            storage_areas = [
-                StorageArea(name='Storage Area A', capacity_kg=5000.0, location='Main Warehouse Section A'),
-                StorageArea(name='Storage Area B', capacity_kg=4000.0, location='Main Warehouse Section B'),
-                StorageArea(name='Storage Area C', capacity_kg=3500.0, location='Secondary Warehouse Section A'),
-                StorageArea(name='Storage Area D', capacity_kg=4500.0, location='Secondary Warehouse Section B')
-            ]
-            db.session.add_all(storage_areas)
+            storage1 = StorageArea()
+            storage1.name = 'Storage Area A'
+            storage1.capacity_kg = 5000.0
+            storage1.location = 'Main Warehouse Section A'
+            
+            storage2 = StorageArea()
+            storage2.name = 'Storage Area B'
+            storage2.capacity_kg = 4000.0
+            storage2.location = 'Main Warehouse Section B'
+            
+            storage3 = StorageArea()
+            storage3.name = 'Storage Area C'
+            storage3.capacity_kg = 3500.0
+            storage3.location = 'Secondary Warehouse Section A'
+            
+            storage4 = StorageArea()
+            storage4.name = 'Storage Area D'
+            storage4.capacity_kg = 4500.0
+            storage4.location = 'Secondary Warehouse Section B'
+            
+            db.session.add_all([storage1, storage2, storage3, storage4])
             db.session.commit()
         
         # Create B1 scale machine
         from models import B1ScaleCleaning
         if not db.session.query(B1ScaleCleaning).first():
-            b1_machine = B1ScaleCleaning(
-                machine_name='B1 Scale',
-                cleaning_frequency_minutes=60,
-                last_cleaned=datetime.utcnow(),
-                next_cleaning_due=datetime.utcnow() + timedelta(minutes=60),
-                status='completed'
-            )
+            b1_machine = B1ScaleCleaning()
+            b1_machine.machine_name = 'B1 Scale'
+            b1_machine.cleaning_frequency_minutes = 60
+            b1_machine.last_cleaned = datetime.utcnow()
+            b1_machine.next_cleaning_due = datetime.utcnow() + timedelta(minutes=60)
+            b1_machine.status = 'completed'
+            
             db.session.add(b1_machine)
             db.session.commit()
         

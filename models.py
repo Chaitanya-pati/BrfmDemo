@@ -49,8 +49,6 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     category = db.Column(db.String(50))  # Main Product or Bran
     description = db.Column(db.Text)
-    unit = db.Column(db.String(20), default='kg')  # Added by migration
-    standard_price = db.Column(db.Float, default=0.0)  # Added by migration
 
 class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -326,7 +324,7 @@ class ProductionOrder(db.Model):
 
     # Add other fields that exist in the database
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'))  # Converted from 'product' string by migration
+    product = db.Column(db.String(100))  # String column as per database schema
     deadline = db.Column(db.DateTime)
     priority = db.Column(db.String(20), default='normal')
     description = db.Column(db.Text)
@@ -334,7 +332,7 @@ class ProductionOrder(db.Model):
 
     # Relationships
     customer = db.relationship('Customer', backref='production_orders')
-    product = db.relationship('Product', backref='production_orders')
+    # product relationship removed - product is now a string column, not a foreign key
     production_plans = db.relationship('ProductionPlan', backref='production_order', lazy=True)
 
 class ProductionPlan(db.Model):
