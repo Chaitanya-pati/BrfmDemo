@@ -479,13 +479,11 @@ document.getElementById('post-process-form').addEventListener('submit', function
 
     const formData = {
         order_id: {{ order.id }},
-        moisture_before: parseFloat(document.getElementById('moisture-before').value),
-        moisture_after: parseFloat(document.getElementById('moisture-after').value),
-        waste_material_kg: parseFloat(document.getElementById('waste-material').value),
-        water_used_liters: parseFloat(document.getElementById('water-used').value),
-        machine_name: document.getElementById('machine-name').value,
+        end_moisture: parseFloat(document.getElementById('moisture-after').value),
+        waste_collected_kg: parseFloat(document.getElementById('waste-material').value),
+        water_added_liters: parseFloat(document.getElementById('water-used').value),
         operator_name: document.getElementById('post-process-operator').value,
-        operator_notes: document.getElementById('process-notes').value
+        notes: document.getElementById('process-notes').value
     };
 
     const submitBtn = this.querySelector('button[type="submit"]');
