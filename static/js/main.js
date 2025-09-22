@@ -8,22 +8,22 @@ function initializeMainApp() {
     // Initialize current time display
     updateCurrentTime();
     setInterval(updateCurrentTime, 1000);
-    
+
     // Initialize tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
-    
+
     // Initialize popovers
     var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
     var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
         return new bootstrap.Popover(popoverTriggerEl);
     });
-    
+
     // File input handlers
     initializeFileInputs();
-    
+
     // Form validation
     initializeFormValidation();
 }
@@ -47,7 +47,7 @@ function initializeFileInputs() {
                 if (label && label.classList.contains('form-label')) {
                     label.textContent = file.name;
                 }
-                
+
                 // Preview image files
                 if (file.type.startsWith('image/')) {
                     previewImage(this, file);
@@ -96,13 +96,13 @@ function showAlert(message, type = 'info', duration = 5000) {
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     if (alertsContainer.firstChild) {
         alertsContainer.insertBefore(alert, alertsContainer.firstChild);
     } else {
         alertsContainer.appendChild(alert);
     }
-    
+
     if (duration > 0) {
         setTimeout(() => {
             if (alert.parentNode) {
@@ -187,9 +187,9 @@ function makeRequest(url, options = {}) {
             'Content-Type': 'application/json',
         }
     };
-    
+
     const config = Object.assign(defaults, options);
-    
+
     return fetch(url, config)
         .then(response => {
             if (!response.ok) {
