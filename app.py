@@ -5,7 +5,6 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_apscheduler import APScheduler
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -33,9 +32,6 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Initialize extensions
 db.init_app(app)
-scheduler = APScheduler()
-scheduler.init_app(app)
-scheduler.start()
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -44,7 +40,7 @@ def init_sample_data():
     """Initialize sample data for testing"""
     try:
         # Import models here to avoid circular imports
-        from models import GodownType, Godown, PrecleaningBin, Supplier, Product, Customer, ShallowsMaster
+        from models import GodownType, Godown, PrecleaningBin, Supplier, Product, Customer
         from datetime import timedelta, datetime
         
         # Create godown types
@@ -160,94 +156,9 @@ def init_sample_data():
             db.session.add_all([customer1, customer2])
             db.session.commit()
         
-        # Create cleaning bins for 24h and 12h processes
-        from models import CleaningBin
-        if not db.session.query(CleaningBin).first():
-            bin1 = CleaningBin()
-            bin1.name = '24-Hour Cleaning Bin #1'
-            bin1.capacity = 100.0
-            bin1.status = 'empty'
-            bin1.cleaning_type = '24_hour'
-            
-            bin2 = CleaningBin()
-            bin2.name = '24-Hour Cleaning Bin #2'
-            bin2.capacity = 100.0
-            bin2.status = 'empty'
-            bin2.cleaning_type = '24_hour'
-            
-            bin3 = CleaningBin()
-            bin3.name = '12-Hour Cleaning Bin #1'
-            bin3.capacity = 75.0
-            bin3.status = 'empty'
-            bin3.cleaning_type = '12_hour'
-            
-            bin4 = CleaningBin()
-            bin4.name = '12-Hour Cleaning Bin #2'
-            bin4.capacity = 75.0
-            bin4.status = 'empty'
-            bin4.cleaning_type = '12_hour'
-            
-            db.session.add_all([bin1, bin2, bin3, bin4])
-            db.session.commit()
         
-        # Create 4 storage areas as requested
-        from models import StorageArea
-        if not db.session.query(StorageArea).first():
-            storage1 = StorageArea()
-            storage1.name = 'Storage Area A'
-            storage1.capacity_kg = 5000.0
-            storage1.location = 'Main Warehouse Section A'
-            
-            storage2 = StorageArea()
-            storage2.name = 'Storage Area B'
-            storage2.capacity_kg = 4000.0
-            storage2.location = 'Main Warehouse Section B'
-            
-            storage3 = StorageArea()
-            storage3.name = 'Storage Area C'
-            storage3.capacity_kg = 3500.0
-            storage3.location = 'Secondary Warehouse Section A'
-            
-            storage4 = StorageArea()
-            storage4.name = 'Storage Area D'
-            storage4.capacity_kg = 4500.0
-            storage4.location = 'Secondary Warehouse Section B'
-            
-            db.session.add_all([storage1, storage2, storage3, storage4])
-            db.session.commit()
         
-        # Create sample shallows
-        if not db.session.query(ShallowsMaster).first():
-            shallow1 = ShallowsMaster()
-            shallow1.name = 'Shallow Tank A'
-            shallow1.capacity_kg = 2000.0
-            shallow1.location = 'Main Processing Area'
-            
-            shallow2 = ShallowsMaster()
-            shallow2.name = 'Shallow Tank B'
-            shallow2.capacity_kg = 1500.0
-            shallow2.location = 'Main Processing Area'
-            
-            shallow3 = ShallowsMaster()
-            shallow3.name = 'Shallow Tank C'
-            shallow3.capacity_kg = 1800.0
-            shallow3.location = 'Secondary Processing Area'
-            
-            db.session.add_all([shallow1, shallow2, shallow3])
-            db.session.commit()
         
-        # Create B1 scale machine
-        from models import B1ScaleCleaning
-        if not db.session.query(B1ScaleCleaning).first():
-            b1_machine = B1ScaleCleaning()
-            b1_machine.machine_name = 'B1 Scale'
-            b1_machine.cleaning_frequency_minutes = 60
-            b1_machine.last_cleaned = datetime.utcnow()
-            b1_machine.next_cleaning_due = datetime.utcnow() + timedelta(minutes=60)
-            b1_machine.status = 'completed'
-            
-            db.session.add(b1_machine)
-            db.session.commit()
         
         # ProductionMachine initialization removed - production functionality deleted
             
