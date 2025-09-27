@@ -161,18 +161,15 @@
                         </a>
                     </div>
                     <div class="col-md-3">
-                        <a href="{{ url_for('production_orders') }}" class="btn btn-outline-info w-100 py-3">
-                            <i class="fas fa-hourglass-half fa-2x d-block mb-2"></i>
-                            <span class="fw-semibold">Production Orders</span>
-                            {% if orders_ready_for_12h > 0 %}
-                                <span class="badge bg-warning">{{ orders_ready_for_12h }} ready for 12h</span>
-                            {% endif %}
+                        <a href="{{ url_for('precleaning') }}" class="btn btn-outline-info w-100 py-3">
+                            <i class="fas fa-broom fa-2x d-block mb-2"></i>
+                            <span class="fw-semibold">Pre-cleaning</span>
                         </a>
                     </div>
                     <div class="col-md-3">
-                        <a href="{{ url_for('reports') }}" class="btn btn-outline-success w-100 py-3">
-                            <i class="fas fa-chart-bar fa-2x d-block mb-2"></i>
-                            <span class="fw-semibold">View Reports</span>
+                        <a href="{{ url_for('sales_dispatch') }}" class="btn btn-outline-success w-100 py-3">
+                            <i class="fas fa-shipping-fast fa-2x d-block mb-2"></i>
+                            <span class="fw-semibold">Sales & Dispatch</span>
                         </a>
                     </div>
                 </div>
@@ -471,9 +468,9 @@
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="{{ url_for('masters') }}" class="btn btn-outline-info w-100">
-                            <i class="fas fa-clipboard-list fa-2x mb-2 d-block"></i>
-                            Master Data
+                        <a href="{{ url_for('godown_management') }}" class="btn btn-outline-info w-100">
+                            <i class="fas fa-warehouse fa-2x mb-2 d-block"></i>
+                            Godown Management
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
@@ -488,11 +485,6 @@
                             Dispatch
                         </a>
                     </div>
-                </div>
-                <div class="text-center mt-3">
-                    <a href="{{ url_for('masters') }}" class="btn btn-secondary">
-                        <i class="fas fa-database me-2"></i>Initialize Sample Data
-                    </a>
                 </div>
             </div>
         </div>

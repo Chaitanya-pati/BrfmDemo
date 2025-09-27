@@ -57,11 +57,6 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('raw_wheat_quality_report') }}">
-                                    <i class="fas fa-microscope"></i>Raw Wheat Quality Report
-                                </a>
-                            </li>
-                            <li class="nav-item">
                                 <a class="nav-link py-2" href="{{ url_for('weight_entry') }}">
                                     <i class="fas fa-weight-hanging"></i>Weight Entry
                                 </a>
@@ -91,46 +86,6 @@
                     </div>
                 </li>
 
-                <!-- Production Management -->
-                <li class="nav-item">
-                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="collapse" data-bs-target="#productionManagement" aria-expanded="false">
-                        <i class="fas fa-cogs"></i><span>Production Management</span>
-                    </a>
-                    <div class="collapse" id="productionManagement">
-                        <ul class="nav flex-column ms-3">
-                            <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('production_orders') }}">
-                                    <i class="fas fa-clipboard-list"></i>Production Orders
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('production_cleaning_overview') }}">
-                                    <i class="fas fa-clock"></i>24 Hours Production
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('production_orders') }}?filter=ready_for_12h">
-                                    <i class="fas fa-hourglass-half"></i>12 Hours Cleaning
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('production_orders') }}?filter=grinding">
-                                    <i class="fas fa-cog"></i>Grinding Process
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('storage_management') }}">
-                                    <i class="fas fa-warehouse me-2"></i>Storage Management
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('production_orders') }}">
-                                    <i class="fas fa-box me-2"></i>Packaging
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </li>
 
                 <!-- Sales & Dispatch -->
                 <li class="nav-item">
@@ -139,31 +94,6 @@
                     </a>
                 </li>
 
-                <!-- Analytics -->
-                <li class="nav-item">
-                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="collapse" data-bs-target="#analytics" aria-expanded="false">
-                        <i class="fas fa-chart-line"></i><span>Analytics</span>
-                    </a>
-                    <div class="collapse" id="analytics">
-                        <ul class="nav flex-column ms-3">
-                            <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('reports') }}">
-                                    <i class="fas fa-chart-bar"></i>Reports & Analytics
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('order_timeline') }}">
-                                    <i class="fas fa-timeline"></i>Order Timeline
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link py-2" href="{{ url_for('masters') }}">
-                                    <i class="fas fa-database"></i>Master Data
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </li>
 
                 <!-- Divider -->
                 <li class="nav-item">
